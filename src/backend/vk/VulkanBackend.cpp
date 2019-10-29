@@ -169,7 +169,7 @@ bool VulkanBackend::checkValidationLayerSupport(const std::vector<const char*>& 
 VkBool32 VulkanBackend::debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 {
-    LogError("VulkanBackend debug callback: %s\n", pCallbackData->pMessage);
+    LogError("VulkanBackend::debugMessageCallback(): %s\n", pCallbackData->pMessage);
     return VK_FALSE;
 }
 
@@ -809,10 +809,10 @@ void VulkanBackend::executeFrame()
     uint32_t imageIndex = m_currentFrameIndex % maxFramesInFlight;
 
     if (vkWaitForFences(m_device, 1, &m_inFlightFrameFences[imageIndex], VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
-        LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (index %u).\n", imageIndex);
+        LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (frame %u).\n", m_currentFrameIndex);
     }
     if (vkResetFences(m_device, 1, &m_inFlightFrameFences[imageIndex]) != VK_SUCCESS) {
-        LogError("VulkanBackend::executeFrame(): error resetting in-flight frame fence (index %u).\n", imageIndex);
+        LogError("VulkanBackend::executeFrame(): error resetting in-flight frame fence (frame %u).\n", m_currentFrameIndex);
     }
 
     uint32_t swapchainImageIndex;
@@ -839,7 +839,7 @@ void VulkanBackend::executeFrame()
         submitInfo.pSignalSemaphores = signalSemaphores;
 
         if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFrameFences[imageIndex]) != VK_SUCCESS) {
-            LogError("VulkanBackend::executeFrame(): could not submit the graphics queue (index %u).\n", imageIndex);
+            LogError("VulkanBackend::executeFrame(): could not submit the graphics queue (frame %u).\n", m_currentFrameIndex);
         }
     }
 
@@ -856,7 +856,7 @@ void VulkanBackend::executeFrame()
         presentInfo.pImageIndices = &swapchainImageIndex;
 
         if (vkQueuePresentKHR(m_presentQueue, &presentInfo) != VK_SUCCESS) {
-            LogError("VulkanBackend::executeFrame(): could not present swapchain (index %u).\n", imageIndex);
+            LogError("VulkanBackend::executeFrame(): could not present swapchain (frame %u).\n", m_currentFrameIndex);
         }
     }
 

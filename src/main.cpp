@@ -2,8 +2,6 @@
 
 #include "backend/Backend.h"
 #include "backend/vk/VulkanBackend.h"
-#include "backend/vk/common-vk.h"
-#include "utility/fileio.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
