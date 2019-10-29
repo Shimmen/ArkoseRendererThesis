@@ -46,6 +46,37 @@ VulkanBackend::VulkanBackend(GLFWwindow* window)
 
     // FIXME!
     createTheRemainingStuff();
+
+    // TODO: This is the command buffer recording for the example triangle drawing stuff
+    for (size_t it = 0; it < m_commandBuffers.size(); ++it) {
+
+        VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+        commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        commandBufferBeginInfo.flags = 0u;
+        commandBufferBeginInfo.pInheritanceInfo = nullptr;
+
+        ASSERT(vkBeginCommandBuffer(m_commandBuffers[it], &commandBufferBeginInfo) == VK_SUCCESS);
+        {
+
+            VkRenderPassBeginInfo renderPassBeginInfo = {};
+            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassBeginInfo.renderPass = m_exRenderPass;
+            renderPassBeginInfo.framebuffer = m_swapchainFramebuffers[it];
+            renderPassBeginInfo.renderArea.offset = { 0, 0 };
+            renderPassBeginInfo.renderArea.extent = m_swapchainExtent;
+            VkClearValue clearColor = { 1.0f, 0.0f, 1.0f, 1.0f };
+            renderPassBeginInfo.clearValueCount = 1;
+            renderPassBeginInfo.pClearValues = &clearColor;
+
+            vkCmdBeginRenderPass(m_commandBuffers[it], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+            {
+                vkCmdBindPipeline(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exGraphicsPipeline);
+                vkCmdDraw(m_commandBuffers[it], 3, 1, 0, 0);
+            }
+            vkCmdEndRenderPass(m_commandBuffers[it]);
+        }
+        ASSERT(vkEndCommandBuffer(m_commandBuffers[it]) == VK_SUCCESS);
+    }
 }
 
 VulkanBackend::~VulkanBackend()
@@ -69,8 +100,9 @@ VulkanBackend::~VulkanBackend()
         vkDestroyFence(m_device, m_inFlightFrameFences[it], nullptr);
     }
 
-    for (const auto& imageView : m_swapchainImageViews) {
-        vkDestroyImageView(m_device, imageView, nullptr);
+    for (size_t it = 0; it < m_numSwapchainImages; ++it) {
+        vkDestroyFramebuffer(m_device, m_swapchainFramebuffers[it], nullptr);
+        vkDestroyImageView(m_device, m_swapchainImageViews[it], nullptr);
     }
 
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
@@ -287,8 +319,10 @@ VkSurfaceFormatKHR VulkanBackend::pickBestSurfaceFormat(VkPhysicalDevice physica
     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, surfaceFormats.data());
 
     for (const auto& format : surfaceFormats) {
-        if (format.format == VK_FORMAT_B8G8R8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            LogInfo("VulkanBackend::pickBestSurfaceFormat(): picked optimal uint8 sRGB surface format.\n");
+        // We use the *_UNORM format since "working directly with SRGB colors is a little bit challenging"
+        // (https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Swap_chain). I don't really know what that's about..
+        if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            LogInfo("VulkanBackend::pickBestSurfaceFormat(): picked optimal RGBA8 sRGB surface format.\n");
             return format;
         }
     }
@@ -296,6 +330,11 @@ VkSurfaceFormatKHR VulkanBackend::pickBestSurfaceFormat(VkPhysicalDevice physica
     // If we didn't find the optimal one, just chose an arbitrary one
     LogInfo("VulkanBackend::pickBestSurfaceFormat(): couldn't find optimal surface format, so picked arbitrary supported format.\n");
     VkSurfaceFormatKHR format = surfaceFormats[0];
+
+    if (format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        LogWarning("VulkanBackend::pickBestSurfaceFormat(): could not find a sRGB surface format, so images won't be pretty!\n");
+    }
+
     return format;
 }
 
@@ -377,7 +416,7 @@ VkInstance VulkanBackend::createInstance(VkDebugUtilsMessengerCreateInfoEXT* deb
 VkSurfaceKHR VulkanBackend::createSurface(VkInstance instance, GLFWwindow* window) const
 {
     VkSurfaceKHR surface;
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) == VK_SUCCESS) {
+    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::createSurface(): can't create window surface, exiting.\n");
     }
 
@@ -475,7 +514,6 @@ VkSwapchainKHR VulkanBackend::createSwapchain(VkPhysicalDevice physicalDevice, V
     vkGetSwapchainImagesKHR(device, swapchain, &m_numSwapchainImages, nullptr);
     std::vector<VkImage> swapchainImages(m_numSwapchainImages);
     vkGetSwapchainImagesKHR(device, swapchain, &m_numSwapchainImages, swapchainImages.data());
-
 
     m_swapchainImageViews.resize(m_numSwapchainImages);
     for (size_t i = 0; i < swapchainImages.size(); ++i) {
@@ -768,21 +806,20 @@ bool VulkanBackend::compileCommandQueue(const CommandQueue&)
 
 void VulkanBackend::executeFrame()
 {
-    if (vkWaitForFences(m_device, 1, &m_inFlightFrameFences[m_currentFrameIndex], VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
-        LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (frame %u).\n", m_currentFrameIndex);
-    }
-    if (vkResetFences(m_device, 1, &m_inFlightFrameFences[m_currentFrameIndex]) == VK_SUCCESS) {
-        LogError("VulkanBackend::executeFrame(): error resetting in-flight frame fence (frame %u).\n", m_currentFrameIndex);
-    }
+    uint32_t imageIndex = m_currentFrameIndex % maxFramesInFlight;
 
-    // TODO: We don't want to poll for events here, right? Especially if we have multiple windows with different backends, if we can get that working..?
-    glfwPollEvents();
+    if (vkWaitForFences(m_device, 1, &m_inFlightFrameFences[imageIndex], VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+        LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (index %u).\n", imageIndex);
+    }
+    if (vkResetFences(m_device, 1, &m_inFlightFrameFences[imageIndex]) != VK_SUCCESS) {
+        LogError("VulkanBackend::executeFrame(): error resetting in-flight frame fence (index %u).\n", imageIndex);
+    }
 
     uint32_t swapchainImageIndex;
-    vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[m_currentFrameIndex], VK_NULL_HANDLE, &swapchainImageIndex);
+    vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[imageIndex], VK_NULL_HANDLE, &swapchainImageIndex);
 
-    VkSemaphore waitSemaphores[] = { m_imageAvailableSemaphores[m_currentFrameIndex] };
-    VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphores[m_currentFrameIndex] };
+    VkSemaphore waitSemaphores[] = { m_imageAvailableSemaphores[imageIndex] };
+    VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphores[imageIndex] };
 
     // Submit command buffer
     // FIXME: This is mostly specific to the example triangle demo thing...
@@ -801,8 +838,8 @@ void VulkanBackend::executeFrame()
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFrameFences[m_currentFrameIndex]) != VK_SUCCESS) {
-            LogError("VulkanBackend::executeFrame(): could not submit the graphics queue (frame %u).\n", m_currentFrameIndex);
+        if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFrameFences[imageIndex]) != VK_SUCCESS) {
+            LogError("VulkanBackend::executeFrame(): could not submit the graphics queue (index %u).\n", imageIndex);
         }
     }
 
@@ -819,9 +856,11 @@ void VulkanBackend::executeFrame()
         presentInfo.pImageIndices = &swapchainImageIndex;
 
         if (vkQueuePresentKHR(m_presentQueue, &presentInfo) != VK_SUCCESS) {
-            LogError("VulkanBackend::executeFrame(): could not present swapchain (frame %u).\n", m_currentFrameIndex);
+            LogError("VulkanBackend::executeFrame(): could not present swapchain (index %u).\n", imageIndex);
         }
     }
+
+    m_currentFrameIndex += 1;
 }
 
 //

@@ -6,6 +6,9 @@
 
 class Backend {
 public:
+    Backend() = default;
+    virtual ~Backend() = default;
+
     virtual ShaderID loadShader(const std::string& shaderName) = 0;
     virtual bool compileCommandQueue(const CommandQueue&) = 0;
 
