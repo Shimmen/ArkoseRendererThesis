@@ -515,7 +515,6 @@ int main()
         dynamicState.dynamicStateCount = 2;
         dynamicState.pDynamicStates = dynamicStates;
 
-        // TODO: Setup render passes, etc.
         VkAttachmentDescription colorAttachment = {};
         colorAttachment.format = surfaceFormat.format;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;

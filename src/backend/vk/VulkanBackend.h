@@ -4,20 +4,91 @@
 #include "common-vk.h"
 #include "common.h"
 
+struct GLFWwindow;
+
 class VulkanBackend final : public Backend {
 public:
-    VulkanBackend(VkInstance, VkDevice);
+    explicit VulkanBackend(GLFWwindow* window);
     virtual ~VulkanBackend();
 
+    bool compileCommandQueue(const CommandQueue&) override;
+    void executeFrame() override;
+
     ShaderID loadShader(const std::string& shaderName) override;
-    bool commitAndExecuteCommandQueue(const CommandQueue&) override;
 
 private:
     [[nodiscard]] std::string fileNameForShaderName(const std::string&) const;
     [[nodiscard]] VkShaderStageFlagBits vulkanShaderShaderStageFlag(ShaderStageType) const;
 
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT,
+        VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT*, void* userData);
+    [[nodiscard]] VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo() const;
+    [[nodiscard]] VkDebugUtilsMessengerEXT createDebugMessenger(VkInstance, VkDebugUtilsMessengerCreateInfoEXT*) const;
+    void destroyDebugMessenger(VkInstance, VkDebugUtilsMessengerEXT) const;
+
+    [[nodiscard]] std::vector<const char*> requiredInstanceExtensions() const;
+    [[nodiscard]] std::vector<const char*> requiredValidationLayers() const;
+    [[nodiscard]] bool checkValidationLayerSupport(const std::vector<const char*>&) const;
+
+    void findQueueFamilyIndices(VkInstance, VkPhysicalDevice, VkSurfaceKHR);
+    [[nodiscard]] VkPhysicalDevice pickBestPhysicalDevice(VkInstance, VkSurfaceKHR) const;
+    [[nodiscard]] VkSurfaceFormatKHR pickBestSurfaceFormat(VkPhysicalDevice, VkSurfaceKHR) const;
+    [[nodiscard]] VkPresentModeKHR pickBestPresentMode(VkPhysicalDevice, VkSurfaceKHR) const;
+    [[nodiscard]] VkExtent2D pickBestSwapchainExtent(VkSurfaceCapabilitiesKHR, GLFWwindow*) const;
+
+    [[nodiscard]] VkInstance createInstance(VkDebugUtilsMessengerCreateInfoEXT*) const;
+    [[nodiscard]] VkSurfaceKHR createSurface(VkInstance, GLFWwindow*) const;
+    [[nodiscard]] VkDevice createDevice(VkInstance, VkPhysicalDevice, VkSurfaceKHR) const;
+    [[nodiscard]] VkSwapchainKHR createSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR, VkSurfaceCapabilitiesKHR);
+
+    void createSemaphoresAndFences(VkDevice);
+
+    // TODO: Work towards removing this
+    void createTheRemainingStuff();
+
+private:
+    GLFWwindow* m_window;
+
+    VkSurfaceKHR m_surface;
+    VkSurfaceFormatKHR m_surfaceFormat;
+    VkPresentModeKHR m_presentMode;
+
     VkInstance m_instance;
+    VkDebugUtilsMessengerEXT m_messenger;
+    VkPhysicalDevice m_physicalDevice;
     VkDevice m_device;
+
+    uint32_t m_graphicsQueueFamilyIndex { UINT32_MAX };
+    uint32_t m_computeQueueFamilyIndex { UINT32_MAX };
+    uint32_t m_presentQueueFamilyIndex { UINT32_MAX };
+
+    VkQueue m_graphicsQueue;
+    VkQueue m_presentQueue;
+
+    VkCommandPool m_commandPool;
+    std::vector<VkCommandBuffer> m_commandBuffers;
+
+    uint32_t m_numSwapchainImages;
+    VkSwapchainKHR m_swapchain;
+    VkExtent2D m_swapchainExtent = {};
+    std::vector<VkImageView> m_swapchainImageViews;
+    std::vector<VkFramebuffer> m_swapchainFramebuffers;
+
+    static constexpr size_t maxFramesInFlight = 2;
+    mutable size_t m_currentFrameIndex = 0;
+
+    std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores;
+    std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores;
+    std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences;
+
+    //
+
+    // FIXME: This is all stuff specific for rendering the example triangle
+    VkPipeline m_exGraphicsPipeline;
+    VkRenderPass m_exRenderPass;
+    VkPipelineLayout m_exPipelineLayout;
+
+    //
 
     //std::vector<VkShaderModule> m_shaderModules {};
     //std::unordered_map<std::string, ShaderID> m_shaderIdForName {};

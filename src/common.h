@@ -34,7 +34,7 @@ using namespace linalg::aliases;
 
 #include <cstdio>
 #define LogInfo(...) printf(__VA_ARGS__)
-#define LogWarning(...) printf(__VA_ARGS__)
+#define LogWarning(...) fprintf(stderr, __VA_ARGS__)
 #define LogError(...) fprintf(stderr, __VA_ARGS__)
 #define LogErrorAndExit(...)          \
     do {                              \
