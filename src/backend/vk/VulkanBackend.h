@@ -51,46 +51,46 @@ private:
 
 private:
     GLFWwindow* m_window;
-    VkSurfaceKHR m_surface;
+    VkSurfaceKHR m_surface {};
     mutable bool m_unhandledWindowResize { false };
 
-    VkInstance m_instance;
-    VkDebugUtilsMessengerEXT m_messenger;
-    VkPhysicalDevice m_physicalDevice;
-    VkDevice m_device;
+    VkInstance m_instance {};
+    VkDebugUtilsMessengerEXT m_messenger {};
+    VkPhysicalDevice m_physicalDevice {};
+    VkDevice m_device {};
 
     uint32_t m_graphicsQueueFamilyIndex { UINT32_MAX };
     uint32_t m_computeQueueFamilyIndex { UINT32_MAX };
     uint32_t m_presentQueueFamilyIndex { UINT32_MAX };
 
-    VkQueue m_graphicsQueue;
-    VkQueue m_computeQueue;
-    VkQueue m_presentQueue;
+    VkQueue m_graphicsQueue {};
+    VkQueue m_computeQueue {};
+    VkQueue m_presentQueue {};
 
-    VkCommandPool m_commandPool;
-    std::vector<VkCommandBuffer> m_commandBuffers;
+    VkCommandPool m_commandPool {};
+    std::vector<VkCommandBuffer> m_commandBuffers {};
 
     static constexpr size_t maxFramesInFlight = 2;
     mutable size_t m_currentFrameIndex = 0;
 
-    std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores;
-    std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores;
-    std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences;
+    std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores {};
+    std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores {};
+    std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences {};
 
     //
 
-    VkSwapchainKHR m_swapchain;
+    VkSwapchainKHR m_swapchain {};
 
-    uint32_t m_numSwapchainImages;
-    std::vector<VkImageView> m_swapchainImageViews;
-    std::vector<VkFramebuffer> m_swapchainFramebuffers;
+    uint32_t m_numSwapchainImages {};
+    std::vector<VkImageView> m_swapchainImageViews {};
+    std::vector<VkFramebuffer> m_swapchainFramebuffers {};
 
     //
 
     // FIXME: This is all stuff specific for rendering the example triangle
-    VkPipeline m_exGraphicsPipeline;
-    VkRenderPass m_exRenderPass;
-    VkPipelineLayout m_exPipelineLayout;
+    VkPipeline m_exGraphicsPipeline {};
+    VkRenderPass m_exRenderPass {};
+    VkPipelineLayout m_exPipelineLayout {};
 
     //
 
