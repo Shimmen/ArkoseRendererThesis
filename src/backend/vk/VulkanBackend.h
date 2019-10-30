@@ -52,7 +52,7 @@ private:
 private:
     GLFWwindow* m_window;
     VkSurfaceKHR m_surface {};
-    mutable bool m_unhandledWindowResize { false };
+    bool m_unhandledWindowResize { false };
 
     VkInstance m_instance {};
     VkDebugUtilsMessengerEXT m_messenger {};
@@ -70,8 +70,8 @@ private:
     VkCommandPool m_commandPool {};
     std::vector<VkCommandBuffer> m_commandBuffers {};
 
-    static constexpr size_t maxFramesInFlight = 2;
-    mutable size_t m_currentFrameIndex = 0;
+    static constexpr size_t maxFramesInFlight { 2 };
+    size_t m_currentFrameIndex { 0 };
 
     std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores {};
     std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores {};
