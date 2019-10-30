@@ -18,29 +18,9 @@ VulkanBackend::VulkanBackend(GLFWwindow* window)
 
     findQueueFamilyIndices(m_physicalDevice, m_surface);
     m_device = createDevice(m_physicalDevice, m_surface);
-
     createSemaphoresAndFences(m_device);
 
-    // TODO TODO TODO vvv TODO TODO TODO
-
-    // TODO: Should all of these inner stuff be nested in a single function??!
-    // TODO: But excluding setting up the pipeline etc. and putting that in a callback?
-
-    VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &surfaceCapabilities) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::VulkanBackend(): could not get surface capabilities, exiting.\n");
-    }
-
-    m_surfaceFormat = pickBestSurfaceFormat(m_physicalDevice, m_surface);
-    m_presentMode = pickBestPresentMode(m_physicalDevice, m_surface);
-
-    m_swapchainExtent = pickBestSwapchainExtent(surfaceCapabilities, window);
-    m_swapchain = createSwapchain(m_physicalDevice, m_device, m_surface, surfaceCapabilities);
-
-    // FIXME!
-    createTheRemainingStuff();
-
-    // TODO TODO TODO ^^^ TODO TODO TODO
+    createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
 }
 
 VulkanBackend::~VulkanBackend()
@@ -48,21 +28,7 @@ VulkanBackend::~VulkanBackend()
     // Before destroying stuff, make sure it's done with all scheduled work
     vkDeviceWaitIdle(m_device);
 
-    vkDestroyPipeline(m_device, m_exGraphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(m_device, m_exPipelineLayout, nullptr);
-    vkDestroyRenderPass(m_device, m_exRenderPass, nullptr);
-
-    // TODO TODO TODO vvv TODO TODO TODO
-
-    for (size_t it = 0; it < m_numSwapchainImages; ++it) {
-        vkDestroyFramebuffer(m_device, m_swapchainFramebuffers[it], nullptr);
-        vkDestroyImageView(m_device, m_swapchainImageViews[it], nullptr);
-    }
-
-    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
-    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
-
-    // TODO TODO TODO ^^^ TODO TODO TODO
+    destroySwapchain();
 
     for (size_t it = 0; it < maxFramesInFlight; ++it) {
         vkDestroySemaphore(m_device, m_imageAvailableSemaphores[it], nullptr);
@@ -444,85 +410,6 @@ VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceK
     return device;
 }
 
-VkSwapchainKHR VulkanBackend::createSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR surfaceCapabilities)
-{
-    VkSwapchainCreateInfoKHR createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface = surface;
-
-    // Request one more image than required, if possible (see https://github.com/KhronosGroup/Vulkan-Docs/issues/909 for information)
-    createInfo.minImageCount = surfaceCapabilities.minImageCount + 1;
-    if (surfaceCapabilities.minImageCount != 0) {
-        // (max of zero means no upper limit, so don't clamp in that case)
-        createInfo.minImageCount = std::min(createInfo.minImageCount, surfaceCapabilities.maxImageCount);
-    }
-
-    createInfo.imageFormat = m_surfaceFormat.format;
-    createInfo.imageColorSpace = m_surfaceFormat.colorSpace;
-
-    createInfo.presentMode = m_presentMode;
-
-    createInfo.imageExtent = m_swapchainExtent;
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // (only color for the swapchain images)
-
-    uint32_t queueFamilyIndices[] = { m_graphicsQueueFamilyIndex, m_presentQueueFamilyIndex };
-    if (m_graphicsQueueFamilyIndex != m_presentQueueFamilyIndex) {
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.pQueueFamilyIndices = queueFamilyIndices;
-        createInfo.queueFamilyIndexCount = 2;
-    } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    }
-
-    createInfo.preTransform = surfaceCapabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // opaque swapchain
-    createInfo.clipped = VK_TRUE; // clip pixels obscured by other windows etc.
-
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
-
-    VkSwapchainKHR swapchain;
-    if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapchain) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::createSwapchainAndPopulateImageViews(): could not create swapchain, exiting.\n");
-    }
-
-    vkGetSwapchainImagesKHR(device, swapchain, &m_numSwapchainImages, nullptr);
-    std::vector<VkImage> swapchainImages(m_numSwapchainImages);
-    vkGetSwapchainImagesKHR(device, swapchain, &m_numSwapchainImages, swapchainImages.data());
-
-    m_swapchainImageViews.resize(m_numSwapchainImages);
-    for (size_t i = 0; i < swapchainImages.size(); ++i) {
-
-        VkImageViewCreateInfo imageViewCreateInfo = {};
-        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-
-        imageViewCreateInfo.image = swapchainImages[i];
-        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format = m_surfaceFormat.format;
-
-        imageViewCreateInfo.components = {
-            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-            .a = VK_COMPONENT_SWIZZLE_IDENTITY
-        };
-
-        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-        imageViewCreateInfo.subresourceRange.levelCount = 1;
-
-        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        imageViewCreateInfo.subresourceRange.layerCount = 1;
-
-        imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-        if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &m_swapchainImageViews[i]) != VK_SUCCESS) {
-            LogErrorAndExit("VulkanBackend::createSwapchainAndPopulateImageViews(): could not create image view %u (out of %u), exiting.\n", i, m_numSwapchainImages);
-        }
-    }
-
-    return swapchain;
-}
-
 void VulkanBackend::createSemaphoresAndFences(VkDevice device)
 {
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
@@ -558,7 +445,113 @@ void VulkanBackend::createSemaphoresAndFences(VkDevice device)
     }
 }
 
-void VulkanBackend::createTheRemainingStuff()
+void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface)
+{
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &surfaceCapabilities) != VK_SUCCESS) {
+        LogErrorAndExit("VulkanBackend::VulkanBackend(): could not get surface capabilities, exiting.\n");
+    }
+
+    VkExtent2D swapchainExtent = pickBestSwapchainExtent(surfaceCapabilities, m_window);
+
+    VkSwapchainCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    createInfo.surface = surface;
+
+    // Request one more image than required, if possible (see https://github.com/KhronosGroup/Vulkan-Docs/issues/909 for information)
+    createInfo.minImageCount = surfaceCapabilities.minImageCount + 1;
+    if (surfaceCapabilities.minImageCount != 0) {
+        // (max of zero means no upper limit, so don't clamp in that case)
+        createInfo.minImageCount = std::min(createInfo.minImageCount, surfaceCapabilities.maxImageCount);
+    }
+
+    VkSurfaceFormatKHR surfaceFormat = pickBestSurfaceFormat(m_physicalDevice, m_surface);
+    createInfo.imageFormat = surfaceFormat.format;
+    createInfo.imageColorSpace = surfaceFormat.colorSpace;
+
+    VkPresentModeKHR presentMode = pickBestPresentMode(m_physicalDevice, m_surface);
+    createInfo.presentMode = presentMode;
+
+    createInfo.imageExtent = swapchainExtent;
+    createInfo.imageArrayLayers = 1;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // (only color for the swapchain images)
+
+    uint32_t queueFamilyIndices[] = { m_graphicsQueueFamilyIndex, m_presentQueueFamilyIndex };
+    if (m_graphicsQueueFamilyIndex != m_presentQueueFamilyIndex) {
+        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        createInfo.pQueueFamilyIndices = queueFamilyIndices;
+        createInfo.queueFamilyIndexCount = 2;
+    } else {
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+
+    createInfo.preTransform = surfaceCapabilities.currentTransform;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; // opaque swapchain
+    createInfo.clipped = VK_TRUE; // clip pixels obscured by other windows etc.
+
+    createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+    if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &m_swapchain) != VK_SUCCESS) {
+        LogErrorAndExit("VulkanBackend::createSwapchainAndPopulateImageViews(): could not create swapchain, exiting.\n");
+    }
+
+    vkGetSwapchainImagesKHR(device, m_swapchain, &m_numSwapchainImages, nullptr);
+    std::vector<VkImage> swapchainImages(m_numSwapchainImages);
+    vkGetSwapchainImagesKHR(device, m_swapchain, &m_numSwapchainImages, swapchainImages.data());
+
+    m_swapchainImageViews.resize(m_numSwapchainImages);
+    for (size_t i = 0; i < swapchainImages.size(); ++i) {
+
+        VkImageViewCreateInfo imageViewCreateInfo = {};
+        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+
+        imageViewCreateInfo.image = swapchainImages[i];
+        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        imageViewCreateInfo.format = surfaceFormat.format;
+
+        imageViewCreateInfo.components = {
+            .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+            .a = VK_COMPONENT_SWIZZLE_IDENTITY
+        };
+
+        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+        imageViewCreateInfo.subresourceRange.levelCount = 1;
+
+        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+        imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+        if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &m_swapchainImageViews[i]) != VK_SUCCESS) {
+            LogErrorAndExit("VulkanBackend::createSwapchainAndPopulateImageViews(): could not create image view %u (out of %u), exiting.\n", i, m_numSwapchainImages);
+        }
+    }
+
+    // FIXME!
+    createTheRemainingStuff(surfaceFormat.format, swapchainExtent);
+}
+
+void VulkanBackend::destroySwapchain()
+{
+    vkDeviceWaitIdle(m_device);
+
+    // TODO: This part isn't really about the swapchain itself.. but it still needs to be handled around here.
+    vkDestroyPipeline(m_device, m_exGraphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(m_device, m_exPipelineLayout, nullptr);
+    vkDestroyRenderPass(m_device, m_exRenderPass, nullptr);
+
+    for (size_t it = 0; it < m_numSwapchainImages; ++it) {
+        vkDestroyFramebuffer(m_device, m_swapchainFramebuffers[it], nullptr);
+        vkDestroyImageView(m_device, m_swapchainImageViews[it], nullptr);
+    }
+
+    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+}
+
+void VulkanBackend::createTheRemainingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent)
 {
     {
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -584,14 +577,14 @@ void VulkanBackend::createTheRemainingStuff()
         VkViewport viewport = {};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = static_cast<float>(m_swapchainExtent.width);
-        viewport.height = static_cast<float>(m_swapchainExtent.height);
+        viewport.width = static_cast<float>(finalTargetExtent.width);
+        viewport.height = static_cast<float>(finalTargetExtent.height);
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
 
         VkRect2D scissor = {};
         scissor.offset = { 0, 0 };
-        scissor.extent = m_swapchainExtent;
+        scissor.extent = finalTargetExtent;
 
         VkPipelineViewportStateCreateInfo viewportState = {};
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -636,7 +629,7 @@ void VulkanBackend::createTheRemainingStuff()
         dynamicState.pDynamicStates = dynamicStates;
 
         VkAttachmentDescription colorAttachment = {};
-        colorAttachment.format = m_surfaceFormat.format;
+        colorAttachment.format = finalTargetFormat;
         colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -752,8 +745,8 @@ void VulkanBackend::createTheRemainingStuff()
         framebufferCreateInfo.renderPass = m_exRenderPass;
         framebufferCreateInfo.attachmentCount = 1;
         framebufferCreateInfo.pAttachments = attachments;
-        framebufferCreateInfo.width = m_swapchainExtent.width;
-        framebufferCreateInfo.height = m_swapchainExtent.height;
+        framebufferCreateInfo.width = finalTargetExtent.width;
+        framebufferCreateInfo.height = finalTargetExtent.height;
         framebufferCreateInfo.layers = 1;
 
         ASSERT(vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &m_swapchainFramebuffers[it]) == VK_SUCCESS);
@@ -784,13 +777,12 @@ void VulkanBackend::createTheRemainingStuff()
 
         ASSERT(vkBeginCommandBuffer(m_commandBuffers[it], &commandBufferBeginInfo) == VK_SUCCESS);
         {
-
             VkRenderPassBeginInfo renderPassBeginInfo = {};
             renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderPassBeginInfo.renderPass = m_exRenderPass;
             renderPassBeginInfo.framebuffer = m_swapchainFramebuffers[it];
             renderPassBeginInfo.renderArea.offset = { 0, 0 };
-            renderPassBeginInfo.renderArea.extent = m_swapchainExtent;
+            renderPassBeginInfo.renderArea.extent = finalTargetExtent;
             VkClearValue clearColor = { 1.0f, 0.0f, 1.0f, 1.0f };
             renderPassBeginInfo.clearValueCount = 1;
             renderPassBeginInfo.pClearValues = &clearColor;

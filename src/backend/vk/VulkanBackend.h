@@ -9,12 +9,12 @@ struct GLFWwindow;
 class VulkanBackend final : public Backend {
 public:
     explicit VulkanBackend(GLFWwindow* window);
-    virtual ~VulkanBackend();
+    ~VulkanBackend() override;
 
     bool compileCommandQueue(const CommandQueue&) override;
     void executeFrame() override;
 
-    ShaderID loadShader(const std::string& shaderName) override;
+    ShaderID loadShader(const std::string& shaderName)  override;
 
 private:
     [[nodiscard]] std::string fileNameForShaderName(const std::string&) const;
@@ -39,19 +39,18 @@ private:
     [[nodiscard]] VkInstance createInstance(VkDebugUtilsMessengerCreateInfoEXT*) const;
     [[nodiscard]] VkSurfaceKHR createSurface(VkInstance, GLFWwindow*) const;
     [[nodiscard]] VkDevice createDevice(VkPhysicalDevice, VkSurfaceKHR);
-    [[nodiscard]] VkSwapchainKHR createSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR, VkSurfaceCapabilitiesKHR);
-
     void createSemaphoresAndFences(VkDevice);
 
-    // TODO: Work towards removing this
-    void createTheRemainingStuff();
+    void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
+    void destroySwapchain();
+
+    // TODO: Work towards removing this. Or rather, this function should be replaced by an application
+    //  designing its own rendering pipeline & shader & fixed state & stuff stuff!
+    void createTheRemainingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtents);
 
 private:
     GLFWwindow* m_window;
-
     VkSurfaceKHR m_surface;
-    VkSurfaceFormatKHR m_surfaceFormat;
-    VkPresentModeKHR m_presentMode;
 
     VkInstance m_instance;
     VkDebugUtilsMessengerEXT m_messenger;
@@ -69,18 +68,20 @@ private:
     VkCommandPool m_commandPool;
     std::vector<VkCommandBuffer> m_commandBuffers;
 
-    uint32_t m_numSwapchainImages;
-    VkSwapchainKHR m_swapchain;
-    VkExtent2D m_swapchainExtent = {};
-    std::vector<VkImageView> m_swapchainImageViews;
-    std::vector<VkFramebuffer> m_swapchainFramebuffers;
-
     static constexpr size_t maxFramesInFlight = 2;
     mutable size_t m_currentFrameIndex = 0;
 
     std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores;
     std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores;
     std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences;
+
+    //
+
+    VkSwapchainKHR m_swapchain;
+
+    uint32_t m_numSwapchainImages;
+    std::vector<VkImageView> m_swapchainImageViews;
+    std::vector<VkFramebuffer> m_swapchainFramebuffers;
 
     //
 
