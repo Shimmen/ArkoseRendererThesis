@@ -12,9 +12,9 @@ public:
     ~VulkanBackend() override;
 
     bool compileCommandQueue(const CommandQueue&) override;
-    void executeFrame() override;
+    bool executeFrame() override;
 
-    ShaderID loadShader(const std::string& shaderName)  override;
+    ShaderID loadShader(const std::string& shaderName) override;
 
 private:
     [[nodiscard]] std::string fileNameForShaderName(const std::string&) const;
@@ -43,6 +43,7 @@ private:
 
     void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
     void destroySwapchain();
+    void recreateSwapchain();
 
     // TODO: Work towards removing this. Or rather, this function should be replaced by an application
     //  designing its own rendering pipeline & shader & fixed state & stuff stuff!
@@ -51,6 +52,7 @@ private:
 private:
     GLFWwindow* m_window;
     VkSurfaceKHR m_surface;
+    mutable bool m_unhandledWindowResize { false };
 
     VkInstance m_instance;
     VkDebugUtilsMessengerEXT m_messenger;

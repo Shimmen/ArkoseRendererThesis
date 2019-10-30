@@ -8,6 +8,12 @@
 VulkanBackend::VulkanBackend(GLFWwindow* window)
     : m_window(window)
 {
+    glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int, int) {
+        auto self = static_cast<VulkanBackend*>(glfwGetWindowUserPointer(window));
+        self->m_unhandledWindowResize = true;
+    }));
+
+    // TODO: Make the creation & deletion of this conditional! We might not always wont this (for performance)
     VkDebugUtilsMessengerCreateInfoEXT dbgMessengerCreateInfo = debugMessengerCreateInfo();
 
     m_instance = createInstance(&dbgMessengerCreateInfo);
@@ -36,6 +42,7 @@ VulkanBackend::~VulkanBackend()
         vkDestroyFence(m_device, m_inFlightFrameFences[it], nullptr);
     }
 
+    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     vkDestroyDevice(m_device, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     destroyDebugMessenger(m_instance, m_messenger);
@@ -449,10 +456,8 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &surfaceCapabilities) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::VulkanBackend(): could not get surface capabilities, exiting.\n");
+        LogErrorAndExit("VulkanBackend::createAndSetupSwapchain(): could not get surface capabilities, exiting.\n");
     }
-
-    VkExtent2D swapchainExtent = pickBestSwapchainExtent(surfaceCapabilities, m_window);
 
     VkSwapchainCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -472,6 +477,7 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     VkPresentModeKHR presentMode = pickBestPresentMode(m_physicalDevice, m_surface);
     createInfo.presentMode = presentMode;
 
+    VkExtent2D swapchainExtent = pickBestSwapchainExtent(surfaceCapabilities, m_window);
     createInfo.imageExtent = swapchainExtent;
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // (only color for the swapchain images)
@@ -492,7 +498,7 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
     if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &m_swapchain) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::createSwapchainAndPopulateImageViews(): could not create swapchain, exiting.\n");
+        LogErrorAndExit("VulkanBackend::createAndSetupSwapchain(): could not create swapchain, exiting.\n");
     }
 
     vkGetSwapchainImagesKHR(device, m_swapchain, &m_numSwapchainImages, nullptr);
@@ -525,7 +531,7 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
         imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
         if (vkCreateImageView(device, &imageViewCreateInfo, nullptr, &m_swapchainImageViews[i]) != VK_SUCCESS) {
-            LogErrorAndExit("VulkanBackend::createSwapchainAndPopulateImageViews(): could not create image view %u (out of %u), exiting.\n", i, m_numSwapchainImages);
+            LogErrorAndExit("VulkanBackend::createAndSetupSwapchain(): could not create image view %u (out of %u), exiting.\n", i, m_numSwapchainImages);
         }
     }
 
@@ -535,8 +541,6 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
 
 void VulkanBackend::destroySwapchain()
 {
-    vkDeviceWaitIdle(m_device);
-
     // TODO: This part isn't really about the swapchain itself.. but it still needs to be handled around here.
     vkDestroyPipeline(m_device, m_exGraphicsPipeline, nullptr);
     vkDestroyPipelineLayout(m_device, m_exPipelineLayout, nullptr);
@@ -547,8 +551,31 @@ void VulkanBackend::destroySwapchain()
         vkDestroyImageView(m_device, m_swapchainImageViews[it], nullptr);
     }
 
-    vkDestroyCommandPool(m_device, m_commandPool, nullptr);
+    vkFreeCommandBuffers(m_device, m_commandPool, m_commandBuffers.size(), m_commandBuffers.data());
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+}
+
+void VulkanBackend::recreateSwapchain()
+{
+    while (true) {
+        // As long as we are minimized, don't do anything
+        int windowFramebufferWidth, windowFramebufferHeight;
+        glfwGetFramebufferSize(m_window, &windowFramebufferWidth, &windowFramebufferHeight);
+        if (windowFramebufferWidth == 0 || windowFramebufferHeight == 0) {
+            LogInfo("VulkanBackend::recreateSwapchain(): rendering paused since there are no pixels to draw to.\n");
+            glfwWaitEvents();
+        } else {
+            LogInfo("VulkanBackend::recreateSwapchain(): rendering resumed.\n");
+            break;
+        }
+    }
+
+    vkDeviceWaitIdle(m_device);
+
+    destroySwapchain();
+    createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
+
+    m_unhandledWindowResize = false;
 }
 
 void VulkanBackend::createTheRemainingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent)
@@ -804,19 +831,29 @@ bool VulkanBackend::compileCommandQueue(const CommandQueue&)
     return false;
 }
 
-void VulkanBackend::executeFrame()
+bool VulkanBackend::executeFrame()
 {
     uint32_t imageIndex = m_currentFrameIndex % maxFramesInFlight;
 
     if (vkWaitForFences(m_device, 1, &m_inFlightFrameFences[imageIndex], VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
         LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (frame %u).\n", m_currentFrameIndex);
     }
-    if (vkResetFences(m_device, 1, &m_inFlightFrameFences[imageIndex]) != VK_SUCCESS) {
-        LogError("VulkanBackend::executeFrame(): error resetting in-flight frame fence (frame %u).\n", m_currentFrameIndex);
-    }
 
     uint32_t swapchainImageIndex;
-    vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[imageIndex], VK_NULL_HANDLE, &swapchainImageIndex);
+    VkResult acquireResult = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[imageIndex], VK_NULL_HANDLE, &swapchainImageIndex);
+
+    if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
+        // Since we couldn't acquire an image to draw to, recreate the swapchain and report that it didn't work
+        recreateSwapchain();
+        return false;
+    }
+    if (acquireResult == VK_SUBOPTIMAL_KHR) {
+        // Since we did manage to acquire an image, just roll with it for now, but it will probably resolve itself after presenting
+        LogWarning("VulkanBackend::executeFrame(): next image was acquired but it's suboptimal, ignoring.\n");
+    }
+    if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR) {
+        LogError("VulkanBackend::executeFrame(): error acquiring next swapchain image.\n");
+    }
 
     VkSemaphore waitSemaphores[] = { m_imageAvailableSemaphores[imageIndex] };
     VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphores[imageIndex] };
@@ -838,6 +875,10 @@ void VulkanBackend::executeFrame()
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
+        if (vkResetFences(m_device, 1, &m_inFlightFrameFences[imageIndex]) != VK_SUCCESS) {
+            LogError("VulkanBackend::executeFrame(): error resetting in-flight frame fence (frame %u).\n", m_currentFrameIndex);
+        }
+
         if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_inFlightFrameFences[imageIndex]) != VK_SUCCESS) {
             LogError("VulkanBackend::executeFrame(): could not submit the graphics queue (frame %u).\n", m_currentFrameIndex);
         }
@@ -855,12 +896,17 @@ void VulkanBackend::executeFrame()
         presentInfo.pSwapchains = &m_swapchain;
         presentInfo.pImageIndices = &swapchainImageIndex;
 
-        if (vkQueuePresentKHR(m_presentQueue, &presentInfo) != VK_SUCCESS) {
+        VkResult presentResult = vkQueuePresentKHR(m_presentQueue, &presentInfo);
+
+        if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || m_unhandledWindowResize) {
+            recreateSwapchain();
+        } else if (presentResult != VK_SUCCESS) {
             LogError("VulkanBackend::executeFrame(): could not present swapchain (frame %u).\n", m_currentFrameIndex);
         }
     }
 
     m_currentFrameIndex += 1;
+    return true;
 }
 
 //

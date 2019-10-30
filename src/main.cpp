@@ -20,7 +20,6 @@ int main()
     uint32_t windowWidth = 1200;
     uint32_t windowHeight = 800;
 
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "Arkose Renderer", nullptr, nullptr);
     if (!window) {
@@ -36,6 +35,7 @@ int main()
                 LogErrorAndExit("ArkoseRenderer: Vulkan is not supported but the Vulkan backend is requested. Exiting.\n");
             }
             backend = new VulkanBackend(window);
+            glfwSetWindowUserPointer(window, backend);
             break;
         }
 
@@ -44,7 +44,11 @@ int main()
 
             glfwPollEvents();
 
-            backend->executeFrame();
+            bool frameExecuted = false;
+            while (!frameExecuted) {
+                frameExecuted = backend->executeFrame();
+            }
+
 
         }
         LogInfo("ArkoseRenderer: main loop end.\n");
