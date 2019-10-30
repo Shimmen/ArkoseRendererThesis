@@ -13,8 +13,18 @@ VulkanBackend::VulkanBackend(GLFWwindow* window)
     m_instance = createInstance(&dbgMessengerCreateInfo);
     m_messenger = createDebugMessenger(m_instance, &dbgMessengerCreateInfo);
 
-    m_surface = createSurface(m_instance, window);
+    m_surface = createSurface(m_instance, m_window);
     m_physicalDevice = pickBestPhysicalDevice(m_instance, m_surface);
+
+    findQueueFamilyIndices(m_physicalDevice, m_surface);
+    m_device = createDevice(m_physicalDevice, m_surface);
+
+    createSemaphoresAndFences(m_device);
+
+    // TODO TODO TODO vvv TODO TODO TODO
+
+    // TODO: Should all of these inner stuff be nested in a single function??!
+    // TODO: But excluding setting up the pipeline etc. and putting that in a callback?
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &surfaceCapabilities) != VK_SUCCESS) {
@@ -24,59 +34,13 @@ VulkanBackend::VulkanBackend(GLFWwindow* window)
     m_surfaceFormat = pickBestSurfaceFormat(m_physicalDevice, m_surface);
     m_presentMode = pickBestPresentMode(m_physicalDevice, m_surface);
 
-    findQueueFamilyIndices(m_instance, m_physicalDevice, m_surface);
-    m_device = createDevice(m_instance, m_physicalDevice, m_surface);
-
-    vkGetDeviceQueue(m_device, m_graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
-    vkGetDeviceQueue(m_device, m_presentQueueFamilyIndex, 0, &m_presentQueue);
-    {
-        VkCommandPoolCreateInfo poolCreateInfo = {};
-        poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolCreateInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
-        poolCreateInfo.flags = 0u;
-        if (vkCreateCommandPool(m_device, &poolCreateInfo, nullptr, &m_commandPool) != VK_SUCCESS) {
-            LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create command pool for the graphics queue, exiting.\n");
-        }
-    }
-
     m_swapchainExtent = pickBestSwapchainExtent(surfaceCapabilities, window);
     m_swapchain = createSwapchain(m_physicalDevice, m_device, m_surface, surfaceCapabilities);
-
-    createSemaphoresAndFences(m_device);
 
     // FIXME!
     createTheRemainingStuff();
 
-    // TODO: This is the command buffer recording for the example triangle drawing stuff
-    for (size_t it = 0; it < m_commandBuffers.size(); ++it) {
-
-        VkCommandBufferBeginInfo commandBufferBeginInfo = {};
-        commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        commandBufferBeginInfo.flags = 0u;
-        commandBufferBeginInfo.pInheritanceInfo = nullptr;
-
-        ASSERT(vkBeginCommandBuffer(m_commandBuffers[it], &commandBufferBeginInfo) == VK_SUCCESS);
-        {
-
-            VkRenderPassBeginInfo renderPassBeginInfo = {};
-            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassBeginInfo.renderPass = m_exRenderPass;
-            renderPassBeginInfo.framebuffer = m_swapchainFramebuffers[it];
-            renderPassBeginInfo.renderArea.offset = { 0, 0 };
-            renderPassBeginInfo.renderArea.extent = m_swapchainExtent;
-            VkClearValue clearColor = { 1.0f, 0.0f, 1.0f, 1.0f };
-            renderPassBeginInfo.clearValueCount = 1;
-            renderPassBeginInfo.pClearValues = &clearColor;
-
-            vkCmdBeginRenderPass(m_commandBuffers[it], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-            {
-                vkCmdBindPipeline(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exGraphicsPipeline);
-                vkCmdDraw(m_commandBuffers[it], 3, 1, 0, 0);
-            }
-            vkCmdEndRenderPass(m_commandBuffers[it]);
-        }
-        ASSERT(vkEndCommandBuffer(m_commandBuffers[it]) == VK_SUCCESS);
-    }
+    // TODO TODO TODO ^^^ TODO TODO TODO
 }
 
 VulkanBackend::~VulkanBackend()
@@ -88,17 +52,7 @@ VulkanBackend::~VulkanBackend()
     vkDestroyPipelineLayout(m_device, m_exPipelineLayout, nullptr);
     vkDestroyRenderPass(m_device, m_exRenderPass, nullptr);
 
-    /*
-    for (const auto& shaderModule : m_shaderModules) {
-        vkDestroyShaderModule(m_device, shaderModule, nullptr);
-    }
-    */
-
-    for (size_t it = 0; it < maxFramesInFlight; ++it) {
-        vkDestroySemaphore(m_device, m_imageAvailableSemaphores[it], nullptr);
-        vkDestroySemaphore(m_device, m_renderFinishedSemaphores[it], nullptr);
-        vkDestroyFence(m_device, m_inFlightFrameFences[it], nullptr);
-    }
+    // TODO TODO TODO vvv TODO TODO TODO
 
     for (size_t it = 0; it < m_numSwapchainImages; ++it) {
         vkDestroyFramebuffer(m_device, m_swapchainFramebuffers[it], nullptr);
@@ -107,6 +61,15 @@ VulkanBackend::~VulkanBackend()
 
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+
+    // TODO TODO TODO ^^^ TODO TODO TODO
+
+    for (size_t it = 0; it < maxFramesInFlight; ++it) {
+        vkDestroySemaphore(m_device, m_imageAvailableSemaphores[it], nullptr);
+        vkDestroySemaphore(m_device, m_renderFinishedSemaphores[it], nullptr);
+        vkDestroyFence(m_device, m_inFlightFrameFences[it], nullptr);
+    }
+
     vkDestroyDevice(m_device, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
     destroyDebugMessenger(m_instance, m_messenger);
@@ -210,7 +173,7 @@ void VulkanBackend::destroyDebugMessenger(VkInstance instance, VkDebugUtilsMesse
     destroyFunc(instance, messenger, nullptr);
 }
 
-void VulkanBackend::findQueueFamilyIndices(VkInstance instance, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+void VulkanBackend::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
     uint32_t count;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, nullptr);
@@ -423,7 +386,7 @@ VkSurfaceKHR VulkanBackend::createSurface(VkInstance instance, GLFWwindow* windo
     return surface;
 }
 
-VkDevice VulkanBackend::createDevice(VkInstance instance, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const
+VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
     std::set<uint32_t> queueFamilyIndices = { m_graphicsQueueFamilyIndex, m_computeQueueFamilyIndex, m_presentQueueFamilyIndex };
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -464,6 +427,18 @@ VkDevice VulkanBackend::createDevice(VkInstance instance, VkPhysicalDevice physi
     VkDevice device;
     if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::createDevice(): could not create a device, exiting.\n");
+    }
+
+    vkGetDeviceQueue(device, m_graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
+    vkGetDeviceQueue(device, m_computeQueueFamilyIndex, 0, &m_computeQueue);
+    vkGetDeviceQueue(device, m_presentQueueFamilyIndex, 0, &m_presentQueue);
+
+    VkCommandPoolCreateInfo poolCreateInfo = {};
+    poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolCreateInfo.queueFamilyIndex = m_graphicsQueueFamilyIndex;
+    poolCreateInfo.flags = 0u;
+    if (vkCreateCommandPool(device, &poolCreateInfo, nullptr, &m_commandPool) != VK_SUCCESS) {
+        LogErrorAndExit("VulkanBackend::createDevice(): could not create command pool for the graphics queue, exiting.\n");
     }
 
     return device;
@@ -592,46 +567,6 @@ void VulkanBackend::createTheRemainingStuff()
         pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
         ASSERT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_exPipelineLayout) == VK_SUCCESS);
 
-        VkShaderModule vertShaderModule;
-        VkPipelineShaderStageCreateInfo vertStageCreateInfo = {};
-        {
-            auto optionalData = fileio::loadEntireFileAsByteBuffer("shaders/example.vert.spv");
-            ASSERT(optionalData.has_value());
-            const auto& binaryData = optionalData.value();
-
-            VkShaderModuleCreateInfo moduleCreateInfo = {};
-            moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            moduleCreateInfo.codeSize = binaryData.size();
-            moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(binaryData.data());
-            ASSERT(vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &vertShaderModule) == VK_SUCCESS);
-
-            vertStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            vertStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-            vertStageCreateInfo.module = vertShaderModule;
-            vertStageCreateInfo.pName = "main";
-        }
-
-        VkShaderModule fragShaderModule;
-        VkPipelineShaderStageCreateInfo fragStageCreateInfo = {};
-        {
-            auto optionalData = fileio::loadEntireFileAsByteBuffer("shaders/example.frag.spv");
-            ASSERT(optionalData.has_value());
-            const auto& binaryData = optionalData.value();
-
-            VkShaderModuleCreateInfo moduleCreateInfo = {};
-            moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-            moduleCreateInfo.codeSize = binaryData.size();
-            moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(binaryData.data());
-            ASSERT(vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &fragShaderModule) == VK_SUCCESS);
-
-            fragStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            fragStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            fragStageCreateInfo.module = fragShaderModule;
-            fragStageCreateInfo.pName = "main";
-        }
-
-        VkPipelineShaderStageCreateInfo shaderStages[] = { vertStageCreateInfo, fragStageCreateInfo };
-
         // Setup fixed functions
 
         VkPipelineVertexInputStateCreateInfo vertInputState = {};
@@ -740,9 +675,48 @@ void VulkanBackend::createTheRemainingStuff()
 
         ASSERT(vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &m_exRenderPass) == VK_SUCCESS);
 
+        VkShaderModule vertShaderModule;
+        VkPipelineShaderStageCreateInfo vertStageCreateInfo = {};
+        {
+            auto optionalData = fileio::loadEntireFileAsByteBuffer("shaders/example.vert.spv");
+            ASSERT(optionalData.has_value());
+            const auto& binaryData = optionalData.value();
+
+            VkShaderModuleCreateInfo moduleCreateInfo = {};
+            moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            moduleCreateInfo.codeSize = binaryData.size();
+            moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(binaryData.data());
+            ASSERT(vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &vertShaderModule) == VK_SUCCESS);
+
+            vertStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vertStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+            vertStageCreateInfo.module = vertShaderModule;
+            vertStageCreateInfo.pName = "main";
+        }
+
+        VkShaderModule fragShaderModule;
+        VkPipelineShaderStageCreateInfo fragStageCreateInfo = {};
+        {
+            auto optionalData = fileio::loadEntireFileAsByteBuffer("shaders/example.frag.spv");
+            ASSERT(optionalData.has_value());
+            const auto& binaryData = optionalData.value();
+
+            VkShaderModuleCreateInfo moduleCreateInfo = {};
+            moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+            moduleCreateInfo.codeSize = binaryData.size();
+            moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(binaryData.data());
+            ASSERT(vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &fragShaderModule) == VK_SUCCESS);
+
+            fragStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            fragStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            fragStageCreateInfo.module = fragShaderModule;
+            fragStageCreateInfo.pName = "main";
+        }
+
         VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
         pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         // stages
+        VkPipelineShaderStageCreateInfo shaderStages[] = { vertStageCreateInfo, fragStageCreateInfo };
         pipelineCreateInfo.stageCount = 2;
         pipelineCreateInfo.pStages = shaderStages;
         // fixed function stuff
@@ -795,6 +769,40 @@ void VulkanBackend::createTheRemainingStuff()
         commandBufferAllocateInfo.commandBufferCount = m_commandBuffers.size();
 
         ASSERT(vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, m_commandBuffers.data()) == VK_SUCCESS);
+    }
+
+    // TODO: The command buffer recording also needs to be redone for the new command buffers,
+    // TODO  but I think it seems like a separate step though... Or is it..?
+
+    // TODO: This is the command buffer recording for the example triangle drawing stuff
+    for (size_t it = 0; it < m_commandBuffers.size(); ++it) {
+
+        VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+        commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        commandBufferBeginInfo.flags = 0u;
+        commandBufferBeginInfo.pInheritanceInfo = nullptr;
+
+        ASSERT(vkBeginCommandBuffer(m_commandBuffers[it], &commandBufferBeginInfo) == VK_SUCCESS);
+        {
+
+            VkRenderPassBeginInfo renderPassBeginInfo = {};
+            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassBeginInfo.renderPass = m_exRenderPass;
+            renderPassBeginInfo.framebuffer = m_swapchainFramebuffers[it];
+            renderPassBeginInfo.renderArea.offset = { 0, 0 };
+            renderPassBeginInfo.renderArea.extent = m_swapchainExtent;
+            VkClearValue clearColor = { 1.0f, 0.0f, 1.0f, 1.0f };
+            renderPassBeginInfo.clearValueCount = 1;
+            renderPassBeginInfo.pClearValues = &clearColor;
+
+            vkCmdBeginRenderPass(m_commandBuffers[it], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+            {
+                vkCmdBindPipeline(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exGraphicsPipeline);
+                vkCmdDraw(m_commandBuffers[it], 3, 1, 0, 0);
+            }
+            vkCmdEndRenderPass(m_commandBuffers[it]);
+        }
+        ASSERT(vkEndCommandBuffer(m_commandBuffers[it]) == VK_SUCCESS);
     }
 }
 

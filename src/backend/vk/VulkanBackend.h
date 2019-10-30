@@ -30,7 +30,7 @@ private:
     [[nodiscard]] std::vector<const char*> requiredValidationLayers() const;
     [[nodiscard]] bool checkValidationLayerSupport(const std::vector<const char*>&) const;
 
-    void findQueueFamilyIndices(VkInstance, VkPhysicalDevice, VkSurfaceKHR);
+    void findQueueFamilyIndices(VkPhysicalDevice, VkSurfaceKHR);
     [[nodiscard]] VkPhysicalDevice pickBestPhysicalDevice(VkInstance, VkSurfaceKHR) const;
     [[nodiscard]] VkSurfaceFormatKHR pickBestSurfaceFormat(VkPhysicalDevice, VkSurfaceKHR) const;
     [[nodiscard]] VkPresentModeKHR pickBestPresentMode(VkPhysicalDevice, VkSurfaceKHR) const;
@@ -38,7 +38,7 @@ private:
 
     [[nodiscard]] VkInstance createInstance(VkDebugUtilsMessengerCreateInfoEXT*) const;
     [[nodiscard]] VkSurfaceKHR createSurface(VkInstance, GLFWwindow*) const;
-    [[nodiscard]] VkDevice createDevice(VkInstance, VkPhysicalDevice, VkSurfaceKHR) const;
+    [[nodiscard]] VkDevice createDevice(VkPhysicalDevice, VkSurfaceKHR);
     [[nodiscard]] VkSwapchainKHR createSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR, VkSurfaceCapabilitiesKHR);
 
     void createSemaphoresAndFences(VkDevice);
@@ -63,6 +63,7 @@ private:
     uint32_t m_presentQueueFamilyIndex { UINT32_MAX };
 
     VkQueue m_graphicsQueue;
+    VkQueue m_computeQueue;
     VkQueue m_presentQueue;
 
     VkCommandPool m_commandPool;
