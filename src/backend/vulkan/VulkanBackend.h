@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Backend.h"
+#include "VulkanContext.h"
 #include "common-vk.h"
 #include "common.h"
 
@@ -10,6 +11,10 @@ class VulkanBackend final : public Backend {
 public:
     explicit VulkanBackend(GLFWwindow* window);
     ~VulkanBackend() override;
+
+    VulkanBackend(VulkanBackend&&) = default;
+    VulkanBackend(VulkanBackend&) = delete;
+    VulkanBackend& operator=(VulkanBackend&) = delete;
 
     bool compileCommandQueue(const CommandQueue&) override;
     bool executeFrame() override;
@@ -45,10 +50,6 @@ private:
     void destroySwapchain();
     void recreateSwapchain();
 
-    // TODO: Work towards removing this. Or rather, this function should be replaced by an application
-    //  designing its own rendering pipeline & shader & fixed state & stuff stuff!
-    void createTheRemainingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtents);
-
 private:
     GLFWwindow* m_window;
     VkSurfaceKHR m_surface {};
@@ -59,16 +60,13 @@ private:
     VkPhysicalDevice m_physicalDevice {};
     VkDevice m_device {};
 
+    VulkanContext* m_context {};
+
     uint32_t m_graphicsQueueFamilyIndex { UINT32_MAX };
     uint32_t m_computeQueueFamilyIndex { UINT32_MAX };
     uint32_t m_presentQueueFamilyIndex { UINT32_MAX };
 
-    VkQueue m_graphicsQueue {};
-    VkQueue m_computeQueue {};
     VkQueue m_presentQueue {};
-
-    VkCommandPool m_commandPool {};
-    std::vector<VkCommandBuffer> m_commandBuffers {};
 
     static constexpr size_t maxFramesInFlight { 2 };
     size_t m_currentFrameIndex { 0 };
@@ -82,15 +80,8 @@ private:
     VkSwapchainKHR m_swapchain {};
 
     uint32_t m_numSwapchainImages {};
+    std::vector<VkImage> m_swapchainImages {};
     std::vector<VkImageView> m_swapchainImageViews {};
-    std::vector<VkFramebuffer> m_swapchainFramebuffers {};
-
-    //
-
-    // FIXME: This is all stuff specific for rendering the example triangle
-    VkPipeline m_exGraphicsPipeline {};
-    VkRenderPass m_exRenderPass {};
-    VkPipelineLayout m_exPipelineLayout {};
 
     //
 

@@ -1,7 +1,7 @@
 #include "common.h"
 
 #include "backend/Backend.h"
-#include "backend/vk/VulkanBackend.h"
+#include "backend/vulkan/VulkanBackend.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
