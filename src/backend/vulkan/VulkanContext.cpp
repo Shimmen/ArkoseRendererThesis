@@ -54,7 +54,7 @@ SelfContainedBuffer VulkanContext::createBufferWithHostVisibleMemory(size_t size
     vkGetBufferMemoryRequirements(m_device, buffer, &memoryRequirements);
 
     VkMemoryAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    allocInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    allocInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     allocInfo.allocationSize = memoryRequirements.size;
 
     VkDeviceMemory memory;
@@ -330,13 +330,15 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 
 void VulkanContext::destroyTheDrawingStuff()
 {
-    vkDestroyPipeline(m_device, m_exGraphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(m_device, m_exPipelineLayout, nullptr);
-    vkDestroyRenderPass(m_device, m_exRenderPass, nullptr);
-
     for (const auto& framebuffer : m_targetFramebuffers) {
         vkDestroyFramebuffer(m_device, framebuffer, nullptr);
     }
+
+    vkFreeCommandBuffers(m_device, m_commandPool, m_commandBuffers.size(), m_commandBuffers.data());
+
+    vkDestroyPipeline(m_device, m_exGraphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(m_device, m_exPipelineLayout, nullptr);
+    vkDestroyRenderPass(m_device, m_exRenderPass, nullptr);
 }
 
 void VulkanContext::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight)
