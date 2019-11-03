@@ -2,7 +2,7 @@
 
 #include "common-vk.h"
 
-struct SelfContainedBuffer {
+struct ManagedBuffer {
     VkBuffer buffer;
     VkDeviceMemory memory;
 };
@@ -22,15 +22,14 @@ public:
 
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
+    VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&);
+    bool copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const;
+    bool setBufferMemoryDirectly(VkDeviceMemory, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+    bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+
     template<typename T>
-    VkBuffer createBufferWithHostVisibleMemory(const std::vector<T>& data, VkBufferUsageFlags);
-    VkBuffer createBufferWithHostVisibleMemory(size_t size, const void* data, VkBufferUsageFlags);
-
-    //BufferRange createBuffer(size_t size, ... todo);
-
-    // TODO: Work towards removing this. Or rather, this function should be replaced by an application
-    //  designing its own rendering pipeline & shader & fixed state & stuff stuff!
-    //void createTheDrawingToScreenStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtents);
+    VkBuffer createDeviceLocalBuffer(const std::vector<T>& data, VkBufferUsageFlags);
+    VkBuffer createDeviceLocalBuffer(size_t size, const void* data, VkBufferUsageFlags);
 
 private:
     [[nodiscard]] uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags) const;
@@ -45,7 +44,8 @@ private:
     //VkDeviceMemory m_masterMemory {};
     //VkBuffer m_masterBuffer {};
 
-    std::vector<SelfContainedBuffer> m_selfContainedBuffers {};
+    // Buffers in this list will be destroyed and their memory freed when the context is destroyed
+    std::vector<ManagedBuffer> m_managedBuffers {};
 
     //
 
@@ -61,9 +61,9 @@ private:
 };
 
 template<typename T>
-VkBuffer VulkanContext::createBufferWithHostVisibleMemory(const std::vector<T>& data, VkBufferUsageFlags usage)
+VkBuffer VulkanContext::createDeviceLocalBuffer(const std::vector<T>& data, VkBufferUsageFlags usage)
 {
     size_t numBytes = data.size() * sizeof(data[0]);
     const void* dataPointer = static_cast<const void*>(data.data());
-    return createBufferWithHostVisibleMemory(numBytes, dataPointer, usage);
+    return createDeviceLocalBuffer(numBytes, dataPointer, usage);
 }

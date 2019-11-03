@@ -29,7 +29,7 @@ VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device)
 
 VulkanContext::~VulkanContext()
 {
-    for (const auto& buffer : m_selfContainedBuffers) {
+    for (const auto& buffer : m_managedBuffers) {
         vkDestroyBuffer(m_device, buffer.buffer, nullptr);
         vkFreeMemory(m_device, buffer.memory, nullptr);
     }
@@ -38,7 +38,7 @@ VulkanContext::~VulkanContext()
     vkDestroyCommandPool(m_device, m_transientCommandPool, nullptr);
 }
 
-VkBuffer VulkanContext::createBufferWithHostVisibleMemory(size_t size, const void* data, VkBufferUsageFlags usage)
+VkBuffer VulkanContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkDeviceMemory& memory)
 {
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -47,7 +47,8 @@ VkBuffer VulkanContext::createBufferWithHostVisibleMemory(size_t size, const voi
 
     VkBuffer buffer;
     if (vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer) != VK_SUCCESS) {
-        LogError("VulkanContext::createBufferWithHostVisibleMemory(): could not create buffer of size %u.\n", size);
+        LogError("VulkanContext::createBuffer(): could not create buffer of size %u.\n", size);
+        memory = {};
         return {};
     }
 
@@ -55,30 +56,126 @@ VkBuffer VulkanContext::createBufferWithHostVisibleMemory(size_t size, const voi
     vkGetBufferMemoryRequirements(m_device, buffer, &memoryRequirements);
 
     VkMemoryAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    allocInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    allocInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, memoryProperties);
     allocInfo.allocationSize = memoryRequirements.size;
 
-    VkDeviceMemory memory;
     if (vkAllocateMemory(m_device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-        LogError("VulkanContext::createBufferWithHostVisibleMemory(): could not allocate the required memory of size %u.\n", size);
+        LogError("VulkanContext::createBuffer(): could not allocate the required memory of size %u.\n", size);
         return {};
     }
 
     if (vkBindBufferMemory(m_device, buffer, memory, 0) != VK_SUCCESS) {
-        LogError("VulkanContext::createBufferWithHostVisibleMemory(): could not bind the allocated memory to the buffer.\n");
+        LogError("VulkanContext::createBuffer(): could not bind the allocated memory to the buffer.\n");
         return {};
     }
 
+    return buffer;
+}
+
+bool VulkanContext::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const
+{
+    VkCommandBufferAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocateInfo.commandPool = m_transientCommandPool;
+    allocateInfo.commandBufferCount = 1;
+
+    VkCommandBuffer copyCommandBuffer;
+    if (vkAllocateCommandBuffers(m_device, &allocateInfo, &copyCommandBuffer) != VK_SUCCESS) {
+        LogError("VulkanContext::copyBuffer(): could not create command buffer for copying.\n");
+        return false;
+    }
+
+    AT_SCOPE_EXIT([&] {
+        vkFreeCommandBuffers(m_device, m_transientCommandPool, 1, &copyCommandBuffer);
+    });
+
+    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(copyCommandBuffer, &beginInfo) != VK_SUCCESS) {
+        LogError("VulkanContext::copyBuffer(): could not begin the copy command buffer.\n");
+        return false;
+    }
+
+    VkBufferCopy bufferCopyRegion = {};
+    bufferCopyRegion.size = size;
+    bufferCopyRegion.srcOffset = 0;
+    bufferCopyRegion.dstOffset = 0;
+
+    vkCmdCopyBuffer(copyCommandBuffer, source, destination, 1, &bufferCopyRegion);
+
+    if (vkEndCommandBuffer(copyCommandBuffer) != VK_SUCCESS) {
+        LogError("VulkanContext::copyBuffer(): could not end the copy command buffer.\n");
+        return false;
+    }
+
+    VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &copyCommandBuffer;
+
+    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        LogError("VulkanContext::copyBuffer(): could not submit the queue for copying.\n");
+        return false;
+    }
+
+    if (vkQueueWaitIdle(m_graphicsQueue) != VK_SUCCESS) {
+        LogError("VulkanContext::copyBuffer(): error waiting for the queue to be idle after submitting.\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool VulkanContext::setBufferMemoryDirectly(VkDeviceMemory memory, const void* data, VkDeviceSize size, VkDeviceSize offset)
+{
     void* sharedMemory;
-    if (vkMapMemory(m_device, memory, 0, size, 0u, &sharedMemory) != VK_SUCCESS) {
-        LogError("VulkanContext::createBufferWithHostVisibleMemory(): could not map the memory for loading data.\n");
-        return {};
+    if (vkMapMemory(m_device, memory, offset, size, 0u, &sharedMemory) != VK_SUCCESS) {
+        LogError("VulkanContext::setBufferMemoryDirectly(): could not map the memory for loading data.\n");
+        return false;
     }
     std::memcpy(sharedMemory, data, size);
     vkUnmapMemory(m_device, memory);
 
-    SelfContainedBuffer selfContainedBuffer = { .buffer = buffer, .memory = memory };
-    m_selfContainedBuffers.push_back(selfContainedBuffer);
+    return true;
+}
+
+bool VulkanContext::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void* data, VkDeviceSize size, VkDeviceSize offset)
+{
+    VkDeviceMemory stagingMemory;
+    VkBuffer stagingBuffer = createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
+
+    AT_SCOPE_EXIT([&] {
+        vkDestroyBuffer(m_device, stagingBuffer, nullptr);
+        vkFreeMemory(m_device, stagingMemory, nullptr);
+    });
+
+    if (!setBufferMemoryDirectly(stagingMemory, data, size)) {
+        LogError("VulkanContext::setBufferDataUsingStagingBuffer(): could not set staging data.\n");
+        return false;
+    }
+
+    if (!copyBuffer(stagingBuffer, buffer, size)) {
+        LogError("VulkanContext::setBufferDataUsingStagingBuffer(): could not copy from staging buffer to buffer.\n");
+        return false;
+    }
+
+    return true;
+}
+
+VkBuffer VulkanContext::createDeviceLocalBuffer(VkDeviceSize size, const void* data, VkBufferUsageFlags usage)
+{
+    // Make sure that we can transfer to this buffer
+    usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    VkDeviceMemory memory;
+    VkBuffer buffer = createBuffer(size, usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memory);
+
+    if (!setBufferDataUsingStagingBuffer(buffer, data, size)) {
+        LogError("VulkanContext::createDeviceLocalBuffer(): could not set data through a staging buffer.\n");
+    }
+
+    // FIXME: This is only temporary! Later we should keep some shared memory which with offset buffers etc..
+    m_managedBuffers.push_back({ buffer, memory });
 
     return buffer;
 }
@@ -323,7 +420,7 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
         { float3(0.5, 0.5, 0), float3(0, 1, 0) },
         { float3(-0.5, 0.5, 0), float3(0, 0, 1) }
     };
-    VkBuffer vertexBuffer = createBufferWithHostVisibleMemory(vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    VkBuffer vertexBuffer = createDeviceLocalBuffer(vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     for (size_t it = 0; it < m_commandBuffers.size(); ++it) {
 
