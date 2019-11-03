@@ -416,11 +416,17 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 
     // TODO: This is the command buffer recording for the example triangle drawing stuff
     std::vector<mesh::common::Vertex> vertices = {
-        { float3(0.0, -0.5, 0), float3(1, 0, 0) },
-        { float3(0.5, 0.5, 0), float3(0, 1, 0) },
-        { float3(-0.5, 0.5, 0), float3(0, 0, 1) }
+        { float3(-0.5, -0.5, 0), float3(1, 0, 0) },
+        { float3(0.5, -0.5, 0), float3(0, 1, 0) },
+        { float3(0.5, 0.5, 0), float3(0, 0, 1) },
+        { float3(-0.5, 0.5, 0), float3(1, 1, 1) }
+    };
+    std::vector<uint16_t> indices = {
+        0, 1, 2,
+        2, 3, 0
     };
     VkBuffer vertexBuffer = createDeviceLocalBuffer(vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    VkBuffer indexBuffer = createDeviceLocalBuffer(indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     for (size_t it = 0; it < m_commandBuffers.size(); ++it) {
 
@@ -448,7 +454,8 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
                 VkBuffer vertexBuffers[] = { vertexBuffer };
                 VkDeviceSize offsets[] = { 0 };
                 vkCmdBindVertexBuffers(m_commandBuffers[it], 0, 1, vertexBuffers, offsets);
-                vkCmdDraw(m_commandBuffers[it], vertices.size(), 1, 0, 0);
+                vkCmdBindIndexBuffer(m_commandBuffers[it], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdDrawIndexed(m_commandBuffers[it], indices.size(), 1, 0, 0, 0);
             }
             vkCmdEndRenderPass(m_commandBuffers[it]);
         }
