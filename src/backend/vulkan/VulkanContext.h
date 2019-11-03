@@ -23,8 +23,8 @@ public:
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
     template<typename T>
-    SelfContainedBuffer createBufferWithHostVisibleMemory(const std::vector<T>& data, VkBufferUsageFlags);
-    SelfContainedBuffer createBufferWithHostVisibleMemory(size_t size, void* data, VkBufferUsageFlags);
+    VkBuffer createBufferWithHostVisibleMemory(const std::vector<T>& data, VkBufferUsageFlags);
+    VkBuffer createBufferWithHostVisibleMemory(size_t size, const void* data, VkBufferUsageFlags);
 
     //BufferRange createBuffer(size_t size, ... todo);
 
@@ -61,8 +61,9 @@ private:
 };
 
 template<typename T>
-SelfContainedBuffer VulkanContext::createBufferWithHostVisibleMemory(const std::vector<T>& data, VkBufferUsageFlags usage)
+VkBuffer VulkanContext::createBufferWithHostVisibleMemory(const std::vector<T>& data, VkBufferUsageFlags usage)
 {
     size_t numBytes = data.size() * sizeof(data[0]);
-    return createBufferWithHostVisibleMemory(numBytes, data.data(), usage);
+    const void* dataPointer = static_cast<const void*>(data.data());
+    return createBufferWithHostVisibleMemory(numBytes, dataPointer, usage);
 }

@@ -1,5 +1,6 @@
 #include "VulkanContext.h"
 
+#include "../mesh.h"
 #include "utility/fileio.h"
 
 VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device)
@@ -37,7 +38,7 @@ VulkanContext::~VulkanContext()
     vkDestroyCommandPool(m_device, m_transientCommandPool, nullptr);
 }
 
-SelfContainedBuffer VulkanContext::createBufferWithHostVisibleMemory(size_t size, void* data, VkBufferUsageFlags usage)
+VkBuffer VulkanContext::createBufferWithHostVisibleMemory(size_t size, const void* data, VkBufferUsageFlags usage)
 {
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -76,11 +77,31 @@ SelfContainedBuffer VulkanContext::createBufferWithHostVisibleMemory(size_t size
     std::memcpy(sharedMemory, data, size);
     vkUnmapMemory(m_device, memory);
 
-    return { .buffer = buffer, .memory = memory };
+    SelfContainedBuffer selfContainedBuffer = { .buffer = buffer, .memory = memory };
+    m_selfContainedBuffers.push_back(selfContainedBuffer);
+
+    return buffer;
 }
 
 void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews)
 {
+    VkVertexInputBindingDescription bindingDescription = {};
+    bindingDescription.binding = 0;
+    bindingDescription.stride = sizeof(mesh::common::Vertex);
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions {};
+
+    attributeDescriptions[0].binding = 0;
+    attributeDescriptions[0].location = 0;
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[0].offset = offsetof(mesh::common::Vertex, position);
+
+    attributeDescriptions[1].binding = 0;
+    attributeDescriptions[1].location = 1;
+    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[1].offset = offsetof(mesh::common::Vertex, color);
+
     {
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
         pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -90,12 +111,11 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 
         // Setup fixed functions
 
-        VkPipelineVertexInputStateCreateInfo vertInputState = {};
-        vertInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertInputState.vertexBindingDescriptionCount = 0;
-        vertInputState.pVertexBindingDescriptions = nullptr;
-        vertInputState.vertexAttributeDescriptionCount = 0;
-        vertInputState.pVertexAttributeDescriptions = nullptr;
+        VkPipelineVertexInputStateCreateInfo vertInputState = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+        vertInputState.vertexBindingDescriptionCount = 1;
+        vertInputState.pVertexBindingDescriptions = &bindingDescription;
+        vertInputState.vertexAttributeDescriptionCount = attributeDescriptions.size();
+        vertInputState.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = {};
         inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -298,6 +318,13 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     // TODO  but I think it seems like a separate step though... Or is it..?
 
     // TODO: This is the command buffer recording for the example triangle drawing stuff
+    std::vector<mesh::common::Vertex> vertices = {
+        { float3(0.0, -0.5, 0), float3(1, 0, 0) },
+        { float3(0.5, 0.5, 0), float3(0, 1, 0) },
+        { float3(-0.5, 0.5, 0), float3(0, 0, 1) }
+    };
+    VkBuffer vertexBuffer = createBufferWithHostVisibleMemory(vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
     for (size_t it = 0; it < m_commandBuffers.size(); ++it) {
 
         VkCommandBufferBeginInfo commandBufferBeginInfo = {};
@@ -320,7 +347,11 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
             vkCmdBeginRenderPass(m_commandBuffers[it], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
             {
                 vkCmdBindPipeline(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exGraphicsPipeline);
-                vkCmdDraw(m_commandBuffers[it], 3, 1, 0, 0);
+
+                VkBuffer vertexBuffers[] = { vertexBuffer };
+                VkDeviceSize offsets[] = { 0 };
+                vkCmdBindVertexBuffers(m_commandBuffers[it], 0, 1, vertexBuffers, offsets);
+                vkCmdDraw(m_commandBuffers[it], vertices.size(), 1, 0, 0);
             }
             vkCmdEndRenderPass(m_commandBuffers[it]);
         }
@@ -372,7 +403,12 @@ uint32_t VulkanContext::findAppropriateMemory(uint32_t typeBits, VkMemoryPropert
     vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memoryProperties);
 
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
-        if (typeBits & (1u << i)) {
+        // Is type i at all supported, given the typeBits?
+        if (!(typeBits & (1u << i))) {
+            continue;
+        }
+
+        if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
             return i;
         }
     }
