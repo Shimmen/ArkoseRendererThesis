@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.h"
+#include "types.h"
 
 template<typename T>
 class Buffer {

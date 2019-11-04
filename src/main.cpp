@@ -1,7 +1,6 @@
-#include "common.h"
-
 #include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
+#include "utility/logging.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -48,8 +47,6 @@ int main()
             while (!frameExecuted) {
                 frameExecuted = backend->executeFrame();
             }
-
-
         }
         LogInfo("ArkoseRenderer: main loop end.\n");
     }

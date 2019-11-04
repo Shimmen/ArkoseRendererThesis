@@ -3,7 +3,8 @@
 #include "../Backend.h"
 #include "VulkanContext.h"
 #include "common-vk.h"
-#include "common.h"
+#include "types.h"
+#include <array>
 
 struct GLFWwindow;
 

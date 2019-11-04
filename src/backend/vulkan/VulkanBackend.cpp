@@ -4,6 +4,11 @@
 #include <GLFW/glfw3.h>
 
 #include "utility/fileio.h"
+#include "utility/logging.h"
+#include "utility/util.h"
+#include <algorithm>
+#include <cstring>
+#include <set>
 
 VulkanBackend::VulkanBackend(GLFWwindow* window)
     : m_window(window)

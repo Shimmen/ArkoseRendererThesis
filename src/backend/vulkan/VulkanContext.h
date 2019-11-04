@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common-vk.h"
+#include <vector>
 
 struct ManagedBuffer {
     VkBuffer buffer;

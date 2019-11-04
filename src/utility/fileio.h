@@ -1,6 +1,8 @@
 #pragma once
 
-#include "common.h"
+#include "types.h"
+#include <optional>
+#include <vector>
 
 namespace fileio {
 

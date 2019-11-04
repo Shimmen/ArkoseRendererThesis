@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common.h"
 #include "frontend/CommandQueue.h"
 #include "resourceid.h"
+#include <string>
 
 class Backend {
 public:

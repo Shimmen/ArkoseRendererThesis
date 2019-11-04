@@ -3,7 +3,12 @@
 #include "../mesh.h"
 #include "camera_state.h"
 #include "utility/fileio.h"
+#include "utility/logging.h"
 #include "utility/mathkit.h"
+#include "utility/util.h"
+#include <array>
+#include <chrono>
+#include <cstring>
 
 VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device)
     : m_physicalDevice(physicalDevice)
