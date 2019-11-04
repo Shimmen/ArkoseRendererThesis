@@ -14,7 +14,6 @@ add_executable(ArkoseRenderer
 
 target_include_directories(ArkoseRenderer PRIVATE src/)
 target_include_directories(ArkoseRenderer PRIVATE shaders/shared)
-#target_include_directories(ArkoseRenderer PRIVATE deps/linalg)
 target_include_directories(ArkoseRenderer PRIVATE deps/glm-0.9.9.6)
 
 set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
