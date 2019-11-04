@@ -1,7 +1,9 @@
 #include "VulkanContext.h"
 
 #include "../mesh.h"
+#include "camera_state.h"
 #include "utility/fileio.h"
+#include "utility/mathkit.h"
 
 VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device)
     : m_physicalDevice(physicalDevice)
@@ -182,6 +184,20 @@ VkBuffer VulkanContext::createDeviceLocalBuffer(VkDeviceSize size, const void* d
 
 void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews)
 {
+    m_exAspectRatio = float(finalTargetExtent.width) / float(finalTargetExtent.height);
+
+    VkDescriptorSetLayoutBinding cameraStateUboLayoutBinding = {};
+    cameraStateUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    cameraStateUboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    cameraStateUboLayoutBinding.binding = 0;
+    cameraStateUboLayoutBinding.descriptorCount = 1;
+    cameraStateUboLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    descriptorSetLayoutCreateInfo.bindingCount = 1;
+    descriptorSetLayoutCreateInfo.pBindings = &cameraStateUboLayoutBinding;
+    ASSERT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &m_exDescriptorSetLayout) == VK_SUCCESS);
+
     VkVertexInputBindingDescription bindingDescription = {};
     bindingDescription.binding = 0;
     bindingDescription.stride = sizeof(mesh::common::Vertex);
@@ -202,7 +218,8 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     {
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
         pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutCreateInfo.setLayoutCount = 0;
+        pipelineLayoutCreateInfo.setLayoutCount = 1;
+        pipelineLayoutCreateInfo.pSetLayouts = &m_exDescriptorSetLayout;
         pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
         ASSERT(vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &m_exPipelineLayout) == VK_SUCCESS);
 
@@ -245,7 +262,7 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE; // TODO: Make sure we have a nice value here :)
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
 
         VkPipelineMultisampleStateCreateInfo multisampling = {};
@@ -399,6 +416,62 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
         ASSERT(vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &m_targetFramebuffers[it]) == VK_SUCCESS);
     }
 
+    m_exCameraStateBuffers.resize(numSwapchainImages);
+    m_exCameraStateBufferMemories.resize(numSwapchainImages);
+    for (size_t it = 0; it < numSwapchainImages; ++it) {
+
+        VkDeviceMemory memory;
+        VkBuffer buffer = createBuffer(sizeof(CameraState), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, memory);
+
+        m_exCameraStateBuffers[it] = buffer;
+        m_exCameraStateBufferMemories[it] = memory;
+
+        // TODO: Don't manage the memory like this!
+        m_managedBuffers.push_back({ buffer, memory });
+    }
+
+    {
+        VkDescriptorPoolSize descriptorPoolSize = {};
+        descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorPoolSize.descriptorCount = numSwapchainImages;
+
+        VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        descriptorPoolCreateInfo.poolSizeCount = 1;
+        descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+        descriptorPoolCreateInfo.maxSets = numSwapchainImages;
+
+        ASSERT(vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &m_exDescriptorPool) == VK_SUCCESS);
+
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts { numSwapchainImages, m_exDescriptorSetLayout };
+        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        descriptorSetAllocateInfo.descriptorPool = m_exDescriptorPool;
+        descriptorSetAllocateInfo.descriptorSetCount = numSwapchainImages;
+        descriptorSetAllocateInfo.pSetLayouts = descriptorSetLayouts.data();
+
+        m_exDescriptorSets.resize(numSwapchainImages);
+        ASSERT(vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, m_exDescriptorSets.data()) == VK_SUCCESS);
+
+        for (size_t i = 0; i < numSwapchainImages; ++i) {
+            VkDescriptorBufferInfo descriptorBufferInfo = {};
+            descriptorBufferInfo.buffer = m_exCameraStateBuffers[i];
+            descriptorBufferInfo.range = VK_WHOLE_SIZE; //sizeof(CameraState);
+            descriptorBufferInfo.offset = 0;
+
+            VkWriteDescriptorSet writeDescriptorSet = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            writeDescriptorSet.dstSet = m_exDescriptorSets[i];
+            writeDescriptorSet.dstBinding = 0;
+            writeDescriptorSet.dstArrayElement = 0;
+
+            writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            writeDescriptorSet.descriptorCount = 1;
+            writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+            writeDescriptorSet.pImageInfo = nullptr;
+            writeDescriptorSet.pTexelBufferView = nullptr;
+
+            vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
+        }
+    }
+
     // Create command buffers (one per swapchain target image)
     m_commandBuffers.resize(numSwapchainImages);
     {
@@ -416,10 +489,10 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 
     // TODO: This is the command buffer recording for the example triangle drawing stuff
     std::vector<mesh::common::Vertex> vertices = {
-        { float3(-0.5, -0.5, 0), float3(1, 0, 0) },
-        { float3(0.5, -0.5, 0), float3(0, 1, 0) },
-        { float3(0.5, 0.5, 0), float3(0, 0, 1) },
-        { float3(-0.5, 0.5, 0), float3(1, 1, 1) }
+        { vec3(-0.5, -0.5, 0), vec3(1, 0, 0) },
+        { vec3(0.5, -0.5, 0), vec3(0, 1, 0) },
+        { vec3(0.5, 0.5, 0), vec3(0, 0, 1) },
+        { vec3(-0.5, 0.5, 0), vec3(1, 1, 1) }
     };
     std::vector<uint16_t> indices = {
         0, 1, 2,
@@ -451,10 +524,13 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
             {
                 vkCmdBindPipeline(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exGraphicsPipeline);
 
+                vkCmdBindDescriptorSets(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exPipelineLayout, 0, 1, &m_exDescriptorSets[it], 0, nullptr);
+
                 VkBuffer vertexBuffers[] = { vertexBuffer };
                 VkDeviceSize offsets[] = { 0 };
                 vkCmdBindVertexBuffers(m_commandBuffers[it], 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer(m_commandBuffers[it], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
                 vkCmdDrawIndexed(m_commandBuffers[it], indices.size(), 1, 0, 0, 0);
             }
             vkCmdEndRenderPass(m_commandBuffers[it]);
@@ -465,19 +541,48 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 
 void VulkanContext::destroyTheDrawingStuff()
 {
-    for (const auto& framebuffer : m_targetFramebuffers) {
-        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    size_t numSwapchainImages = m_targetFramebuffers.size();
+    for (size_t i = 0; i < numSwapchainImages; ++i) {
+        vkDestroyFramebuffer(m_device, m_targetFramebuffers[i], nullptr);
     }
 
     vkFreeCommandBuffers(m_device, m_commandPool, m_commandBuffers.size(), m_commandBuffers.data());
 
+    vkDestroyDescriptorPool(m_device, m_exDescriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(m_device, m_exDescriptorSetLayout, nullptr);
     vkDestroyPipeline(m_device, m_exGraphicsPipeline, nullptr);
     vkDestroyPipelineLayout(m_device, m_exPipelineLayout, nullptr);
     vkDestroyRenderPass(m_device, m_exRenderPass, nullptr);
 }
 
+void VulkanContext::timestepForTheDrawingStuff(uint32_t index)
+{
+    // FIXME: Use the time stuff provided by GLFW
+    static auto startTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    // FIXME: We need access to the aspect ratio here!!
+
+    // Update the uniform buffer(s)
+    CameraState cameraState = {};
+    cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, time * 3.1415f / 2.0f);
+    cameraState.view_from_world = mathkit::lookAt({ 0, 2, -4 }, { 0, 0, 0 });
+    cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), m_exAspectRatio, 0.1f);
+
+    cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
+    cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
+
+    if (!setBufferMemoryDirectly(m_exCameraStateBufferMemories[index], &cameraState, sizeof(CameraState))) {
+        LogError("VulkanContext::timestepForTheDrawingStuff(): could not update the uniform buffer.\n");
+    }
+}
+
 void VulkanContext::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight)
 {
+    // FIXME: This is the "active" part for a later "render pass" abstraction
+    timestepForTheDrawingStuff(imageIndex);
+
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 

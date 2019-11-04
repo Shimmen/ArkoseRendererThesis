@@ -15,9 +15,6 @@
 
 #include <iostream>
 
-#include <linalg.h>
-using namespace linalg::aliases;
-
 #ifdef NDEBUG
 #define ASSERT(x) (x)
 #else

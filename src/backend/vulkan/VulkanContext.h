@@ -19,6 +19,7 @@ public:
 
     void createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews);
     void destroyTheDrawingStuff();
+    void timestepForTheDrawingStuff(uint32_t index);
 
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
@@ -55,6 +56,12 @@ private:
     std::vector<VkCommandBuffer> m_commandBuffers {};
 
     // FIXME: This is all stuff specific for rendering the example triangle
+    float m_exAspectRatio {};
+    std::vector<VkBuffer> m_exCameraStateBuffers {};
+    std::vector<VkDeviceMemory> m_exCameraStateBufferMemories {};
+    VkDescriptorPool m_exDescriptorPool {};
+    VkDescriptorSetLayout m_exDescriptorSetLayout {};
+    std::vector<VkDescriptorSet> m_exDescriptorSets {};
     VkPipeline m_exGraphicsPipeline {};
     VkRenderPass m_exRenderPass {};
     VkPipelineLayout m_exPipelineLayout {};

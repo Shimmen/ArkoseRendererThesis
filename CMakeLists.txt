@@ -13,7 +13,9 @@ add_executable(ArkoseRenderer
         src/utility/Random.cpp)
 
 target_include_directories(ArkoseRenderer PRIVATE src/)
-target_include_directories(ArkoseRenderer PRIVATE deps/linalg)
+target_include_directories(ArkoseRenderer PRIVATE shaders/shared)
+#target_include_directories(ArkoseRenderer PRIVATE deps/linalg)
+target_include_directories(ArkoseRenderer PRIVATE deps/glm-0.9.9.6)
 
 set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)

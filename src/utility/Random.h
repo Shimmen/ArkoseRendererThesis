@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.h"
+#include "utility/mathkit.h"
 
 #include <random>
 
@@ -16,8 +16,8 @@ public:
     float randomBilateral();
     int randomInt(int minVal, int maxVal);
 
-    float3 randomInXyUnitDisk();
-    float3 randomInUnitSphere();
+    vec3 randomInXyUnitDisk();
+    vec3 randomInUnitSphere();
 
 private:
     std::default_random_engine m_engine;

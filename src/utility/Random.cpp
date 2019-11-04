@@ -34,20 +34,20 @@ int Random::randomInt(int minVal, int maxVal)
     return distribution(m_engine);
 }
 
-float3 Random::randomInXyUnitDisk()
+vec3 Random::randomInXyUnitDisk()
 {
-    float3 position {};
+    vec3 position {};
     do {
-        position = float3(randomBilateral(), randomBilateral(), 0.0f);
-    } while (length2(position) >= 1.0f);
+        position = vec3(randomBilateral(), randomBilateral(), 0.0f);
+    } while (mathkit::length2(position) >= 1.0f);
     return position;
 }
 
-float3 Random::randomInUnitSphere()
+glm::vec3 Random::randomInUnitSphere()
 {
-    float3 position {};
+    vec3 position {};
     do {
-        position = float3(randomBilateral(), randomBilateral(), randomBilateral());
-    } while (linalg::length2(position) >= 1.0f);
+        position = vec3(randomBilateral(), randomBilateral(), randomBilateral());
+    } while (mathkit::length2(position) >= 1.0f);
     return position;
 }
