@@ -23,6 +23,9 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glfw-3.3)
 target_link_libraries(ArkoseRenderer glfw)
 
+add_subdirectory(deps/stb_image)
+target_link_libraries(ArkoseRenderer stb_image)
+
 find_package(Vulkan REQUIRED)
 target_include_directories(ArkoseRenderer PRIVATE Vulkan::Vulkan)
 target_link_libraries(ArkoseRenderer Vulkan::Vulkan)
