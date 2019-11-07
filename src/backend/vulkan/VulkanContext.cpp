@@ -9,6 +9,7 @@
 #include <array>
 #include <chrono>
 #include <cstring>
+#include <stb_image.h>
 
 VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device)
     : m_physicalDevice(physicalDevice)
@@ -41,8 +42,58 @@ VulkanContext::~VulkanContext()
         vkFreeMemory(m_device, buffer.memory, nullptr);
     }
 
+    for (const auto& image : m_managedImages) {
+        vkDestroyImage(m_device, image.image, nullptr);
+        vkFreeMemory(m_device, image.memory, nullptr);
+    }
+
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     vkDestroyCommandPool(m_device, m_transientCommandPool, nullptr);
+}
+
+bool VulkanContext::issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const
+{
+    VkCommandBufferAllocateInfo commandBufferAllocInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAllocInfo.commandPool = m_transientCommandPool;
+    commandBufferAllocInfo.commandBufferCount = 1;
+
+    VkCommandBuffer oneTimeCommandBuffer;
+    vkAllocateCommandBuffers(m_device, &commandBufferAllocInfo, &oneTimeCommandBuffer);
+    AT_SCOPE_EXIT([&] {
+        vkFreeCommandBuffers(m_device, m_transientCommandPool, 1, &oneTimeCommandBuffer);
+    });
+
+    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(oneTimeCommandBuffer, &beginInfo) != VK_SUCCESS) {
+        LogError("VulkanContext::issueSingleTimeCommand(): could not begin the command buffer.\n");
+        return false;
+    }
+
+    callback(oneTimeCommandBuffer);
+
+    if (vkEndCommandBuffer(oneTimeCommandBuffer) != VK_SUCCESS) {
+        LogError("VulkanContext::issueSingleTimeCommand(): could not end the command buffer.\n");
+        return false;
+    }
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &oneTimeCommandBuffer;
+
+    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        LogError("VulkanContext::issueSingleTimeCommand(): could not submit the single-time command buffer.\n");
+        return false;
+    }
+    if (vkQueueWaitIdle(m_graphicsQueue) != VK_SUCCESS) {
+        LogError("VulkanContext::issueSingleTimeCommand(): error while waiting for the graphics queue to idle.\n");
+        return false;
+    }
+
+    return true;
 }
 
 VkBuffer VulkanContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkDeviceMemory& memory)
@@ -68,6 +119,7 @@ VkBuffer VulkanContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage
 
     if (vkAllocateMemory(m_device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
         LogError("VulkanContext::createBuffer(): could not allocate the required memory of size %u.\n", size);
+        memory = {};
         return {};
     }
 
@@ -81,52 +133,17 @@ VkBuffer VulkanContext::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage
 
 bool VulkanContext::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const
 {
-    VkCommandBufferAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    allocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocateInfo.commandPool = m_transientCommandPool;
-    allocateInfo.commandBufferCount = 1;
-
-    VkCommandBuffer copyCommandBuffer;
-    if (vkAllocateCommandBuffers(m_device, &allocateInfo, &copyCommandBuffer) != VK_SUCCESS) {
-        LogError("VulkanContext::copyBuffer(): could not create command buffer for copying.\n");
-        return false;
-    }
-
-    AT_SCOPE_EXIT([&] {
-        vkFreeCommandBuffers(m_device, m_transientCommandPool, 1, &copyCommandBuffer);
-    });
-
-    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    if (vkBeginCommandBuffer(copyCommandBuffer, &beginInfo) != VK_SUCCESS) {
-        LogError("VulkanContext::copyBuffer(): could not begin the copy command buffer.\n");
-        return false;
-    }
-
     VkBufferCopy bufferCopyRegion = {};
     bufferCopyRegion.size = size;
     bufferCopyRegion.srcOffset = 0;
     bufferCopyRegion.dstOffset = 0;
 
-    vkCmdCopyBuffer(copyCommandBuffer, source, destination, 1, &bufferCopyRegion);
+    bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+        vkCmdCopyBuffer(commandBuffer, source, destination, 1, &bufferCopyRegion);
+    });
 
-    if (vkEndCommandBuffer(copyCommandBuffer) != VK_SUCCESS) {
-        LogError("VulkanContext::copyBuffer(): could not end the copy command buffer.\n");
-        return false;
-    }
-
-    VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &copyCommandBuffer;
-
-    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-        LogError("VulkanContext::copyBuffer(): could not submit the queue for copying.\n");
-        return false;
-    }
-
-    if (vkQueueWaitIdle(m_graphicsQueue) != VK_SUCCESS) {
-        LogError("VulkanContext::copyBuffer(): error waiting for the queue to be idle after submitting.\n");
+    if (!success) {
+        LogError("VulkanContext::copyBuffer(): error copying buffer, refer to issueSingleTimeCommand errors for more information.\n");
         return false;
     }
 
@@ -187,9 +204,186 @@ VkBuffer VulkanContext::createDeviceLocalBuffer(VkDeviceSize size, const void* d
     return buffer;
 }
 
+VkImage VulkanContext::createImage2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkDeviceMemory& memory, VkImageTiling tiling)
+{
+    VkImageCreateInfo imageCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.extent = { .width = width, .height = height, .depth = 1 };
+    imageCreateInfo.mipLevels = 1; // FIXME?
+    imageCreateInfo.arrayLayers = 1;
+    imageCreateInfo.usage = usage;
+    imageCreateInfo.format = format;
+    imageCreateInfo.tiling = tiling;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkImage image;
+    if (vkCreateImage(m_device, &imageCreateInfo, nullptr, &image) != VK_SUCCESS) {
+        LogError("VulkanContext::createImage2D(): could not create image.\n");
+        memory = {};
+        return {};
+    }
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetImageMemoryRequirements(m_device, image, &memoryRequirements);
+
+    VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    allocateInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, memoryProperties);
+    allocateInfo.allocationSize = memoryRequirements.size;
+
+    if (vkAllocateMemory(m_device, &allocateInfo, nullptr, &memory) != VK_SUCCESS) {
+        LogError("VulkanContext::createImage2D(): could not allocate memory for image.\n");
+        memory = {};
+        return {};
+    }
+
+    if (vkBindImageMemory(m_device, image, memory, 0) != VK_SUCCESS) {
+        LogError("VulkanContext::createImage2D(): could not bind the allocated memory to the image.\n");
+        return {};
+    }
+
+    return image;
+}
+
+bool VulkanContext::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) const
+{
+    VkImageMemoryBarrier imageBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imageBarrier.oldLayout = oldLayout;
+    imageBarrier.newLayout = newLayout;
+    imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    imageBarrier.image = image;
+    imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageBarrier.subresourceRange.baseMipLevel = 0;
+    imageBarrier.subresourceRange.levelCount = 1;
+    imageBarrier.subresourceRange.baseArrayLayer = 0;
+    imageBarrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage;
+    VkPipelineStageFlags destinationStage;
+
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        imageBarrier.srcAccessMask = 0;
+
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    } else {
+        LogErrorAndExit("VulkanContext::transitionImageLayout(): old & new layout combination unsupported by application, exiting.\n");
+    }
+
+    bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+        vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageBarrier);
+    });
+
+    if (!success) {
+        LogError("VulkanContext::transitionImageLayout(): error transitioning layout, refer to issueSingleTimeCommand errors for more information.\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool VulkanContext::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const
+{
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+
+    // (zeros here indicate tightly packed data)
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageOffset = VkOffset3D { 0, 0, 0 };
+    region.imageExtent = VkExtent3D { width, height, 1 };
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+        // NOTE: This assumes that the image we are copying to has the VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL layout!
+        vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    });
+
+    if (!success) {
+        LogError("VulkanContext::copyBufferToImage(): error copying buffer to image, refer to issueSingleTimeCommand errors for more information.\n");
+        return false;
+    }
+
+    return true;
+}
+
+VkImage VulkanContext::createImageFromImagePath(const std::string& imagePath)
+{
+    if (!fileio::isFileReadable(imagePath)) {
+        LogError("VulkanContext::createImageFromImage(): there is no file that can be read at path '%s'.\n", imagePath.c_str());
+        return {};
+    }
+
+    ASSERT(!stbi_is_hdr(imagePath.c_str()));
+
+    int width, height, numChannels; // FIXME: Check the number of channels instead of forcing RGBA
+    stbi_uc* pixels = stbi_load(imagePath.c_str(), &width, &height, &numChannels, STBI_rgb_alpha);
+    if (!pixels) {
+        LogError("VulkanContext::createImageFromImage(): stb_image could not read the contents of '%s'.\n", imagePath.c_str());
+        stbi_image_free(pixels);
+        return {};
+    }
+
+    VkDeviceSize imageSize = width * height * numChannels * sizeof(stbi_uc);
+    VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM; // TODO: Use sRGB images for this type of stuff!
+
+    VkDeviceMemory stagingMemory;
+    VkBuffer stagingBuffer = createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
+    if (!setBufferMemoryDirectly(stagingMemory, pixels, imageSize)) {
+        LogError("VulkanContext::createImageFromImagePath(): could not set the staging buffer memory.\n");
+    }
+    AT_SCOPE_EXIT([&]() {
+        vkDestroyBuffer(m_device, stagingBuffer, nullptr);
+        vkFreeMemory(m_device, stagingMemory, nullptr);
+        stbi_image_free(pixels);
+    });
+
+    VkDeviceMemory imageMemory;
+    VkImage image = createImage2D(width, height, imageFormat, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, imageMemory);
+
+    if (!transitionImageLayout(image, imageFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
+        LogError("VulkanContext::createImageFromImagePath(): could not transition the image to transfer layout.\n");
+    }
+    if (!copyBufferToImage(stagingBuffer, image, width, height)) {
+        LogError("VulkanContext::createImageFromImagePath(): could not copy the staging buffer to the image.\n");
+    }
+    if (!transitionImageLayout(image, imageFormat, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
+        LogError("VulkanContext::createImageFromImagePath(): could not transition the image to shader-read-only layout.\n");
+    }
+
+    // FIXME: This is only temporary! Later we should keep some shared memory which with offset buffers etc..
+    m_managedImages.push_back({ image, imageMemory });
+
+    return image;
+}
+
 void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews)
 {
     m_exAspectRatio = float(finalTargetExtent.width) / float(finalTargetExtent.height);
+
+    VkImage testImage = createImageFromImagePath("assets/test-pattern.png");
 
     VkDescriptorSetLayoutBinding cameraStateUboLayoutBinding = {};
     cameraStateUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

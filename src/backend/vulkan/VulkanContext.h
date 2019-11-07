@@ -1,10 +1,17 @@
 #pragma once
 
 #include "common-vk.h"
+#include <functional>
+#include <string>
 #include <vector>
 
 struct ManagedBuffer {
     VkBuffer buffer;
+    VkDeviceMemory memory;
+};
+
+struct ManagedImage {
+    VkImage image;
     VkDeviceMemory memory;
 };
 
@@ -24,6 +31,8 @@ public:
 
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
+    bool issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const;
+
     VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&);
     bool copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const;
     bool setBufferMemoryDirectly(VkDeviceMemory, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
@@ -32,6 +41,12 @@ public:
     template<typename T>
     VkBuffer createDeviceLocalBuffer(const std::vector<T>& data, VkBufferUsageFlags);
     VkBuffer createDeviceLocalBuffer(size_t size, const void* data, VkBufferUsageFlags);
+
+    VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
+    bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout) const;
+    bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height) const;
+
+    VkImage createImageFromImagePath(const std::string& imagePath);
 
 private:
     [[nodiscard]] uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags) const;
@@ -48,6 +63,7 @@ private:
 
     // Buffers in this list will be destroyed and their memory freed when the context is destroyed
     std::vector<ManagedBuffer> m_managedBuffers {};
+    std::vector<ManagedImage> m_managedImages {};
 
     //
 

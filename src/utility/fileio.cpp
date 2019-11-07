@@ -2,10 +2,10 @@
 
 #include <fstream>
 
-std::optional<fileio::BinaryData> fileio::loadEntireFileAsByteBuffer(const std::string& filename)
+std::optional<fileio::BinaryData> fileio::loadEntireFileAsByteBuffer(const std::string& filePath)
 {
     // Open file as binary and immediately seek to the end
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+    std::ifstream file(filePath, std::ios::ate | std::ios::binary);
 
     if (!file.is_open())
         return {};
@@ -18,4 +18,11 @@ std::optional<fileio::BinaryData> fileio::loadEntireFileAsByteBuffer(const std::
 
     file.close();
     return binaryData;
+}
+
+bool fileio::isFileReadable(const std::string& filePath)
+{
+    std::ifstream file(filePath);
+    bool isGood = file.good();
+    return isGood;
 }
