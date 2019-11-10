@@ -459,7 +459,7 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     bindingDescription.stride = sizeof(mesh::common::Vertex);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions {};
+    std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions {};
 
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
@@ -470,6 +470,11 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     attributeDescriptions[1].location = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
     attributeDescriptions[1].offset = offsetof(mesh::common::Vertex, color);
+
+    attributeDescriptions[2].binding = 0;
+    attributeDescriptions[2].location = 2;
+    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+    attributeDescriptions[2].offset = offsetof(mesh::common::Vertex, texCoord);
 
     {
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -762,10 +767,10 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 
     // TODO: This is the command buffer recording for the example triangle drawing stuff
     std::vector<mesh::common::Vertex> vertices = {
-        { vec3(-0.5, -0.5, 0), vec3(1, 0, 0) },
-        { vec3(0.5, -0.5, 0), vec3(0, 1, 0) },
-        { vec3(0.5, 0.5, 0), vec3(0, 0, 1) },
-        { vec3(-0.5, 0.5, 0), vec3(1, 1, 1) }
+        { vec3(-0.5, -0.5, 0), vec3(1, 0, 0), vec2(1, 0) },
+        { vec3(0.5, -0.5, 0), vec3(0, 1, 0), vec2(0, 0) },
+        { vec3(0.5, 0.5, 0), vec3(0, 0, 1), vec2(0, 1) },
+        { vec3(-0.5, 0.5, 0), vec3(1, 1, 1), vec2(1, 1) }
     };
     std::vector<uint16_t> indices = {
         0, 1, 2,
@@ -840,7 +845,7 @@ void VulkanContext::timestepForTheDrawingStuff(uint32_t index)
     // Update the uniform buffer(s)
     CameraState cameraState = {};
     cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, time * 3.1415f / 2.0f);
-    cameraState.view_from_world = mathkit::lookAt({ 0, 2, -4 }, { 0, 0, 0 });
+    cameraState.view_from_world = mathkit::lookAt({ 0, 1, -2 }, { 0, 0, 0 });
     cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), m_exAspectRatio, 0.1f);
 
     cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
