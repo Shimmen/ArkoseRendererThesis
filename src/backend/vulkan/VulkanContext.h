@@ -11,6 +11,8 @@ struct ManagedBuffer {
 };
 
 struct ManagedImage {
+    VkSampler sampler;
+    VkImageView view;
     VkImage image;
     VkDeviceMemory memory;
 };
@@ -46,7 +48,7 @@ public:
     bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height) const;
 
-    VkImage createImageFromImagePath(const std::string& imagePath);
+    ManagedImage createImageViewFromImagePath(const std::string& imagePath);
 
 private:
     [[nodiscard]] uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags) const;

@@ -247,6 +247,12 @@ VkPhysicalDevice VulkanBackend::pickBestPhysicalDevice(VkInstance instance, VkSu
         LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with swapchain support, exiting.\n");
     }
 
+    VkPhysicalDeviceFeatures supportedFeatures;
+    vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
+    if (!supportedFeatures.samplerAnisotropy) {
+        LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with sampler anisotropy support, exiting.\n");
+    }
+
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(physicalDevice, &props);
     LogInfo("VulkanBackend::pickBestPhysicalDevice(): using physical device '%s'\n", props.deviceName);
@@ -382,13 +388,12 @@ VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceK
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkDeviceCreateInfo deviceCreateInfo = {};
-    deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    VkPhysicalDeviceFeatures requestedDeviceFeatures = {};
+    requestedDeviceFeatures.samplerAnisotropy = VK_TRUE;
 
+    VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
     deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
-
-    VkPhysicalDeviceFeatures requestedDeviceFeatures = {};
     deviceCreateInfo.pEnabledFeatures = &requestedDeviceFeatures;
 
     std::vector<const char*> deviceValidationLayers;

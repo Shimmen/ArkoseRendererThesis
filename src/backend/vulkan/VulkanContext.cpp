@@ -43,6 +43,8 @@ VulkanContext::~VulkanContext()
     }
 
     for (const auto& image : m_managedImages) {
+        vkDestroySampler(m_device, image.sampler, nullptr);
+        vkDestroyImageView(m_device, image.view, nullptr);
         vkDestroyImage(m_device, image.image, nullptr);
         vkFreeMemory(m_device, image.memory, nullptr);
     }
@@ -329,7 +331,7 @@ bool VulkanContext::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t w
     return true;
 }
 
-VkImage VulkanContext::createImageFromImagePath(const std::string& imagePath)
+ManagedImage VulkanContext::createImageViewFromImagePath(const std::string& imagePath)
 {
     if (!fileio::isFileReadable(imagePath)) {
         LogError("VulkanContext::createImageFromImage(): there is no file that can be read at path '%s'.\n", imagePath.c_str());
@@ -373,17 +375,60 @@ VkImage VulkanContext::createImageFromImagePath(const std::string& imagePath)
         LogError("VulkanContext::createImageFromImagePath(): could not transition the image to shader-read-only layout.\n");
     }
 
-    // FIXME: This is only temporary! Later we should keep some shared memory which with offset buffers etc..
-    m_managedImages.push_back({ image, imageMemory });
+    VkImageViewCreateInfo viewCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewCreateInfo.image = image;
+    viewCreateInfo.format = imageFormat;
+    viewCreateInfo.components = {
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY
+    };
+    viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewCreateInfo.subresourceRange.baseMipLevel = 0;
+    viewCreateInfo.subresourceRange.levelCount = 1;
+    viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+    viewCreateInfo.subresourceRange.layerCount = 1;
 
-    return image;
+    VkImageView imageView;
+    if (vkCreateImageView(m_device, &viewCreateInfo, nullptr, &imageView) != VK_SUCCESS) {
+        LogError("VulkanContext::createImageFromImagePath(): could not create the image view for the image.\n");
+    }
+
+    VkSamplerCreateInfo samplerCreateInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+    samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerCreateInfo.anisotropyEnable = VK_TRUE;
+    samplerCreateInfo.maxAnisotropy = 16.0f;
+    samplerCreateInfo.compareEnable = VK_FALSE;
+    samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerCreateInfo.mipLodBias = 0.0f;
+    samplerCreateInfo.minLod = 0.0f;
+    samplerCreateInfo.maxLod = 0.0f;
+
+    VkSampler sampler;
+    if (vkCreateSampler(m_device, &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
+        LogError("VulkanContext::createImageFromImagePath(): could not create the sampler for the image.\n");
+    }
+
+    ManagedImage managedImage = { sampler, imageView, image, imageMemory };
+
+    // FIXME: This is only temporary! Later we should keep some shared memory which with offset buffers etc..
+    m_managedImages.push_back(managedImage);
+
+    return managedImage;
 }
 
 void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews)
 {
     m_exAspectRatio = float(finalTargetExtent.width) / float(finalTargetExtent.height);
-
-    VkImage testImage = createImageFromImagePath("assets/test-pattern.png");
 
     VkDescriptorSetLayoutBinding cameraStateUboLayoutBinding = {};
     cameraStateUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -392,9 +437,21 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     cameraStateUboLayoutBinding.descriptorCount = 1;
     cameraStateUboLayoutBinding.pImmutableSamplers = nullptr;
 
+    ManagedImage testImage = createImageViewFromImagePath("assets/test-pattern.png");
+    //m_exImageView = testImage.view;
+    //m_exImageSampler = testImage.sampler;
+    VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+    samplerLayoutBinding.binding = 1;
+    samplerLayoutBinding.descriptorCount = 1;
+    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerLayoutBinding.pImmutableSamplers = nullptr;
+
+    std::array<VkDescriptorSetLayoutBinding, 2> allBindings = { cameraStateUboLayoutBinding, samplerLayoutBinding };
+
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    descriptorSetLayoutCreateInfo.bindingCount = 1;
-    descriptorSetLayoutCreateInfo.pBindings = &cameraStateUboLayoutBinding;
+    descriptorSetLayoutCreateInfo.bindingCount = allBindings.size();
+    descriptorSetLayoutCreateInfo.pBindings = allBindings.data();
     ASSERT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &m_exDescriptorSetLayout) == VK_SUCCESS);
 
     VkVertexInputBindingDescription bindingDescription = {};
@@ -630,13 +687,15 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     }
 
     {
-        VkDescriptorPoolSize descriptorPoolSize = {};
-        descriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorPoolSize.descriptorCount = numSwapchainImages;
+        std::array<VkDescriptorPoolSize, 2> descriptorPoolSizes {};
+        descriptorPoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorPoolSizes[0].descriptorCount = numSwapchainImages;
+        descriptorPoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorPoolSizes[1].descriptorCount = numSwapchainImages;
 
         VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-        descriptorPoolCreateInfo.poolSizeCount = 1;
-        descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
+        descriptorPoolCreateInfo.poolSizeCount = descriptorPoolSizes.size();
+        descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
         descriptorPoolCreateInfo.maxSets = numSwapchainImages;
 
         ASSERT(vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &m_exDescriptorPool) == VK_SUCCESS);
@@ -656,18 +715,33 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
             descriptorBufferInfo.range = VK_WHOLE_SIZE; //sizeof(CameraState);
             descriptorBufferInfo.offset = 0;
 
-            VkWriteDescriptorSet writeDescriptorSet = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-            writeDescriptorSet.dstSet = m_exDescriptorSets[i];
-            writeDescriptorSet.dstBinding = 0;
-            writeDescriptorSet.dstArrayElement = 0;
+            VkDescriptorImageInfo descriptorImageInfo = {};
+            descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            descriptorImageInfo.imageView = testImage.view;
+            descriptorImageInfo.sampler = testImage.sampler;
 
-            writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            writeDescriptorSet.descriptorCount = 1;
-            writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
-            writeDescriptorSet.pImageInfo = nullptr;
-            writeDescriptorSet.pTexelBufferView = nullptr;
+            VkWriteDescriptorSet uniformBufferWriteDescriptorSet = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            uniformBufferWriteDescriptorSet.dstSet = m_exDescriptorSets[i];
+            uniformBufferWriteDescriptorSet.dstBinding = 0;
+            uniformBufferWriteDescriptorSet.dstArrayElement = 0;
+            uniformBufferWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            uniformBufferWriteDescriptorSet.descriptorCount = 1;
+            uniformBufferWriteDescriptorSet.pBufferInfo = &descriptorBufferInfo;
+            uniformBufferWriteDescriptorSet.pImageInfo = nullptr;
+            uniformBufferWriteDescriptorSet.pTexelBufferView = nullptr;
 
-            vkUpdateDescriptorSets(m_device, 1, &writeDescriptorSet, 0, nullptr);
+            VkWriteDescriptorSet imageSamplerWriteDescriptorSet = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            imageSamplerWriteDescriptorSet.dstSet = m_exDescriptorSets[i];
+            imageSamplerWriteDescriptorSet.dstBinding = 1;
+            imageSamplerWriteDescriptorSet.dstArrayElement = 0;
+            imageSamplerWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            imageSamplerWriteDescriptorSet.descriptorCount = 1;
+            imageSamplerWriteDescriptorSet.pImageInfo = &descriptorImageInfo;
+            imageSamplerWriteDescriptorSet.pBufferInfo = nullptr;
+            imageSamplerWriteDescriptorSet.pTexelBufferView = nullptr;
+
+            std::array<VkWriteDescriptorSet, 2> allWriteDescriptorSets = { uniformBufferWriteDescriptorSet, imageSamplerWriteDescriptorSet };
+            vkUpdateDescriptorSets(m_device, allWriteDescriptorSets.size(), allWriteDescriptorSets.data(), 0, nullptr);
         }
     }
 
