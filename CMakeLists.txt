@@ -14,7 +14,9 @@ add_executable(ArkoseRenderer
 
 target_include_directories(ArkoseRenderer PRIVATE src/)
 target_include_directories(ArkoseRenderer PRIVATE shaders/shared)
+
 target_include_directories(ArkoseRenderer PRIVATE deps/glm-0.9.9.6)
+target_include_directories(ArkoseRenderer PRIVATE deps/nlohmann_json)
 
 set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -25,6 +27,9 @@ target_link_libraries(ArkoseRenderer glfw)
 
 add_subdirectory(deps/stb_image)
 target_link_libraries(ArkoseRenderer stb_image)
+
+add_subdirectory(deps/tiny_gltf)
+target_link_libraries(ArkoseRenderer tiny_gltf)
 
 find_package(Vulkan REQUIRED)
 target_include_directories(ArkoseRenderer PRIVATE Vulkan::Vulkan)
