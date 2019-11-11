@@ -897,7 +897,7 @@ void VulkanContext::timestepForTheDrawingStuff(uint32_t index)
     // Update the uniform buffer(s)
     CameraState cameraState = {};
     cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, time * 3.1415f / 2.0f);
-    cameraState.view_from_world = mathkit::lookAt({ 0, 1, -2 }, { 0, 0, 0 });
+    cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
     cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), m_exAspectRatio, 0.1f);
 
     cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;

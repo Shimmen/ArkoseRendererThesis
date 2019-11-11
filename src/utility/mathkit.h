@@ -21,8 +21,6 @@ using mat4 = glm::mat4;
 
 namespace mathkit {
 
-// NOTE: Everything in this namespace assumes a *left handed coordinate system*!
-
 #include <glm/gtc/matrix_transform.hpp>
 
 constexpr float PI = 3.14159265359f;
@@ -49,7 +47,7 @@ inline mat4 axisAngle(const vec3& axis, float angle)
 
 inline mat4 lookAt(const vec3& eye, const vec3& target, const vec3& up = globalUp)
 {
-    return glm::lookAtLH(eye, target, up);
+    return glm::lookAt(eye, target, up);
 }
 
 inline mat4 translate(float x, float y, float z)
@@ -59,7 +57,7 @@ inline mat4 translate(float x, float y, float z)
 
 inline mat4 infinitePerspective(float fieldOfViewY, float aspectRatio, float zNear)
 {
-    mat4 matrix = glm::infinitePerspectiveLH(fieldOfViewY, aspectRatio, zNear);
+    mat4 matrix = glm::infinitePerspective(fieldOfViewY, aspectRatio, zNear);
     matrix[1][1] *= -1.0f; // (flip for OpenGL -> Vulkan conventions)
     return matrix;
 }
