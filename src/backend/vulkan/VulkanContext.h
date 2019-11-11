@@ -27,7 +27,7 @@ public:
     explicit VulkanContext(VkPhysicalDevice, VkDevice);
     ~VulkanContext();
 
-    void createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews);
+    void createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
     void destroyTheDrawingStuff();
     void timestepForTheDrawingStuff(uint32_t index);
 
@@ -45,6 +45,8 @@ public:
     VkBuffer createDeviceLocalBuffer(size_t size, const void* data, VkBufferUsageFlags);
 
     VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
+    VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
+
     bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height) const;
 

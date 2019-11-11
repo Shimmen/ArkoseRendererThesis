@@ -84,6 +84,10 @@ private:
     std::vector<VkImage> m_swapchainImages {};
     std::vector<VkImageView> m_swapchainImageViews {};
 
+    VkImage m_depthImage {};
+    VkImageView m_depthImageView {};
+    VkDeviceMemory m_depthImageMemory {};
+
     //
 
     //std::vector<VkShaderModule> m_shaderModules {};

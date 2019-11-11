@@ -536,12 +536,23 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
         }
     }
 
-    m_context->createTheDrawingStuff(surfaceFormat.format, swapchainExtent, m_swapchainImageViews);
+    // FIXME: For now also create a depth image, but later we probably don't want one on the final presentation images
+    //  so it doesn't really make sense to have it here anyway. I guess that's an excuse for the code structure.. :)
+    // FIXME: Should we add an explicit image transition for the depth image..?
+    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+    m_depthImage = m_context->createImage2D(swapchainExtent.width, swapchainExtent.height, depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_depthImageMemory);
+    m_depthImageView = m_context->createImageView2D(m_depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    m_context->createTheDrawingStuff(surfaceFormat.format, swapchainExtent, m_swapchainImageViews, m_depthImageView, depthFormat);
 }
 
 void VulkanBackend::destroySwapchain()
 {
     m_context->destroyTheDrawingStuff();
+
+    vkDestroyImageView(m_device, m_depthImageView, nullptr);
+    vkDestroyImage(m_device, m_depthImage, nullptr);
+    vkFreeMemory(m_device, m_depthImageMemory, nullptr);
 
     for (size_t it = 0; it < m_numSwapchainImages; ++it) {
         vkDestroyImageView(m_device, m_swapchainImageViews[it], nullptr);
