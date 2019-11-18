@@ -9,6 +9,8 @@ add_executable(ArkoseRenderer
         src/backend/Backend.cpp
         src/backend/vulkan/VulkanBackend.cpp
         src/backend/vulkan/VulkanContext.cpp
+        src/frontend/Resources.cpp
+        src/frontend/RenderPass.cpp
         src/utility/fileio.cpp
         src/utility/Random.cpp)
 

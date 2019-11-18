@@ -1,6 +1,6 @@
 #pragma once
 
-#include "frontend/CommandQueue.h"
+#include "frontend/CommandSubmitter.h"
 #include "resourceid.h"
 #include <string>
 
@@ -10,7 +10,7 @@ public:
     virtual ~Backend() = default;
 
     virtual ShaderID loadShader(const std::string& shaderName) = 0;
-    virtual bool compileCommandQueue(const CommandQueue&) = 0;
+    virtual bool compileCommandSubmitter(const CommandSubmitter&) = 0;
 
     virtual bool executeFrame() = 0;
 

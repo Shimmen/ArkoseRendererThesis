@@ -17,7 +17,7 @@ public:
     VulkanBackend(VulkanBackend&) = delete;
     VulkanBackend& operator=(VulkanBackend&) = delete;
 
-    bool compileCommandQueue(const CommandQueue&) override;
+    bool compileCommandSubmitter(const CommandSubmitter&) override;
     bool executeFrame() override;
 
     ShaderID loadShader(const std::string& shaderName) override;

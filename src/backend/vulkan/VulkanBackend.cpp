@@ -584,7 +584,7 @@ void VulkanBackend::recreateSwapchain()
     m_unhandledWindowResize = false;
 }
 
-bool VulkanBackend::compileCommandQueue(const CommandQueue&)
+bool VulkanBackend::compileCommandSubmitter(const CommandSubmitter&)
 {
     // TODO!
     return false;
