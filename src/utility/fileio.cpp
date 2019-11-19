@@ -20,6 +20,26 @@ std::optional<fileio::BinaryData> fileio::loadEntireFileAsByteBuffer(const std::
     return binaryData;
 }
 
+std::optional<std::string> fileio::loadEntireFile(const std::string& filePath)
+{
+    // Open file as binary and immediately seek to the end
+    std::ifstream file(filePath, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open())
+        return {};
+
+    std::string contents {};
+
+    size_t sizeInBytes = file.tellg();
+    contents.reserve(sizeInBytes);
+    file.seekg(0, std::ios::beg);
+
+    contents.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+
+    file.close();
+    return contents;
+}
+
 bool fileio::isFileReadable(const std::string& filePath)
 {
     std::ifstream file(filePath);

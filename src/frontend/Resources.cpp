@@ -1,6 +1,7 @@
 #include "Resources.h"
-#include <utility/logging.h>
 
+#include <backend/ShaderManager.h>
+#include <utility/logging.h>
 #include <utility>
 
 Texture2D::Texture2D(int width, int height, Components components, bool srgb, bool mipmaps)
@@ -118,7 +119,19 @@ ShaderFile::ShaderFile(std::string name, ShaderFileType type)
     : m_name(std::move(name))
     , m_type(type)
 {
-    // TODO: At this level it might make sense to verify that it at least exist!
+    auto& manager = ShaderManager::instance();
+    switch (manager.loadAndCompileImmediately(name)) {
+    case ShaderManager::ShaderStatus::FileNotFound:
+        LogErrorAndExit("Shader file '%s' not found, exiting.\n");
+    case ShaderManager::ShaderStatus::CompileError: {
+        std::string errorMessage = manager.shaderError(name).value();
+        LogError("Shader file '%s' has compile errors:\n");
+        LogError("  %s\n", errorMessage.c_str());
+        LogErrorAndExit("Exiting due to bad shader at startup.\n");
+    }
+    default:
+        break;
+    }
 }
 
 ShaderFileType ShaderFile::type() const

@@ -1,5 +1,6 @@
 #include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
+#include "utility/GlobalState.h"
 #include "utility/logging.h"
 
 #define GLFW_INCLUDE_NONE
@@ -39,6 +40,11 @@ int main()
         }
 
         LogInfo("ArkoseRenderer: main loop begin.\n");
+
+        // TODO: It's (probably) important that this is set to true before any frontend code is run,
+        //  in case it has logic for stopping if the application exits etc.
+        GlobalState::getMutable().setApplicationRunning(true);
+
         while (!glfwWindowShouldClose(window)) {
 
             glfwPollEvents();
@@ -48,6 +54,7 @@ int main()
                 frameExecuted = backend->executeFrame();
             }
         }
+        GlobalState::getMutable().setApplicationRunning(false);
         LogInfo("ArkoseRenderer: main loop end.\n");
     }
     delete backend;
