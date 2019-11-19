@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-std::optional<fileio::BinaryData> fileio::loadEntireFileAsByteBuffer(const std::string& filePath)
+std::optional<fileio::BinaryData> fileio::readEntireFileAsByteBuffer(const std::string& filePath)
 {
     // Open file as binary and immediately seek to the end
     std::ifstream file(filePath, std::ios::ate | std::ios::binary);
@@ -20,7 +20,7 @@ std::optional<fileio::BinaryData> fileio::loadEntireFileAsByteBuffer(const std::
     return binaryData;
 }
 
-std::optional<std::string> fileio::loadEntireFile(const std::string& filePath)
+std::optional<std::string> fileio::readEntireFile(const std::string& filePath)
 {
     // Open file as binary and immediately seek to the end
     std::ifstream file(filePath, std::ios::ate | std::ios::binary);

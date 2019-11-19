@@ -621,7 +621,7 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
         VkShaderModule vertShaderModule;
         VkPipelineShaderStageCreateInfo vertStageCreateInfo = {};
         {
-            auto optionalData = fileio::loadEntireFileAsByteBuffer("shaders/example.vert.spv");
+            auto optionalData = fileio::readEntireFileAsByteBuffer("shaders/example.vert.spv");
             ASSERT(optionalData.has_value());
             const auto& binaryData = optionalData.value();
 
@@ -640,7 +640,7 @@ void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
         VkShaderModule fragShaderModule;
         VkPipelineShaderStageCreateInfo fragStageCreateInfo = {};
         {
-            auto optionalData = fileio::loadEntireFileAsByteBuffer("shaders/example.frag.spv");
+            auto optionalData = fileio::readEntireFileAsByteBuffer("shaders/example.frag.spv");
             ASSERT(optionalData.has_value());
             const auto& binaryData = optionalData.value();
 

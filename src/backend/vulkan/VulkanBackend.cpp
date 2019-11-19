@@ -657,7 +657,7 @@ ShaderID VulkanBackend::loadShader(const std::string& shaderName)
     }
     */
     auto fileName = fileNameForShaderName(shaderName);
-    auto optionalData = fileio::loadEntireFileAsByteBuffer(fileName);
+    auto optionalData = fileio::readEntireFileAsByteBuffer(fileName);
     if (!optionalData.has_value()) {
         LogError("VulkanBackend::loadShader(): could not load '%s'.\n", shaderName.c_str());
         return NullShaderID;

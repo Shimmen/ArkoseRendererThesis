@@ -62,7 +62,7 @@ ShaderManager::ShaderStatus ShaderManager::loadAndCompileImmediately(const std::
         }
 
         ShaderData data { name, path };
-        data.glslSource = fileio::loadEntireFile(path).value();
+        data.glslSource = fileio::readEntireFile(path).value();
         data.lastEditTimestamp = std::filesystem::last_write_time(path).time_since_epoch().count();
 
         m_loadedShaders[path] = std::move(data);
@@ -124,7 +124,7 @@ void ShaderManager::startFileWatching(unsigned msBetweenPolls)
 
                     uint64_t lastWrite = std::filesystem::last_write_time(data.path).time_since_epoch().count();
                     if (lastWrite > data.lastEditTimestamp) {
-                        data.glslSource = fileio::loadEntireFile(data.path).value();
+                        data.glslSource = fileio::readEntireFile(data.path).value();
                         data.lastEditTimestamp = lastWrite;
                         if (!compileGlslToSpirv(data)) {
                             LogError("Shader at path '%s' could not compile:\n\t%s\n", data.path.c_str(), data.lastCompileError.c_str());

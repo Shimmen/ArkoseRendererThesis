@@ -7,9 +7,9 @@
 namespace fileio {
 
 using BinaryData = std::vector<char>;
-std::optional<BinaryData> loadEntireFileAsByteBuffer(const std::string& filePath);
+std::optional<BinaryData> readEntireFileAsByteBuffer(const std::string& filePath);
 
-std::optional<std::string> loadEntireFile(const std::string& filePath);
+std::optional<std::string> readEntireFile(const std::string& filePath);
 
 bool isFileReadable(const std::string& filePath);
 
