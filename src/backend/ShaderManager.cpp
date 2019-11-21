@@ -49,6 +49,21 @@ std::optional<std::string> ShaderManager::shaderError(const std::string& name) c
     return data.lastCompileError;
 }
 
+std::optional<uint32_t> ShaderManager::shaderVersion(const std::string& name) const
+{
+    auto path = resolvePath(name);
+
+    std::lock_guard<std::mutex> dataLock(m_shaderDataMutex);
+    auto result = m_loadedShaders.find(path);
+
+    if (result == m_loadedShaders.end()) {
+        return {};
+    }
+
+    const ShaderData& data = result->second;
+    return data.currentBinaryVersion;
+}
+
 ShaderManager::ShaderStatus ShaderManager::loadAndCompileImmediately(const std::string& name)
 {
     auto path = resolvePath(name);
@@ -71,7 +86,9 @@ ShaderManager::ShaderStatus ShaderManager::loadAndCompileImmediately(const std::
     ShaderData& data = m_loadedShaders[path];
     bool compilationSuccess = compileGlslToSpirv(data);
 
-    if (!compilationSuccess) {
+    if (compilationSuccess) {
+        data.currentBinaryVersion = 1;
+    } else {
         return ShaderStatus::CompileError;
     }
 
@@ -126,7 +143,9 @@ void ShaderManager::startFileWatching(unsigned msBetweenPolls)
                     if (lastWrite > data.lastEditTimestamp) {
                         data.glslSource = fileio::readEntireFile(data.path).value();
                         data.lastEditTimestamp = lastWrite;
-                        if (!compileGlslToSpirv(data)) {
+                        if (compileGlslToSpirv(data)) {
+                            data.currentBinaryVersion += 1;
+                        } else {
                             LogError("Shader at path '%s' could not compile:\n\t%s\n", data.path.c_str(), data.lastCompileError.c_str());
                         }
                     }

@@ -28,6 +28,7 @@ public:
 
     [[nodiscard]] std::string resolvePath(const std::string& name) const;
     [[nodiscard]] std::optional<std::string> shaderError(const std::string& name) const;
+    [[nodiscard]] std::optional<uint32_t> shaderVersion(const std::string& name) const;
 
     ShaderStatus loadAndCompileImmediately(const std::string& name);
 
@@ -53,6 +54,7 @@ private:
         std::string path {};
 
         uint64_t lastEditTimestamp { 0 };
+        uint32_t currentBinaryVersion { 0 };
         bool lastEditSuccessfullyCompiled { false };
         std::string lastCompileError {};
 
