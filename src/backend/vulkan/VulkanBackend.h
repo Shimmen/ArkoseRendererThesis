@@ -3,7 +3,6 @@
 #include "../Backend.h"
 #include "VulkanContext.h"
 #include "common-vk.h"
-#include "types.h"
 #include <array>
 
 struct GLFWwindow;
@@ -20,12 +19,7 @@ public:
     bool compileCommandSubmitter(const CommandSubmitter&) override;
     bool executeFrame() override;
 
-    ShaderID loadShader(const std::string& shaderName) override;
-
 private:
-    [[nodiscard]] std::string fileNameForShaderName(const std::string&) const;
-    [[nodiscard]] VkShaderStageFlagBits vulkanShaderShaderStageFlag(ShaderStageType) const;
-
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT,
         VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT*, void* userData);
     [[nodiscard]] VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo() const;

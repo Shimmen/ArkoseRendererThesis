@@ -1,7 +1,5 @@
 #pragma once
 
-#include "types.h"
-
 #include <vulkan/vulkan.h>
 
 #ifdef NDEBUG

@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD 17)
 add_executable(ArkoseRenderer
         src/main.cpp
         src/app/App.cpp
-        src/backend/Backend.cpp
         src/backend/ShaderManager.cpp
         src/backend/vulkan/VulkanBackend.cpp
         src/backend/vulkan/VulkanContext.cpp

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "types.h"
 #include "utility/copying.h"
 #include "utility/mathkit.h"
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
