@@ -51,8 +51,8 @@ private:
     uint32_t m_handle { NullHandle };
 };
 
-struct Framebuffer {
-    NON_COPYABLE(Framebuffer)
+struct RenderTarget {
+    NON_COPYABLE(RenderTarget)
 
     enum class AttachmentType {
         Color0,
@@ -67,9 +67,9 @@ struct Framebuffer {
         Texture2D* texture;
     };
 
-    explicit Framebuffer(Texture2D&);
-    Framebuffer(std::initializer_list<Attachment>);
-    Framebuffer(Framebuffer&&) noexcept;
+    explicit RenderTarget(Texture2D&);
+    RenderTarget(std::initializer_list<Attachment>);
+    RenderTarget(RenderTarget&&) noexcept;
 
     [[nodiscard]] Extent2D extent() const;
     [[nodiscard]] size_t attachmentCount() const;

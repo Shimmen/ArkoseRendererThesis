@@ -29,14 +29,14 @@ Texture2D::~Texture2D()
     }
 }
 
-Framebuffer::Framebuffer(Texture2D& colorTexture)
+RenderTarget::RenderTarget(Texture2D& colorTexture)
     : m_attachments()
 {
     Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
     m_attachments.push_back(colorAttachment);
 }
 
-Framebuffer::Framebuffer(std::initializer_list<Attachment> targets)
+RenderTarget::RenderTarget(std::initializer_list<Attachment> targets)
 {
     for (const Attachment& attachment : targets) {
         if (attachment.type == AttachmentType::Depth) {
@@ -47,26 +47,26 @@ Framebuffer::Framebuffer(std::initializer_list<Attachment> targets)
     }
 
     if (attachmentCount() < 1) {
-        LogErrorAndExit("Framebuffer error: tried to create with less than one color attachments!\n");
+        LogErrorAndExit("RenderTarget error: tried to create with less than one color attachments!\n");
     }
 
     Extent2D firstExtent = m_attachments.front().texture->extent;
     for (auto& attachment : m_attachments) {
         if (attachment.texture->extent != firstExtent) {
-            LogErrorAndExit("Framebuffer error: tried to create with attachments of different sizes: (%ix%i) vs (%ix%i)\n",
+            LogErrorAndExit("RenderTarget error: tried to create with attachments of different sizes: (%ix%i) vs (%ix%i)\n",
                 attachment.texture->extent.width, attachment.texture->extent.height,
                 firstExtent.width, firstExtent.height);
         }
     }
 
     if (m_depthAttachment.has_value() && m_depthAttachment->texture->extent != firstExtent) {
-        LogErrorAndExit("Framebuffer error: tried to create with depth attachments of non-matching size: (%ix%i) vs (%ix%i)\n",
+        LogErrorAndExit("RenderTarget error: tried to create with depth attachments of non-matching size: (%ix%i) vs (%ix%i)\n",
             m_depthAttachment->texture->extent.width, m_depthAttachment->texture->extent.height,
             firstExtent.width, firstExtent.height);
     }
 }
 
-Framebuffer::Framebuffer(Framebuffer&& other) noexcept
+RenderTarget::RenderTarget(RenderTarget&& other) noexcept
     : m_attachments(std::move(other.m_attachments))
     , m_depthAttachment(other.m_depthAttachment)
 {
@@ -74,17 +74,17 @@ Framebuffer::Framebuffer(Framebuffer&& other) noexcept
     other.m_depthAttachment = {};
 }
 
-Extent2D Framebuffer::extent() const
+Extent2D RenderTarget::extent() const
 {
     return m_attachments.front().texture->extent;
 }
 
-size_t Framebuffer::attachmentCount() const
+size_t RenderTarget::attachmentCount() const
 {
     return m_attachments.size();
 }
 
-bool Framebuffer::hasDepthTarget() const
+bool RenderTarget::hasDepthTarget() const
 {
     return m_depthAttachment.has_value();
 }
