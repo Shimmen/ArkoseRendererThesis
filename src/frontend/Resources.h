@@ -11,10 +11,13 @@ constexpr uint32_t NullHandle = 0u;
 
 struct Extent2D {
     Extent2D(int width, int height)
-        : width(width)
-        , height(height)
+        : m_width(width)
+        , m_height(height)
     {
     }
+
+    [[nodiscard]] int width() const { return m_width; }
+    [[nodiscard]] int height() const { return m_height; }
 
     bool operator!=(const Extent2D& other) const
     {
@@ -22,11 +25,11 @@ struct Extent2D {
     }
     bool operator==(const Extent2D& other) const
     {
-        return width == other.width && height == other.height;
+        return m_width == other.m_width && m_height == other.m_height;
     }
 
-    const int width {};
-    const int height {};
+    int m_width {};
+    int m_height {};
 };
 
 struct Texture2D {

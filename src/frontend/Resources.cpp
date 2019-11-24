@@ -54,15 +54,15 @@ RenderTarget::RenderTarget(std::initializer_list<Attachment> targets)
     for (auto& attachment : m_attachments) {
         if (attachment.texture->extent != firstExtent) {
             LogErrorAndExit("RenderTarget error: tried to create with attachments of different sizes: (%ix%i) vs (%ix%i)\n",
-                attachment.texture->extent.width, attachment.texture->extent.height,
-                firstExtent.width, firstExtent.height);
+                attachment.texture->extent.width(), attachment.texture->extent.height(),
+                firstExtent.width(), firstExtent.height());
         }
     }
 
     if (m_depthAttachment.has_value() && m_depthAttachment->texture->extent != firstExtent) {
         LogErrorAndExit("RenderTarget error: tried to create with depth attachments of non-matching size: (%ix%i) vs (%ix%i)\n",
-            m_depthAttachment->texture->extent.width, m_depthAttachment->texture->extent.height,
-            firstExtent.width, firstExtent.height);
+            m_depthAttachment->texture->extent.width(), m_depthAttachment->texture->extent.height(),
+            firstExtent.width(), firstExtent.height());
     }
 }
 
