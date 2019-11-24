@@ -39,6 +39,4 @@ target_link_libraries(ArkoseRenderer Vulkan::Vulkan)
 
 if (WIN32)
     target_compile_definitions(ArkoseRenderer PRIVATE VK_USE_PLATFORM_WIN32_KHR)
-else ()
-    message(SEND_ERROR "TODO: Setup vulkan for this platform!")
 endif ()

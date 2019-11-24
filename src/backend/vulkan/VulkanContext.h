@@ -42,7 +42,7 @@ public:
 
     template<typename T>
     VkBuffer createDeviceLocalBuffer(const std::vector<T>& data, VkBufferUsageFlags);
-    VkBuffer createDeviceLocalBuffer(size_t size, const void* data, VkBufferUsageFlags);
+    VkBuffer createDeviceLocalBuffer(VkDeviceSize, const void* data, VkBufferUsageFlags);
 
     VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
