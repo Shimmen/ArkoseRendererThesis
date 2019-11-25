@@ -30,7 +30,7 @@ private:
     [[nodiscard]] std::vector<const char*> requiredValidationLayers() const;
     [[nodiscard]] bool checkValidationLayerSupport(const std::vector<const char*>&) const;
 
-    void findQueueFamilyIndices(VkPhysicalDevice, VkSurfaceKHR);
+    [[nodiscard]] VulkanQueueInfo findQueueFamilyIndices(VkPhysicalDevice, VkSurfaceKHR);
     [[nodiscard]] VkPhysicalDevice pickBestPhysicalDevice(VkInstance, VkSurfaceKHR) const;
     [[nodiscard]] VkSurfaceFormatKHR pickBestSurfaceFormat(VkPhysicalDevice, VkSurfaceKHR) const;
     [[nodiscard]] VkPresentModeKHR pickBestPresentMode(VkPhysicalDevice, VkSurfaceKHR) const;
@@ -57,10 +57,7 @@ private:
 
     VulkanContext* m_context {};
 
-    uint32_t m_graphicsQueueFamilyIndex { UINT32_MAX };
-    uint32_t m_computeQueueFamilyIndex { UINT32_MAX };
-    uint32_t m_presentQueueFamilyIndex { UINT32_MAX };
-
+    VulkanQueueInfo m_queueInfo {};
     VkQueue m_presentQueue {};
 
     static constexpr size_t maxFramesInFlight { 2 };
@@ -82,8 +79,4 @@ private:
     VkImageView m_depthImageView {};
     VkDeviceMemory m_depthImageMemory {};
 
-    //
-
-    //std::vector<VkShaderModule> m_shaderModules {};
-    //std::unordered_map<std::string, ShaderID> m_shaderIdForName {};
 };

@@ -11,17 +11,16 @@
 #include <cstring>
 #include <stb_image.h>
 
-VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device)
+VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device, VulkanQueueInfo queueInfo)
     : m_physicalDevice(physicalDevice)
     , m_device(device)
+    , m_queueInfo(queueInfo)
 {
-
-    uint32_t graphicsQueueFamily = 0; // TODO TODO TODO
-    vkGetDeviceQueue(m_device, graphicsQueueFamily, 0, &m_graphicsQueue);
+    vkGetDeviceQueue(m_device, queueInfo.graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
 
     VkCommandPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolCreateInfo.queueFamilyIndex = graphicsQueueFamily;
+    poolCreateInfo.queueFamilyIndex = m_queueInfo.graphicsQueueFamilyIndex;
     poolCreateInfo.flags = 0u;
     if (vkCreateCommandPool(device, &poolCreateInfo, nullptr, &m_commandPool) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::VulkanContext(): could not create command pool for the graphics queue, exiting.\n");
@@ -29,7 +28,7 @@ VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device)
 
     VkCommandPoolCreateInfo transientPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     transientPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    transientPoolCreateInfo.queueFamilyIndex = graphicsQueueFamily;
+    transientPoolCreateInfo.queueFamilyIndex = m_queueInfo.graphicsQueueFamilyIndex;
     if (vkCreateCommandPool(m_device, &transientPoolCreateInfo, nullptr, &m_transientCommandPool) != VK_SUCCESS) {
         LogErrorAndExit("VulkanContext::VulkanContext(): could not create transient command pool, exiting.\n");
     }

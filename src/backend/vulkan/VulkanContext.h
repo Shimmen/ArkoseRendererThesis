@@ -1,5 +1,6 @@
 #pragma once
 
+#include "VulkanQueueInfo.h"
 #include "common-vk.h"
 #include <functional>
 #include <string>
@@ -24,7 +25,7 @@ struct BufferRange {
 
 class VulkanContext {
 public:
-    explicit VulkanContext(VkPhysicalDevice, VkDevice);
+    VulkanContext(VkPhysicalDevice, VkDevice, VulkanQueueInfo);
     ~VulkanContext();
 
     void createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
@@ -71,6 +72,7 @@ private:
 
     //
 
+    VulkanQueueInfo m_queueInfo {};
     VkQueue m_graphicsQueue {};
 
     VkCommandPool m_commandPool {};

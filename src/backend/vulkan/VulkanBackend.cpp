@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "VulkanQueueInfo.h"
 #include "utility/fileio.h"
 #include "utility/logging.h"
 #include "utility/util.h"
@@ -27,11 +28,11 @@ VulkanBackend::VulkanBackend(GLFWwindow* window)
     m_surface = createSurface(m_instance, m_window);
     m_physicalDevice = pickBestPhysicalDevice(m_instance, m_surface);
 
-    findQueueFamilyIndices(m_physicalDevice, m_surface);
+    m_queueInfo = findQueueFamilyIndices(m_physicalDevice, m_surface);
     m_device = createDevice(m_physicalDevice, m_surface);
     createSemaphoresAndFences(m_device);
 
-    m_context = new VulkanContext(m_physicalDevice, m_device);
+    m_context = new VulkanContext(m_physicalDevice, m_device, m_queueInfo);
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
 }
 
@@ -153,7 +154,7 @@ void VulkanBackend::destroyDebugMessenger(VkInstance instance, VkDebugUtilsMesse
     destroyFunc(instance, messenger, nullptr);
 }
 
-void VulkanBackend::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+VulkanQueueInfo VulkanBackend::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
     uint32_t count;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, nullptr);
@@ -164,16 +165,18 @@ void VulkanBackend::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSu
     bool foundComputeQueue = false;
     bool foundPresentQueue = false;
 
+    VulkanQueueInfo queueInfo {};
+
     for (uint32_t idx = 0; idx < count; ++idx) {
         const auto& queueFamily = queueFamilies[idx];
 
         if (!foundGraphicsQueue && queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            m_graphicsQueueFamilyIndex = idx;
+            queueInfo.graphicsQueueFamilyIndex = idx;
             foundGraphicsQueue = true;
         }
 
         if (!foundComputeQueue && queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-            m_computeQueueFamilyIndex = idx;
+            queueInfo.computeQueueFamilyIndex = idx;
             foundComputeQueue = true;
         }
 
@@ -181,7 +184,7 @@ void VulkanBackend::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSu
             VkBool32 presentSupportForQueue;
             vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, idx, surface, &presentSupportForQueue);
             if (presentSupportForQueue) {
-                m_presentQueueFamilyIndex = idx;
+                queueInfo.presentQueueFamilyIndex = idx;
                 foundPresentQueue = true;
             }
         }
@@ -196,6 +199,8 @@ void VulkanBackend::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSu
     if (!foundPresentQueue) {
         LogErrorAndExit("VulkanBackend::findQueueFamilyIndices(): could not find a present queue, exiting.\n");
     }
+
+    return queueInfo;
 }
 
 VkPhysicalDevice VulkanBackend::pickBestPhysicalDevice(VkInstance instance, VkSurfaceKHR surface) const
@@ -374,7 +379,7 @@ VkSurfaceKHR VulkanBackend::createSurface(VkInstance instance, GLFWwindow* windo
 
 VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
-    std::set<uint32_t> queueFamilyIndices = { m_graphicsQueueFamilyIndex, m_computeQueueFamilyIndex, m_presentQueueFamilyIndex };
+    std::set<uint32_t> queueFamilyIndices = { m_queueInfo.graphicsQueueFamilyIndex, m_queueInfo.computeQueueFamilyIndex, m_queueInfo.presentQueueFamilyIndex };
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     const float queuePriority = 1.0f;
     for (uint32_t familyIndex : queueFamilyIndices) {
@@ -414,7 +419,7 @@ VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceK
         LogErrorAndExit("VulkanBackend::createDevice(): could not create a device, exiting.\n");
     }
 
-    vkGetDeviceQueue(device, m_presentQueueFamilyIndex, 0, &m_presentQueue);
+    vkGetDeviceQueue(device, m_queueInfo.presentQueueFamilyIndex, 0, &m_presentQueue);
     return device;
 }
 
@@ -483,8 +488,8 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // (only color for the swapchain images)
 
-    uint32_t queueFamilyIndices[] = { m_graphicsQueueFamilyIndex, m_presentQueueFamilyIndex };
-    if (m_graphicsQueueFamilyIndex != m_presentQueueFamilyIndex) {
+    uint32_t queueFamilyIndices[] = { m_queueInfo.graphicsQueueFamilyIndex, m_queueInfo.presentQueueFamilyIndex };
+    if (!m_queueInfo.combinedGraphicsComputeQueue()) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
         createInfo.queueFamilyIndexCount = 2;
