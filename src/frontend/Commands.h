@@ -1,5 +1,6 @@
 #pragma once
 
+#include "RenderState.h"
 #include "Resources.h"
 #include <memory>
 
@@ -30,15 +31,27 @@ enum class DrawMode {
 };
 
 struct DrawElements : public Command {
-    std::unique_ptr<Buffer> vertexBuffer;
+
+    DrawElements(Buffer& vBuf, VertexLayout vLay, Buffer& iBuf, size_t numI, DrawMode dMode, RenderState state, Shader& shad)
+        : vertexBuffer(vBuf)
+        , vertexLayout(vLay)
+        , indexBuffer(iBuf)
+        , numIndices(numI)
+        , mode(dMode)
+        , renderState(state)
+        , shader(shad)
+    {
+    }
+
+    Buffer& vertexBuffer;
     VertexLayout vertexLayout;
 
-    std::unique_ptr<Buffer> indexBuffer;
-
-    std::unique_ptr<Shader> shader;
-
+    Buffer& indexBuffer;
     size_t numIndices;
     DrawMode mode { DrawMode::Triangles };
+
+    RenderState renderState;
+    Shader& shader;
 };
 
 }

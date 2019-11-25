@@ -33,7 +33,7 @@ struct Extent2D {
 };
 
 struct Texture2D {
-    NON_COPYABLE(Texture2D)
+    //NON_COPYABLE(Texture2D)
 
     enum class Components {
         Grayscale,
@@ -41,14 +41,15 @@ struct Texture2D {
         Rgba,
     };
 
+    Texture2D() = default;
     Texture2D(int width, int height, Components, bool srgb = true, bool mipmaps = true);
-    Texture2D(Texture2D&&) noexcept;
+    //Texture2D(Texture2D&&) noexcept;
     ~Texture2D();
 
-    const Extent2D extent;
-    const Components components;
-    const bool mipmaps;
-    const bool srgb;
+    Extent2D extent { 0, 0 };
+    Components components { Components::Grayscale };
+    bool mipmaps { false };
+    bool srgb { false };
 
 private:
     uint32_t m_handle { NullHandle };
@@ -84,7 +85,7 @@ private:
 };
 
 struct Buffer {
-    NON_COPYABLE(Buffer)
+    //NON_COPYABLE(Buffer)
 
     enum class Usage {
         TransferOptimal,
@@ -100,14 +101,15 @@ struct Buffer {
         return buffer;
     }
 
+    Buffer() = default;
     Buffer(size_t size, Usage);
-    Buffer(Buffer&&) noexcept;
+    //Buffer(Buffer&&) noexcept;
     ~Buffer();
 
     void setData(void* data, size_t size, size_t offset = 0);
 
-    const size_t size;
-    const Usage usage;
+    size_t size { 0 };
+    Usage usage { Usage::GpuOptimal };
 
 private:
     uint32_t m_handle {};

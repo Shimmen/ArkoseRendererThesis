@@ -11,7 +11,7 @@ Texture2D::Texture2D(int width, int height, Components components, bool srgb, bo
     , mipmaps(mipmaps)
 {
 }
-
+/*
 Texture2D::Texture2D(Texture2D&& other) noexcept
     : extent(other.extent)
     , components(other.components)
@@ -21,7 +21,7 @@ Texture2D::Texture2D(Texture2D&& other) noexcept
     m_handle = other.m_handle;
     other.m_handle = NullHandle;
 }
-
+*/
 Texture2D::~Texture2D()
 {
     if (m_handle != NullHandle) {
@@ -94,7 +94,7 @@ Buffer::Buffer(size_t size, Usage usage)
     , usage(usage)
 {
 }
-
+/*
 Buffer::Buffer(Buffer&& other) noexcept
     : size(other.size)
     , usage(other.usage)
@@ -102,7 +102,7 @@ Buffer::Buffer(Buffer&& other) noexcept
     m_handle = other.m_handle;
     other.m_handle = NullHandle;
 }
-
+*/
 Buffer::~Buffer()
 {
     if (m_handle != NullHandle) {

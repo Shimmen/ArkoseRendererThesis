@@ -1,53 +1,11 @@
 #pragma once
 
+#include "ApplicationState.h"
+#include "CommandSubmitter.h"
+#include "ResourceManager.h"
 #include "Resources.h"
 #include "utility/copying.h"
 #include <functional>
-
-struct ApplicationState {
-    const int frameIndex;
-
-    const double deltaTime;
-    const double timeSinceStartup;
-
-    const Extent2D windowExtent;
-    const bool windowSizeDidChange;
-};
-
-class ResourceManager {
-    // TODO: This is passed to the construct passes and is used to allocate
-    //  resources (e.g. textures & buffers) used in the execute pass.
-public:
-    explicit ResourceManager(ApplicationState appState)
-        : m_appState(std::move(appState))
-    {
-    }
-
-    // TODO: Add a nice API for creating & managing resources here
-
-    // TODO: Idea for implementation: remember all previous resources created from it (from previous frames)
-    //  and if everything is the same, don't actually delete and construct new resources that are the same.
-    //  Example situation: the window resizes, the render pass is reconstructed, and the code requests an
-    //  identical buffer for e.g. static data, so we simply return the last used one. Maybe we then only delete
-    //  resources when we ask for new stuff or when you manually request that things are release (e.g. at shutdown).
-    //  Internally a backend could keep track of <RenderPass, ResourceManager> pairs which are in sync with each other!
-
-    // TODO: Another idea for implementation! Since all other resources go through this resource builder
-    //  (really it should be called ResourceManager) why not manage a "static" resource manager for an App object,
-    //  which manages all resources that persist throughout the whole application lifetime.
-
-    [[nodiscard]] RenderTarget getWindowRenderTarget();
-    [[nodiscard]] RenderTarget createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
-
-    [[nodiscard]] Texture2D createTexture2D(int width, int height);
-    [[nodiscard]] Buffer createBuffer(size_t size);
-
-    void setBufferDataImmediately(Buffer, void* data, size_t size, size_t offset = 0);
-
-private:
-    const ApplicationState m_appState;
-    // TODO: Add some type of references to resources here so it can keep track of stuff.
-};
 
 enum class RenderPassChangeRequest {
     //! The exact same command as previous frame should be submitted.
@@ -65,9 +23,10 @@ public:
     using NeedsConstructCallback = std::function<bool(const ApplicationState&)>;
     using ChangeRequestCallback = std::function<RenderPassChangeRequest(const ApplicationState&)>;
 
-    using CommandSubmissionCallback = std::function<void()>;
+    using CommandSubmissionCallback = std::function<void(CommandSubmitter&)>;
     using RenderPassConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&)>;
 
+    RenderPass() = default; // TODO: Should we have such a thing use instead just use null for members?
     explicit RenderPass(RenderPassConstructorFunction);
     ~RenderPass();
 

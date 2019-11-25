@@ -1,13 +1,24 @@
 #pragma once
 
-class App {
+#include "ApplicationState.h"
+#include "RenderPass.h"
+#include "ResourceManager.h"
+#include <memory>
 
+class App {
 public:
-    virtual void setup() = 0;
-    virtual void resize() = 0;
-    virtual void render() = 0;
+    explicit App(ResourceManager&);
+
+    void setup(ApplicationState);
+    void drawFrame(ApplicationState);
 
 private:
-    int m_screenWidth;
-    int m_screenHeight;
+    ResourceManager& m_resourceManager;
+
+    // TODO: Move these stuff below to some subclass..?
+    Texture2D m_testTexture {};
+    Buffer m_vertexBuffer {};
+    Buffer m_indexBuffer {};
+
+    std::unique_ptr<RenderPass> m_renderPass {};
 };

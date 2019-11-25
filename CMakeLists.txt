@@ -11,6 +11,8 @@ add_executable(ArkoseRenderer
         src/frontend/App.cpp
         src/frontend/Resources.cpp
         src/frontend/RenderPass.cpp
+        src/frontend/ResourceManager.cpp
+        src/frontend/CommandSubmitter.cpp
         src/utility/fileio.cpp
         src/utility/Random.cpp)
 

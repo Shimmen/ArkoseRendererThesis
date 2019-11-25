@@ -123,11 +123,12 @@ void ShaderManager::startFileWatching(unsigned msBetweenPolls)
         return;
     }
 
-    m_fileWatcherThread = std::make_unique<std::thread>([&]() {
+    m_fileWatcherThread = std::make_unique<std::thread>([this, msBetweenPolls]() {
         while (GlobalState::get().applicationRunning()) {
 
             std::this_thread::sleep_for(std::chrono::milliseconds(msBetweenPolls));
             {
+                LogInfo("ShaderManager: update!\n");
                 std::lock_guard<std::mutex> dataLock(m_shaderDataMutex);
 
                 std::vector<std::string> filesToRemove {};
