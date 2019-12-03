@@ -11,7 +11,7 @@
 #include <cstring>
 #include <set>
 
-VulkanBackend::VulkanBackend(GLFWwindow* window)
+VulkanBackend::VulkanBackend(App& app, GLFWwindow* window)
     : m_window(window)
 {
     glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int, int) {
@@ -32,7 +32,7 @@ VulkanBackend::VulkanBackend(GLFWwindow* window)
     m_device = createDevice(m_physicalDevice, m_surface);
     createSemaphoresAndFences(m_device);
 
-    m_context = new VulkanContext(m_physicalDevice, m_device, m_queueInfo);
+    m_context = new VulkanContext(app, m_physicalDevice, m_device, m_queueInfo);
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
 }
 

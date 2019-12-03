@@ -2,6 +2,7 @@
 
 #include "../mesh.h"
 #include "camera_state.h"
+#include "rendering/App.h"
 #include "utility/fileio.h"
 #include "utility/logging.h"
 #include "utility/mathkit.h"
@@ -11,8 +12,9 @@
 #include <cstring>
 #include <stb_image.h>
 
-VulkanContext::VulkanContext(VkPhysicalDevice physicalDevice, VkDevice device, VulkanQueueInfo queueInfo)
-    : m_physicalDevice(physicalDevice)
+VulkanContext::VulkanContext(App& app, VkPhysicalDevice physicalDevice, VkDevice device, VulkanQueueInfo queueInfo)
+    : m_app(app)
+    , m_physicalDevice(physicalDevice)
     , m_device(device)
     , m_queueInfo(queueInfo)
 {
@@ -50,6 +52,188 @@ VulkanContext::~VulkanContext()
 
     vkDestroyCommandPool(m_device, m_commandPool, nullptr);
     vkDestroyCommandPool(m_device, m_transientCommandPool, nullptr);
+}
+
+void VulkanContext::translateRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderPass, const ResourceManager& resourceManager)
+{
+    VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+
+    Extent2D extent = renderPass.target().extent();
+    renderPassBeginInfo.renderArea.extent = { extent.width(), extent.height() };
+    renderPassBeginInfo.renderArea.offset = { 0, 0 };
+
+    auto cmdIterator = renderPass.commands().begin();
+
+    std::vector<VkClearValue> clearValues {};
+    if (renderPass.commands().front()->type() == typeid(CmdClear)) {
+
+        // TODO: Respect clear command settings!
+        //auto clearCmd = dynamic_cast<CmdClear*>(renderPass.commands().front());
+        //clearValues.reserve(renderPass.target().attachmentCount() + (renderPass.target().hasDepthTarget() ? 1 : 0));
+
+        clearValues[0].color = { 1.0f, 0.0f, 1.0f, 1.0f };
+        clearValues[1].depthStencil = { 1.0f, 0 };
+
+        renderPassBeginInfo.clearValueCount = clearValues.size();
+        renderPassBeginInfo.pClearValues = clearValues.data();
+
+        // Skip the first command now, because its intent has been captured
+        std::advance(cmdIterator, 1);
+    }
+
+    // TODO: The render pass, framebuffer, pipeline, and pipeline layout should be created at render pass construction.
+    //  At this stage we should just perform a basic lookup to get those resources from the VulkanContext
+
+    // TODO: The descriptor set (and maybe the pipeline layout?!) can be tied to per frame updates, so we need to do some stuff here. Unclear..
+
+    VulkanContext::RenderPassInfo info = renderPassInfo(renderPass);
+    renderPassBeginInfo.renderPass = info.renderPass;
+    renderPassBeginInfo.framebuffer = framebuffer(renderPass.target());
+
+    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipeline);
+    //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipelineLayout, 0, 1, &THE_DESCRIPTOR_SET_FOR_FRAME, 0, nullptr); // TODO!
+
+    for (; cmdIterator != renderPass.commands().end(); std::advance(cmdIterator, 1)) {
+        const FrontendCommand* cmd = *cmdIterator;
+        auto& type = cmd->type();
+
+        if (type == typeid(CmdDrawIndexed)) {
+            translateDrawIndexed(commandBuffer, resourceManager, *dynamic_cast<const CmdDrawIndexed*>(cmd));
+        } else {
+            ASSERT_NOT_REACHED();
+        }
+    }
+
+    vkCmdEndRenderPass(commandBuffer);
+}
+
+void VulkanContext::translateDrawIndexed(VkCommandBuffer commandBuffer, const ResourceManager& resourceManager, const CmdDrawIndexed& command)
+{
+    VkBuffer vertexBuffer = buffer(command.vertexBuffer);
+    VkBuffer indexBuffer = buffer(command.indexBuffer);
+
+    // TODO Here we need someone to tell us what a resource from the resource manager means for the Vulkan backend! Who actually owns resources? It should be the context, right?! Maybe..?
+    VkBuffer vertexBuffers[] = { vertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdDrawIndexed(commandBuffer, command.numIndices, 1, 0, 0, 0);
+}
+
+void VulkanContext::newBuffer(Buffer& buffer)
+{
+    // TODO: Create buffer, put it in the m_buffers vector, and register this backend with the id as the the vector index
+    buffer.registerBackend(123);
+}
+
+VkBuffer VulkanContext::buffer(const Buffer& buffer)
+{
+    // TODO: Manage free list, etc.
+    auto& bufferInfo = m_bufferInfos[buffer.id()];
+    return bufferInfo.buffer;
+}
+
+void VulkanContext::newFramebuffer(RenderTarget& renderTarget)
+{
+    // TODO: Create framebuffer according to specs, put it in the m_framebuffers vector, and register this backend with the id as the the vector index
+    renderTarget.registerBackend(456);
+}
+
+VkFramebuffer VulkanContext::framebuffer(const RenderTarget& renderTarget)
+{
+    if (renderTarget.isWindowTarget()) {
+        // TODO: Now we actually have to get the one for this frame!
+        ASSERT_NOT_REACHED();
+    }
+
+    // TODO: Manage free list, etc.
+    VkFramebuffer framebuffer = m_framebuffers[renderTarget.id()];
+    return framebuffer;
+}
+
+void VulkanContext::newRenderPass(RenderPass& renderPass)
+{
+    // TODO: Create stuff according to specs and store away etc..
+    renderPass.registerBackend(789);
+}
+
+const VulkanContext::RenderPassInfo& VulkanContext::renderPassInfo(const RenderPass& renderPass)
+{
+    return m_renderPassInfos[renderPass.id()];
+}
+
+void VulkanContext::recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat)
+{
+    size_t numSwapchainImages = swapchainImageViews.size();
+
+    // TODO: All of these need to be passed in
+    bool windowSizeDidChange = true;
+    double deltaTime = 1.0 / 60.0;
+    double timeSinceStartup = 0.0;
+    int frameIndex = 0;
+
+    for (size_t i = 0; i < numSwapchainImages; ++i) {
+
+        ApplicationState appState {
+            Extent2D(finalTargetExtent.width, finalTargetExtent.height),
+            windowSizeDidChange, deltaTime, timeSinceStartup, frameIndex
+        };
+        /*
+        // TODO: How are we going to get the backend from here? Ugh, it really should all be the same class
+        ResourceManager resourceManager(appState, backend);
+
+        app().passTree().forEachPassInOrder([](const RenderPass& pass) {
+            pass.construct(resourceManager);
+
+            ResourceManager& previourResourceManager = m_resourceManagerForPass[pass];
+            ResourceChangeList changeList = resourceManager.changeListRelativeTo(previousResourceManager);
+
+            for (auto& bufferChange : changeList.buffers) {
+                if (bufferChange.type == ResourceManager::Change::Create) {
+                    newBuffer(bufferChange.buffer);
+                } else if (bufferChange.type == ResourceManager::Change::Remove) {
+                    // todo
+                }
+            }
+            for (auto& textureChange : changeList.textures) {
+                // todo
+            }
+            for (auto& todoChange : changeList.otherStuffStuff) {
+                // todo
+            }
+            for (auto& immediateBufferUpdates : changeList.immediateBufferUpdates) {
+                // todo
+            }
+
+            // Replace previous resource manager
+            m_resourceManagerForPass[pass] = resourceManager;
+        });
+        */
+    }
+}
+
+void VulkanContext::newFrame(uint32_t relFrameIndex, float totalTime, float deltaTime)
+{
+    ApplicationState appState = {}; // TODO!
+
+    // TODO: How about we don't have any of these needsUpdate pass, and instead just figures out
+    //  if there are new commands, which implies that there are updates needed.
+
+    // TODO: However, it could be tricky if we don't know if command buffers need rerecording util after we have called execute(), maybe?
+    /*
+    for (const RenderPass& pass : app().passTree()) {
+        RenderPass::CommandList commandList {};
+
+        // NOTE: This function both fills out the command list and performs updates etc. to its own resources
+        pass.execute(appState, commandList);
+
+        if (commandList != previousCommandList ) { // maybeJustForThisRelFrameIndex? Or maybe globally new command list?
+            // todo: now we actually have to rerecord the command buffers!
+        }
+    }
+    */
 }
 
 bool VulkanContext::issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const
@@ -437,6 +621,8 @@ ManagedImage VulkanContext::createImageViewFromImagePath(const std::string& imag
 
 void VulkanContext::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat)
 {
+    recordCommandBuffers(finalTargetFormat, finalTargetExtent, swapchainImageViews, depthImageView, depthFormat);
+
     m_exAspectRatio = float(finalTargetExtent.width) / float(finalTargetExtent.height);
 
     VkDescriptorSetLayoutBinding cameraStateUboLayoutBinding = {};
@@ -886,6 +1072,8 @@ void VulkanContext::destroyTheDrawingStuff()
 
 void VulkanContext::timestepForTheDrawingStuff(uint32_t index)
 {
+    newFrame(index, 0.0f, 1.0 / 60.0f);
+
     // FIXME: Use the time stuff provided by GLFW
     static auto startTime = std::chrono::high_resolution_clock::now();
     auto currentTime = std::chrono::high_resolution_clock::now();

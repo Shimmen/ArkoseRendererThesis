@@ -2,8 +2,8 @@
 
 #include "ApplicationState.h"
 #include "CommandSubmitter.h"
-#include "ResourceManager.h"
 #include "Resources.h"
+#include "rendering/ResourceManager.h"
 #include "utility/copying.h"
 #include <functional>
 
@@ -18,17 +18,27 @@ enum class RenderPassChangeRequest {
     ResubmitCommands
 };
 
-class RenderPass {
+class RenderPass : public Resource {
 public:
     using NeedsConstructCallback = std::function<bool(const ApplicationState&)>;
     using ChangeRequestCallback = std::function<RenderPassChangeRequest(const ApplicationState&)>;
 
-    using CommandSubmissionCallback = std::function<void(CommandSubmitter&)>;
+    using CommandList = std::vector<std::unique_ptr<FrontendCommand>>;
+    using CommandSubmissionCallback = std::function<void(const ApplicationState&, CommandList&)>;
     using RenderPassConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&)>;
 
     RenderPass() = default; // TODO: Should we have such a thing use instead just use null for members?
     explicit RenderPass(RenderPassConstructorFunction);
     ~RenderPass();
+
+    [[nodiscard]] const RenderTarget& target() const;
+    [[nodiscard]] const std::vector<FrontendCommand*>& commands() const { return m_commands; }
+
+    //! Constructs the pass with a resource manager that manages the resources for it.
+    void construct(ResourceManager&);
+
+    //! Executes the pass and returns the commands that need to be performed.
+    void execute(const ApplicationState&, CommandList&);
 
     //! Returns true if the render pass needs to be (re)constructed with new resources, e.g. in case of a window resize.
     [[nodiscard]] bool needsConstruction(const ApplicationState&) const;
@@ -56,4 +66,10 @@ protected:
 
     //! Queries the pass regarding changes to commands executed in the command submission callback.
     ChangeRequestCallback m_change_request_callback {};
+
+    //! The target that this pass renders to.
+    std::optional<RenderTarget> m_target {};
+
+    //! The commands that this render pass last submitted.
+    std::vector<FrontendCommand*> m_commands {};
 };

@@ -1,15 +1,15 @@
 #include "App.h"
 #include "Commands.h"
 #include "RenderState.h"
+#include "rendering/ResourceManager.h"
 
-App::App(ResourceManager& resourceManager)
-    : m_resourceManager(resourceManager)
+App::App()
 {
 }
 
 void App::setup(ApplicationState appState)
 {
-    m_testTexture = m_resourceManager.loadTexture2D("test-pattern.png", false);
+    //m_testTexture = m_resourceManager.loadTexture2D("test-pattern.png", false);
 
     struct Vertex {
         vec3 position;
@@ -36,10 +36,8 @@ void App::setup(ApplicationState appState)
         6, 7, 4
     };
 
-    m_vertexBuffer = m_resourceManager.createBuffer(vertices, Buffer::Usage::GpuOptimal);
-    m_indexBuffer = m_resourceManager.createBuffer(indices, Buffer::Usage::GpuOptimal);
-
-    using namespace command;
+    Buffer vertexBuffer = m_resourceManager->createBuffer(vertices, Buffer::Usage::GpuOptimal);
+    Buffer indexBuffer = m_resourceManager->createBuffer(indices, Buffer::Usage::GpuOptimal);
 
     RenderState defaultState {};
     Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
@@ -47,7 +45,7 @@ void App::setup(ApplicationState appState)
     m_renderPass = std::make_unique<RenderPass>([&](ResourceManager& resourceManager) {
         RenderTarget windowTarget = resourceManager.getWindowRenderTarget();
 
-        return [&](CommandSubmitter& commandSubmitter) {
+        return [&](const ApplicationState& appState, RenderPass::CommandList& commandList) {
             VertexLayout vertexLayout = {
                 sizeof(Vertex),
                 { { 0, VertexAttributeType::Float4, offsetof(Vertex, position) },
@@ -55,10 +53,10 @@ void App::setup(ApplicationState appState)
                     { 2, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
             };
 
-            commandSubmitter.submit(std::make_unique<DrawElements>(
-                m_vertexBuffer,
+            commandList.push_back(std::make_unique<CmdDrawIndexed>(
+                vertexBuffer,
                 vertexLayout,
-                m_indexBuffer,
+                indexBuffer,
                 indices.size(),
                 DrawMode::Triangles,
                 defaultState,

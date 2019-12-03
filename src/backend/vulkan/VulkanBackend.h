@@ -2,14 +2,15 @@
 
 #include "../Backend.h"
 #include "VulkanContext.h"
-#include "common-vk.h"
 #include <array>
+
+#include <vulkan/vulkan.h>
 
 struct GLFWwindow;
 
 class VulkanBackend final : public Backend {
 public:
-    explicit VulkanBackend(GLFWwindow* window);
+    explicit VulkanBackend(App&, GLFWwindow*);
     ~VulkanBackend() override;
 
     VulkanBackend(VulkanBackend&&) = default;
@@ -78,5 +79,4 @@ private:
     VkImage m_depthImage {};
     VkImageView m_depthImageView {};
     VkDeviceMemory m_depthImageMemory {};
-
 };

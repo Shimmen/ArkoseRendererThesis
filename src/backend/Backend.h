@@ -1,6 +1,6 @@
 #pragma once
 
-#include "frontend/CommandSubmitter.h"
+#include "rendering/CommandSubmitter.h"
 #include <string>
 
 class Backend {

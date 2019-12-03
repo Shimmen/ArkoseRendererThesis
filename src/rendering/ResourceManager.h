@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ApplicationState.h"
-#include "Resources.h"
+#include "rendering/ApplicationState.h"
+#include "rendering/Resources.h"
 
 class Backend;
 
@@ -31,7 +31,7 @@ public:
     [[nodiscard]] RenderTarget createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
     [[nodiscard]] Texture2D loadTexture2D(std::string imagePath, bool generateMipmaps);
-    [[nodiscard]] Texture2D createTexture2D(int width, int height, Texture2D::Components, bool mipmaps, bool srgb);
+    [[nodiscard]] Texture2D createTexture2D(int width, int height, Texture2D::Components, bool srgb, bool mipmaps);
     [[nodiscard]] Texture2D getTexture2D(std::string renderPass, std::string name);
 
     [[nodiscard]] Buffer createBuffer(size_t size, Buffer::Usage);

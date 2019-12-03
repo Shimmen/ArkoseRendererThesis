@@ -1,5 +1,6 @@
 #include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
+#include "rendering/App.h"
 #include "utility/GlobalState.h"
 #include "utility/logging.h"
 
@@ -51,13 +52,13 @@ GLFWwindow* createWindow(BackendType backendType, WindowType windowType, Extent2
     return window;
 }
 
-Backend* createBackend(BackendType backendType, GLFWwindow* window)
+Backend* createBackend(App& app, BackendType backendType, GLFWwindow* window)
 {
     Backend* backend;
 
     switch (backendType) {
     case BackendType::Vulkan:
-        backend = new VulkanBackend(window);
+        backend = new VulkanBackend(app, window);
         break;
     }
 
@@ -71,9 +72,11 @@ int main()
         LogErrorAndExit("ArkoseRenderer::main(): could not initialize GLFW, exiting.\n");
     }
 
+    App* app = new App();
+
     BackendType backendType = BackendType::Vulkan;
     GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
-    Backend* backend = createBackend(backendType, window);
+    Backend* backend = createBackend(*app, backendType, window);
 
     LogInfo("ArkoseRenderer: main loop begin.\n");
 
@@ -93,6 +96,7 @@ int main()
     GlobalState::getMutable().setApplicationRunning(false);
     LogInfo("ArkoseRenderer: main loop end.\n");
 
+    delete app;
     delete backend;
     glfwDestroyWindow(window);
     glfwTerminate();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utility/Badge.h"
 #include "utility/copying.h"
 #include "utility/mathkit.h"
 #include <cstdint>
@@ -9,15 +10,25 @@
 
 constexpr uint32_t NullHandle = 0u;
 
+class ResourceManager;
+
 struct Extent2D {
-    Extent2D(int width, int height)
+    Extent2D()
+        : Extent2D(0, 0)
+    {
+    }
+    Extent2D(uint32_t width, uint32_t height)
         : m_width(width)
         , m_height(height)
     {
     }
+    Extent2D(const Extent2D& other)
+        : Extent2D(other.m_width, other.m_height)
+    {
+    }
 
-    [[nodiscard]] int width() const { return m_width; }
-    [[nodiscard]] int height() const { return m_height; }
+    [[nodiscard]] uint32_t width() const { return m_width; }
+    [[nodiscard]] uint32_t height() const { return m_height; }
 
     bool operator!=(const Extent2D& other) const
     {
@@ -28,12 +39,22 @@ struct Extent2D {
         return m_width == other.m_width && m_height == other.m_height;
     }
 
-    int m_width {};
-    int m_height {};
+private:
+    uint32_t m_width {};
+    uint32_t m_height {};
+};
+
+struct Resource {
+public:
+    // TODO: We probably want to require a Badge for access to these
+    [[nodiscard]] uint64_t id() const;
+    void registerBackend(uint64_t id);
+
+private:
+    uint64_t m_id { UINT64_MAX };
 };
 
 struct Texture2D {
-    //NON_COPYABLE(Texture2D)
 
     enum class Components {
         Grayscale,
@@ -41,22 +62,21 @@ struct Texture2D {
         Rgba,
     };
 
-    Texture2D() = default;
-    Texture2D(int width, int height, Components, bool srgb = true, bool mipmaps = true);
-    //Texture2D(Texture2D&&) noexcept;
-    ~Texture2D();
+    Texture2D(Badge<ResourceManager>, int width, int height, Components, bool srgb = true, bool mipmaps = true);
 
-    Extent2D extent { 0, 0 };
-    Components components { Components::Grayscale };
-    bool mipmaps { false };
-    bool srgb { false };
+    [[nodiscard]] const Extent2D& extent() const { return m_extent; }
+    [[nodiscard]] Components components() const { return m_components; }
+    [[nodiscard]] bool hasMipmaps() const { return m_mipmaps; }
+    [[nodiscard]] bool isSrgb() const { return m_srgb; }
 
 private:
-    uint32_t m_handle { NullHandle };
+    Extent2D m_extent;
+    Components m_components;
+    bool m_mipmaps;
+    bool m_srgb;
 };
 
-struct RenderTarget {
-    NON_COPYABLE(RenderTarget)
+struct RenderTarget : public Resource {
 
     enum class AttachmentType {
         Color0,
@@ -71,48 +91,32 @@ struct RenderTarget {
         Texture2D* texture;
     };
 
-    explicit RenderTarget(Texture2D&);
-    RenderTarget(std::initializer_list<Attachment>);
-    RenderTarget(RenderTarget&&) noexcept;
+    explicit RenderTarget(Badge<ResourceManager>, Texture2D&&);
+    explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> targets);
 
-    [[nodiscard]] Extent2D extent() const;
+    [[nodiscard]] const Extent2D& extent() const;
     [[nodiscard]] size_t attachmentCount() const;
-    [[nodiscard]] bool hasDepthTarget() const;
+    [[nodiscard]] bool hasDepthAttachment() const;
+    [[nodiscard]] bool isWindowTarget() const;
 
 private:
     std::vector<Attachment> m_attachments {};
     std::optional<Attachment> m_depthAttachment {};
+    bool m_isWindowTarget { false };
 };
 
-struct Buffer {
-    //NON_COPYABLE(Buffer)
+struct Buffer : public Resource {
 
     enum class Usage {
         TransferOptimal,
         GpuOptimal,
     };
 
-    template<typename T>
-    static inline Buffer createStatic(const std::vector<T>& data)
-    {
-        size_t size = data.size() * sizeof(T);
-        Buffer buffer { size, Usage::GpuOptimal };
-        buffer.setData(data.data(), size, 0);
-        return buffer;
-    }
-
-    Buffer() = default;
-    Buffer(size_t size, Usage);
-    //Buffer(Buffer&&) noexcept;
-    ~Buffer();
-
-    void setData(void* data, size_t size, size_t offset = 0);
-
-    size_t size { 0 };
-    Usage usage { Usage::GpuOptimal };
+    Buffer(Badge<ResourceManager>, size_t size, Usage);
 
 private:
-    uint32_t m_handle {};
+    size_t m_size { 0 };
+    Usage m_usage { Usage::GpuOptimal };
 };
 
 enum class ShaderFileType {

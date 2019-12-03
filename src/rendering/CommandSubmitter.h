@@ -16,8 +16,8 @@ public:
 
     CommandSubmitter(int numGraphicsQueues, int numComputeQueues);
 
-    CommandLink submit(std::unique_ptr<command::Command> command);
-    CommandLink submitAfter(std::unique_ptr<command::Command>, CommandLink other);
+    CommandLink submit(std::unique_ptr<FrontendCommand> command);
+    CommandLink submitAfter(std::unique_ptr<FrontendCommand>, CommandLink other);
 
 private:
 };

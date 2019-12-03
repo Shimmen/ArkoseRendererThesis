@@ -1,42 +1,42 @@
 #include "Resources.h"
 
-#include <backend/ShaderManager.h>
-#include <utility/logging.h>
-#include <utility>
+#include "rendering/ShaderManager.h"
+#include "utility/logging.h"
+#include "utility/util.h"
 
-Texture2D::Texture2D(int width, int height, Components components, bool srgb, bool mipmaps)
-    : extent(width, height)
-    , components(components)
-    , srgb(srgb)
-    , mipmaps(mipmaps)
+uint64_t Resource::id() const
 {
-}
-/*
-Texture2D::Texture2D(Texture2D&& other) noexcept
-    : extent(other.extent)
-    , components(other.components)
-    , srgb(other.srgb)
-    , mipmaps(other.mipmaps)
-{
-    m_handle = other.m_handle;
-    other.m_handle = NullHandle;
-}
-*/
-Texture2D::~Texture2D()
-{
-    if (m_handle != NullHandle) {
-        // TODO: Delete the texture and etc stuff
+    if (m_id == UINT64_MAX) {
+        LogErrorAndExit("Requested resource does not have an attached backend!\n");
     }
+    return m_id;
 }
 
-RenderTarget::RenderTarget(Texture2D& colorTexture)
+void Resource::registerBackend(uint64_t id)
+{
+    ASSERT(id != UINT64_MAX);
+    if (m_id != UINT64_MAX) {
+        LogErrorAndExit("Trying to register backend for a resource twice!\n");
+    }
+    m_id = id;
+}
+
+Texture2D::Texture2D(Badge<ResourceManager>, int width, int height, Components components, bool srgb, bool mipmaps)
+    : m_extent(width, height)
+    , m_components(components)
+    , m_srgb(srgb)
+    , m_mipmaps(mipmaps)
+{
+}
+
+RenderTarget::RenderTarget(Badge<ResourceManager>, Texture2D&& colorTexture)
     : m_attachments()
 {
     Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
     m_attachments.push_back(colorAttachment);
 }
 
-RenderTarget::RenderTarget(std::initializer_list<Attachment> targets)
+RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> targets)
 {
     for (const Attachment& attachment : targets) {
         if (attachment.type == AttachmentType::Depth) {
@@ -49,7 +49,7 @@ RenderTarget::RenderTarget(std::initializer_list<Attachment> targets)
     if (attachmentCount() < 1) {
         LogErrorAndExit("RenderTarget error: tried to create with less than one color attachments!\n");
     }
-
+    /*
     Extent2D firstExtent = m_attachments.front().texture->extent;
     for (auto& attachment : m_attachments) {
         if (attachment.texture->extent != firstExtent) {
@@ -64,19 +64,12 @@ RenderTarget::RenderTarget(std::initializer_list<Attachment> targets)
             m_depthAttachment->texture->extent.width(), m_depthAttachment->texture->extent.height(),
             firstExtent.width(), firstExtent.height());
     }
+    */
 }
 
-RenderTarget::RenderTarget(RenderTarget&& other) noexcept
-    : m_attachments(std::move(other.m_attachments))
-    , m_depthAttachment(other.m_depthAttachment)
+const Extent2D& RenderTarget::extent() const
 {
-    other.m_attachments.clear();
-    other.m_depthAttachment = {};
-}
-
-Extent2D RenderTarget::extent() const
-{
-    return m_attachments.front().texture->extent;
+    return m_attachments.front().texture->extent();
 }
 
 size_t RenderTarget::attachmentCount() const
@@ -84,35 +77,20 @@ size_t RenderTarget::attachmentCount() const
     return m_attachments.size();
 }
 
-bool RenderTarget::hasDepthTarget() const
+bool RenderTarget::hasDepthAttachment() const
 {
     return m_depthAttachment.has_value();
 }
 
-Buffer::Buffer(size_t size, Usage usage)
-    : size(size)
-    , usage(usage)
+bool RenderTarget::isWindowTarget() const
 {
-}
-/*
-Buffer::Buffer(Buffer&& other) noexcept
-    : size(other.size)
-    , usage(other.usage)
-{
-    m_handle = other.m_handle;
-    other.m_handle = NullHandle;
-}
-*/
-Buffer::~Buffer()
-{
-    if (m_handle != NullHandle) {
-        // TODO: Delete the buffer stuff
-    }
+    return m_isWindowTarget;
 }
 
-void Buffer::setData(void* data, size_t size, size_t offset)
+Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage)
+    : m_size(size)
+    , m_usage(usage)
 {
-    // TODO: I'm quite unsure how we want to handle this type of immediate actions..
 }
 
 ShaderFile::ShaderFile(std::string name, ShaderFileType type)

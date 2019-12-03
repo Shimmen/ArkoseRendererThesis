@@ -6,5 +6,5 @@ class Badge {
 private:
     friend T;
     Badge() {}
-    Key(Key&) {}
+    Badge(Badge&) {}
 };
