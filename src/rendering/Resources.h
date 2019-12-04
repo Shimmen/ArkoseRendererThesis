@@ -10,6 +10,7 @@
 
 constexpr uint32_t NullHandle = 0u;
 
+class Backend;
 class ResourceManager;
 
 struct Extent2D {
@@ -48,7 +49,7 @@ struct Resource {
 public:
     // TODO: We probably want to require a Badge for access to these
     [[nodiscard]] uint64_t id() const;
-    void registerBackend(uint64_t id);
+    void registerBackend(Badge<Backend>, uint64_t id);
 
 private:
     uint64_t m_id { UINT64_MAX };

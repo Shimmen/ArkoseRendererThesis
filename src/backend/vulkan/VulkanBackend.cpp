@@ -3,7 +3,6 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include "../mesh.h"
 #include "VulkanQueueInfo.h"
 #include "utility/fileio.h"
 #include "utility/logging.h"
@@ -16,9 +15,8 @@
 
 #include "camera_state.h"
 
-VulkanBackend::VulkanBackend(App& app, GLFWwindow* window)
-    : m_app(app)
-    , m_window(window)
+VulkanBackend::VulkanBackend(GLFWwindow* window)
+    : m_window(window)
 {
     glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int, int) {
         auto self = static_cast<VulkanBackend*>(glfwGetWindowUserPointer(window));
@@ -624,13 +622,7 @@ void VulkanBackend::recreateSwapchain()
     m_unhandledWindowResize = false;
 }
 
-bool VulkanBackend::compileCommandSubmitter(const CommandSubmitter&)
-{
-    // TODO!
-    return false;
-}
-
-bool VulkanBackend::executeFrame()
+bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
 {
     uint32_t currentFrameMod = m_currentFrameIndex % maxFramesInFlight;
 
@@ -752,7 +744,7 @@ void VulkanBackend::translateDrawIndexed(VkCommandBuffer commandBuffer, const Re
 void VulkanBackend::newBuffer(Buffer& buffer)
 {
     // TODO: Create buffer, put it in the m_buffers vector, and register this backend with the id as the the vector index
-    buffer.registerBackend(123);
+    buffer.registerBackend(backendBadge(), 123);
 }
 
 VkBuffer VulkanBackend::buffer(const Buffer& buffer)
@@ -765,7 +757,7 @@ VkBuffer VulkanBackend::buffer(const Buffer& buffer)
 void VulkanBackend::newFramebuffer(RenderTarget& renderTarget)
 {
     // TODO: Create framebuffer according to specs, put it in the m_framebuffers vector, and register this backend with the id as the the vector index
-    renderTarget.registerBackend(456);
+    renderTarget.registerBackend(backendBadge(), 456);
 }
 
 VkFramebuffer VulkanBackend::framebuffer(const RenderTarget& renderTarget)
@@ -783,7 +775,7 @@ VkFramebuffer VulkanBackend::framebuffer(const RenderTarget& renderTarget)
 void VulkanBackend::newRenderPass(RenderPass& renderPass)
 {
     // TODO: Create stuff according to specs and store away etc..
-    renderPass.registerBackend(789);
+    renderPass.registerBackend(backendBadge(), 789);
 }
 
 const VulkanBackend::RenderPassInfo& VulkanBackend::renderPassInfo(const RenderPass& renderPass)
@@ -1170,7 +1162,7 @@ bool VulkanBackend::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t w
     return true;
 }
 
-ManagedImage VulkanBackend::createImageViewFromImagePath(const std::string& imagePath)
+VulkanBackend::ManagedImage VulkanBackend::createImageViewFromImagePath(const std::string& imagePath)
 {
     if (!fileio::isFileReadable(imagePath)) {
         LogError("VulkanBackend::createImageFromImage(): there is no file that can be read at path '%s'.\n", imagePath.c_str());
@@ -1276,9 +1268,15 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     descriptorSetLayoutCreateInfo.pBindings = allBindings.data();
     ASSERT(vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &m_exDescriptorSetLayout) == VK_SUCCESS);
 
+    struct ExampleVertex {
+        vec3 position;
+        vec3 color;
+        vec2 texCoord;
+    };
+
     VkVertexInputBindingDescription bindingDescription = {};
     bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(mesh::common::Vertex);
+    bindingDescription.stride = sizeof(ExampleVertex);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions {};
@@ -1286,17 +1284,17 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
     attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(mesh::common::Vertex, position);
+    attributeDescriptions[0].offset = offsetof(ExampleVertex, position);
 
     attributeDescriptions[1].binding = 0;
     attributeDescriptions[1].location = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(mesh::common::Vertex, color);
+    attributeDescriptions[1].offset = offsetof(ExampleVertex, color);
 
     attributeDescriptions[2].binding = 0;
     attributeDescriptions[2].location = 2;
     attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[2].offset = offsetof(mesh::common::Vertex, texCoord);
+    attributeDescriptions[2].offset = offsetof(ExampleVertex, texCoord);
 
     {
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
@@ -1619,7 +1617,7 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     // TODO  but I think it seems like a separate step though... Or is it..?
 
     // TODO: This is the command buffer recording for the example triangle drawing stuff
-    std::vector<mesh::common::Vertex> vertices = {
+    std::vector<ExampleVertex> vertices = {
         { vec3(-0.5, -0.5, 0), vec3(1, 0, 0), vec2(1, 0) },
         { vec3(0.5, -0.5, 0), vec3(0, 1, 0), vec2(0, 0) },
         { vec3(0.5, 0.5, 0), vec3(0, 0, 1), vec2(0, 1) },

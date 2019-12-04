@@ -12,7 +12,7 @@ uint64_t Resource::id() const
     return m_id;
 }
 
-void Resource::registerBackend(uint64_t id)
+void Resource::registerBackend(Badge<Backend>, uint64_t id)
 {
     ASSERT(id != UINT64_MAX);
     if (m_id != UINT64_MAX) {

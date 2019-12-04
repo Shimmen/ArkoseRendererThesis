@@ -9,34 +9,25 @@
 
 struct GLFWwindow;
 
-struct ManagedBuffer {
-    VkBuffer buffer;
-    VkDeviceMemory memory;
-};
-
-struct ManagedImage {
-    VkSampler sampler;
-    VkImageView view;
-    VkImage image;
-    VkDeviceMemory memory;
-};
-
 constexpr bool vulkanDebugMode = true;
 
 class VulkanBackend final : public Backend {
 public:
-    explicit VulkanBackend(App&, GLFWwindow*);
+    explicit VulkanBackend(GLFWwindow*);
     ~VulkanBackend() override;
 
     VulkanBackend(VulkanBackend&&) = default;
     VulkanBackend(VulkanBackend&) = delete;
     VulkanBackend& operator=(VulkanBackend&) = delete;
 
-    bool compileCommandSubmitter(const CommandSubmitter&) override;
-    bool executeFrame() override;
+    ///////////////////////////////////////////////////////////////////////////
+    /// Public backend API
 
-    /////////////////////////////////////////////
-    /////////////////////////////////////////////
+    bool executeFrame(double elapsedTime, double deltaTime) override;
+
+private:
+    ///////////////////////////////////////////////////////////////////////////
+    /// Command translation & resource management
 
     void translateRenderPass(VkCommandBuffer, const RenderPass&, const ResourceManager&);
     void translateDrawIndexed(VkCommandBuffer, const ResourceManager&, const CmdDrawIndexed&);
@@ -61,16 +52,29 @@ public:
         VkPipelineLayout pipelineLayout;
     };
 
-    //
-
     void recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
     void newFrame(uint32_t relFrameIndex, float totalTime, float deltaTime);
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Temporary drawing - TODO: remove these
 
     void createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
     void destroyTheDrawingStuff();
     void timestepForTheDrawingStuff(uint32_t index);
 
+    ///////////////////////////////////////////////////////////////////////////
+    ///
+
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
+
+    void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
+    void destroySwapchain();
+    void recreateSwapchain();
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.
+
+    [[nodiscard]] uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags) const;
 
     bool issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const;
 
@@ -89,12 +93,12 @@ public:
     bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height) const;
 
+    struct ManagedImage;
     ManagedImage createImageViewFromImagePath(const std::string& imagePath);
 
-    /////////////////////////////////////////////
-    /////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////
+    /// Utilities for setting up the backend
 
-private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT,
         VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT*, void* userData);
     [[nodiscard]] VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo() const;
@@ -116,22 +120,32 @@ private:
     [[nodiscard]] VkDevice createDevice(VkPhysicalDevice, VkSurfaceKHR);
     void createSemaphoresAndFences(VkDevice);
 
-    void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
-    void destroySwapchain();
-    void recreateSwapchain();
-
-private:
-    GLFWwindow* m_window;
-    VkSurfaceKHR m_surface {};
-    bool m_unhandledWindowResize { false };
+    ///////////////////////////////////////////////////////////////////////////
+    /// Common backend members
 
     VkInstance m_instance {};
     VkDebugUtilsMessengerEXT m_messenger {};
     VkPhysicalDevice m_physicalDevice {};
-    VkDevice m_device {};
 
+    VkDevice m_device {};
     VulkanQueueInfo m_queueInfo {};
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Window and swapchain related members
+
+    GLFWwindow* m_window;
+    bool m_unhandledWindowResize { false };
+
+    VkSurfaceKHR m_surface {};
+    VkSwapchainKHR m_swapchain {};
     VkQueue m_presentQueue {};
+
+    uint32_t m_numSwapchainImages {};
+    std::vector<VkImage> m_swapchainImages {};
+    std::vector<VkImageView> m_swapchainImageViews {};
+
+    // These render to the swapchain, but they are also command buffer specific, so maybe they shouldn't be here..
+    std::vector<VkFramebuffer> m_targetFramebuffers {};
 
     static constexpr size_t maxFramesInFlight { 2 };
     size_t m_currentFrameIndex { 0 };
@@ -140,45 +154,20 @@ private:
     std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores {};
     std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences {};
 
-    //
-
-    VkSwapchainKHR m_swapchain {};
-
-    uint32_t m_numSwapchainImages {};
-    std::vector<VkImage> m_swapchainImages {};
-    std::vector<VkImageView> m_swapchainImageViews {};
-
+    // Swapchain depth image, for when applicable
     VkImage m_depthImage {};
     VkImageView m_depthImageView {};
     VkDeviceMemory m_depthImageMemory {};
 
-    /////////////////////////////////////////////
-    /////////////////////////////////////////////
-
-    [[nodiscard]] uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags) const;
-
-    App& m_app;
-
-    std::vector<VkFramebuffer> m_targetFramebuffers {};
-
-    VkCommandPool m_transientCommandPool {};
-
-    //VkDeviceMemory m_masterMemory {};
-    //VkBuffer m_masterBuffer {};
-
-    // Buffers in this list will be destroyed and their memory freed when the context is destroyed
-    std::vector<ManagedBuffer> m_managedBuffers {};
-    std::vector<ManagedImage> m_managedImages {};
-
-    //
+    ///////////////////////////////////////////////////////////////////////////
+    /// Resource & resource management members
 
     VkQueue m_graphicsQueue {};
 
     VkCommandPool m_commandPool {};
-    std::vector<VkCommandBuffer> m_commandBuffers {};
-    //std::vector<std::unique_ptr<ResourceManager>> m_resourceManagers {};
+    VkCommandPool m_transientCommandPool {};
 
-    //
+    std::vector<VkCommandBuffer> m_commandBuffers {};
 
     struct BufferInfo {
         VkBuffer buffer {};
@@ -190,7 +179,8 @@ private:
     std::vector<VkRenderPass> m_renderPasses {};
     std::vector<RenderPassInfo> m_renderPassInfos {};
 
-    //
+    ///////////////////////////////////////////////////////////////////////////
+    /// Extra stuff that shouldn't be here at all - TODO: remove this
 
     // FIXME: This is all stuff specific for rendering the example triangle
     float m_exAspectRatio {};
@@ -202,6 +192,23 @@ private:
     VkPipeline m_exGraphicsPipeline {};
     VkRenderPass m_exRenderPass {};
     VkPipelineLayout m_exPipelineLayout {};
+
+    struct ManagedBuffer {
+        VkBuffer buffer;
+        VkDeviceMemory memory;
+    };
+
+    struct ManagedImage {
+        VkSampler sampler;
+        VkImageView view;
+        VkImage image;
+        VkDeviceMemory memory;
+    };
+
+    // Buffers in this list will be destroyed and their memory freed when the context is destroyed
+    // FIXME: This is also kind of specific to the example triangle. When the resource management is in place this is redundant
+    std::vector<ManagedBuffer> m_managedBuffers {};
+    std::vector<ManagedImage> m_managedImages {};
 };
 
 template<typename T>

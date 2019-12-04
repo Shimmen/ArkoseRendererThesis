@@ -52,13 +52,13 @@ GLFWwindow* createWindow(BackendType backendType, WindowType windowType, Extent2
     return window;
 }
 
-Backend* createBackend(App& app, BackendType backendType, GLFWwindow* window)
+Backend* createBackend(BackendType backendType, GLFWwindow* window)
 {
     Backend* backend;
 
     switch (backendType) {
     case BackendType::Vulkan:
-        backend = new VulkanBackend(app, window);
+        backend = new VulkanBackend(window);
         break;
     }
 
@@ -72,11 +72,12 @@ int main()
         LogErrorAndExit("ArkoseRenderer::main(): could not initialize GLFW, exiting.\n");
     }
 
-    App* app = new App();
-
     BackendType backendType = BackendType::Vulkan;
     GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
-    Backend* backend = createBackend(*app, backendType, window);
+    Backend* backend = createBackend(backendType, window);
+
+    App* app = new App();
+    backend->setApp(app);
 
     LogInfo("ArkoseRenderer: main loop begin.\n");
 
@@ -84,13 +85,19 @@ int main()
     //  in case it has logic for stopping if the application exits etc.
     GlobalState::getMutable().setApplicationRunning(true);
 
+    glfwSetTime(0.0);
+    double lastTime = 0.0;
     while (!glfwWindowShouldClose(window)) {
 
         glfwPollEvents();
 
+        double elapsedTime = glfwGetTime();
+        double deltaTime = elapsedTime - lastTime;
+        lastTime = elapsedTime;
+
         bool frameExecuted = false;
         while (!frameExecuted) {
-            frameExecuted = backend->executeFrame();
+            frameExecuted = backend->executeFrame(elapsedTime, deltaTime);
         }
     }
     GlobalState::getMutable().setApplicationRunning(false);
