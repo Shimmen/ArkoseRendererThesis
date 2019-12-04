@@ -27,6 +27,14 @@ public:
 
 private:
     ///////////////////////////////////////////////////////////////////////////
+    /// Rendering of a single frame
+
+    void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
+
+    void recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
+    void timeStepForFrame(uint32_t relFrameIndex, float elapsedTime, float deltaTime);
+
+    ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
     void translateRenderPass(VkCommandBuffer, const RenderPass&, const ResourceManager&);
@@ -38,12 +46,7 @@ private:
     void newFramebuffer(RenderTarget&);
     VkFramebuffer framebuffer(const RenderTarget&);
 
-    struct RenderPassInfo {
-        VkRenderPass renderPass;
-        VkPipeline pipeline;
-        VkPipelineLayout pipelineLayout;
-    };
-
+    struct RenderPassInfo;
     void newRenderPass(RenderPass&);
     const RenderPassInfo& renderPassInfo(const RenderPass&);
 
@@ -52,24 +55,18 @@ private:
         VkPipelineLayout pipelineLayout;
     };
 
-    void recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
-    void newFrame(uint32_t relFrameIndex, float totalTime, float deltaTime);
+    ///////////////////////////////////////////////////////////////////////////
+    /// Swapchain management
+
+    void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
+    void destroySwapchain();
+    void recreateSwapchain();
 
     ///////////////////////////////////////////////////////////////////////////
     /// Temporary drawing - TODO: remove these
 
     void createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
     void destroyTheDrawingStuff();
-    void timestepForTheDrawingStuff(uint32_t index);
-
-    ///////////////////////////////////////////////////////////////////////////
-    ///
-
-    void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
-
-    void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
-    void destroySwapchain();
-    void recreateSwapchain();
 
     ///////////////////////////////////////////////////////////////////////////
     /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.
@@ -140,6 +137,7 @@ private:
     VkSwapchainKHR m_swapchain {};
     VkQueue m_presentQueue {};
 
+    Extent2D m_swapchainExtent {};
     uint32_t m_numSwapchainImages {};
     std::vector<VkImage> m_swapchainImages {};
     std::vector<VkImageView> m_swapchainImageViews {};
@@ -171,19 +169,26 @@ private:
 
     struct BufferInfo {
         VkBuffer buffer {};
+        // FIXME: At some later point in time, we should have a common device memory
+        //  e.g. one for all vertex buffers, and here we keep a reference to that one
+        //  and some offset and size. But for now every buffer has its own memory.
         std::optional<VkDeviceMemory> memory {};
+    };
+
+    struct RenderPassInfo {
+        VkRenderPass renderPass;
+        VkPipeline pipeline;
+        VkPipelineLayout pipelineLayout;
     };
 
     std::vector<BufferInfo> m_bufferInfos {};
     std::vector<VkFramebuffer> m_framebuffers {};
-    std::vector<VkRenderPass> m_renderPasses {};
     std::vector<RenderPassInfo> m_renderPassInfos {};
 
     ///////////////////////////////////////////////////////////////////////////
     /// Extra stuff that shouldn't be here at all - TODO: remove this
 
     // FIXME: This is all stuff specific for rendering the example triangle
-    float m_exAspectRatio {};
     std::vector<VkBuffer> m_exCameraStateBuffers {};
     std::vector<VkDeviceMemory> m_exCameraStateBufferMemories {};
     VkDescriptorPool m_exDescriptorPool {};

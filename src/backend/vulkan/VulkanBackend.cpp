@@ -36,10 +36,10 @@ VulkanBackend::VulkanBackend(GLFWwindow* window)
     m_device = createDevice(m_physicalDevice, m_surface);
     createSemaphoresAndFences(m_device);
 
+    vkGetDeviceQueue(m_device, m_queueInfo.presentQueueFamilyIndex, 0, &m_presentQueue);
     vkGetDeviceQueue(m_device, m_queueInfo.graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
 
-    VkCommandPoolCreateInfo poolCreateInfo = {};
-    poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     poolCreateInfo.queueFamilyIndex = m_queueInfo.graphicsQueueFamilyIndex;
     poolCreateInfo.flags = 0u;
     if (vkCreateCommandPool(m_device, &poolCreateInfo, nullptr, &m_commandPool) != VK_SUCCESS) {
@@ -452,7 +452,6 @@ VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceK
         LogErrorAndExit("VulkanBackend::createDevice(): could not create a device, exiting.\n");
     }
 
-    vkGetDeviceQueue(device, m_queueInfo.presentQueueFamilyIndex, 0, &m_presentQueue);
     return device;
 }
 
@@ -574,6 +573,8 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
         }
     }
 
+    m_swapchainExtent = { swapchainExtent.width, swapchainExtent.height };
+
     // FIXME: For now also create a depth image, but later we probably don't want one on the final presentation images
     //  so it doesn't really make sense to have it here anyway. I guess that's an excuse for the code structure.. :)
     // FIXME: Should we add an explicit image transition for the depth image..?
@@ -647,6 +648,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         LogError("VulkanBackend::executeFrame(): error acquiring next swapchain image.\n");
     }
 
+    timeStepForFrame(swapchainImageIndex, elapsedTime, deltaTime);
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
     // Present results (synced on the semaphores)
@@ -732,7 +734,6 @@ void VulkanBackend::translateDrawIndexed(VkCommandBuffer commandBuffer, const Re
     VkBuffer vertexBuffer = buffer(command.vertexBuffer);
     VkBuffer indexBuffer = buffer(command.indexBuffer);
 
-    // TODO Here we need someone to tell us what a resource from the resource manager means for the Vulkan backend! Who actually owns resources? It should be the context, right?! Maybe..?
     VkBuffer vertexBuffers[] = { vertexBuffer };
     VkDeviceSize offsets[] = { 0 };
 
@@ -791,7 +792,7 @@ void VulkanBackend::recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D 
     bool windowSizeDidChange = true;
     double deltaTime = 1.0 / 60.0;
     double timeSinceStartup = 0.0;
-    int frameIndex = 0;
+    unsigned int frameIndex = 0;
 
     for (size_t i = 0; i < numSwapchainImages; ++i) {
 
@@ -833,9 +834,11 @@ void VulkanBackend::recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D 
     }
 }
 
-void VulkanBackend::newFrame(uint32_t relFrameIndex, float totalTime, float deltaTime)
+void VulkanBackend::timeStepForFrame(uint32_t relFrameIndex, float elapsedTime, float deltaTime)
 {
-    ApplicationState appState = {}; // TODO!
+    // FIXME: this is a bit sketchy.. unhandled is not the same as 'definitely this frame'
+    bool windowSizeDidChange = m_unhandledWindowResize;
+    ApplicationState appState { m_swapchainExtent, windowSizeDidChange, deltaTime, elapsedTime, relFrameIndex };
 
     // TODO: How about we don't have any of these needsUpdate pass, and instead just figures out
     //  if there are new commands, which implies that there are updates needed.
@@ -853,6 +856,20 @@ void VulkanBackend::newFrame(uint32_t relFrameIndex, float totalTime, float delt
         }
     }
     */
+
+    // Update the uniform buffer(s)
+    CameraState cameraState = {};
+    cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f);
+    cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
+    float aspectRatio = float(m_swapchainExtent.width()) / float(m_swapchainExtent.height());
+    cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), aspectRatio, 0.1f);
+
+    cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
+    cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
+
+    if (!setBufferMemoryDirectly(m_exCameraStateBufferMemories[relFrameIndex], &cameraState, sizeof(CameraState))) {
+        LogError("VulkanBackend::timeStepForFrame(): could not update the uniform buffer.\n");
+    }
 }
 
 bool VulkanBackend::issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const
@@ -1242,8 +1259,6 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 {
     recordCommandBuffers(finalTargetFormat, finalTargetExtent, swapchainImageViews, depthImageView, depthFormat);
 
-    m_exAspectRatio = float(finalTargetExtent.width) / float(finalTargetExtent.height);
-
     VkDescriptorSetLayoutBinding cameraStateUboLayoutBinding = {};
     cameraStateUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     cameraStateUboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -1252,8 +1267,6 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     cameraStateUboLayoutBinding.pImmutableSamplers = nullptr;
 
     ManagedImage testImage = createImageViewFromImagePath("assets/test-pattern.png");
-    //m_exImageView = testImage.view;
-    //m_exImageSampler = testImage.sampler;
     VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
     samplerLayoutBinding.binding = 1;
     samplerLayoutBinding.descriptorCount = 1;
@@ -1695,36 +1708,8 @@ void VulkanBackend::destroyTheDrawingStuff()
     vkDestroyRenderPass(m_device, m_exRenderPass, nullptr);
 }
 
-void VulkanBackend::timestepForTheDrawingStuff(uint32_t index)
-{
-    newFrame(index, 0.0f, 1.0 / 60.0f);
-
-    // FIXME: Use the time stuff provided by GLFW
-    static auto startTime = std::chrono::high_resolution_clock::now();
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-    // FIXME: We need access to the aspect ratio here!!
-
-    // Update the uniform buffer(s)
-    CameraState cameraState = {};
-    cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, time * 3.1415f / 2.0f);
-    cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
-    cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), m_exAspectRatio, 0.1f);
-
-    cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
-    cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
-
-    if (!setBufferMemoryDirectly(m_exCameraStateBufferMemories[index], &cameraState, sizeof(CameraState))) {
-        LogError("VulkanBackend::timestepForTheDrawingStuff(): could not update the uniform buffer.\n");
-    }
-}
-
 void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight)
 {
-    // FIXME: This is the "active" part for a later "render pass" abstraction
-    timestepForTheDrawingStuff(imageIndex);
-
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 

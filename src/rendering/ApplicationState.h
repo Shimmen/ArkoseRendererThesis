@@ -5,7 +5,7 @@
 struct ApplicationState {
 
     ApplicationState() = default;
-    ApplicationState(const Extent2D& windowExtent, bool windowSizeDidChange, double deltaTime, double timeSinceStartup, int frameIndex)
+    ApplicationState(const Extent2D& windowExtent, bool windowSizeDidChange, double deltaTime, double timeSinceStartup, unsigned int frameIndex)
         : windowExtent(windowExtent)
         , windowSizeDidChange(windowSizeDidChange)
         , deltaTime(deltaTime)
@@ -14,7 +14,7 @@ struct ApplicationState {
     {
     }
 
-    const int frameIndex {};
+    const unsigned int frameIndex {};
 
     const double deltaTime {};
     const double timeSinceStartup {};
