@@ -1,35 +1,26 @@
 #pragma once
 
 #include "ApplicationState.h"
-#include "CommandSubmitter.h"
+#include "Commands.h"
+#include "ResourceManager.h"
 #include "Resources.h"
-#include "rendering/ResourceManager.h"
 #include "utility/copying.h"
 #include <functional>
-
-enum class RenderPassChangeRequest {
-    //! The exact same command as previous frame should be submitted.
-    NoChange,
-
-    //! The commands of this pass should not be submitted this frame.
-    DoNotExecute,
-
-    //! New commands need to be submitted, so the CommandSubmissionCallback should be called this frame.
-    ResubmitCommands
-};
+#include <memory>
+#include <string>
 
 class RenderPass : public Resource {
 public:
-    using NeedsConstructCallback = std::function<bool(const ApplicationState&)>;
-    using ChangeRequestCallback = std::function<RenderPassChangeRequest(const ApplicationState&)>;
-
+    // FIXME: We probably want a command list type that the RenderPasses can't read from, but only add to!
     using CommandList = std::vector<std::unique_ptr<FrontendCommand>>;
+
+    using NeedsConstructCallback = std::function<bool(const ApplicationState&)>;
     using CommandSubmissionCallback = std::function<void(const ApplicationState&, CommandList&)>;
     using RenderPassConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&)>;
 
-    RenderPass() = default; // TODO: Should we have such a thing use instead just use null for members?
     explicit RenderPass(RenderPassConstructorFunction);
-    ~RenderPass();
+    ~RenderPass() = default;
+    //NON_COPYABLE(RenderPass)
 
     [[nodiscard]] const RenderTarget& target() const;
     [[nodiscard]] const std::vector<FrontendCommand*>& commands() const { return m_commands; }
@@ -46,15 +37,7 @@ public:
     //! Set the NeedsConstructCallback that is called every frame to override default reconstruction policy.
     void setNeedsConstructionCallback(NeedsConstructCallback);
 
-    //! Query the render pass if there are going to be changes to the commands submitted.
-    [[nodiscard]] RenderPassChangeRequest changeRequest(const ApplicationState&) const;
-
-    //! Set the ChangeRequestCallback that is called every frame to override default command submission policy.
-    void setChangeRequestCallback(ChangeRequestCallback);
-
 protected:
-    NON_COPYABLE(RenderPass)
-
     //! Call this function to regenerate the render pass resources.
     RenderPassConstructorFunction m_constructor_function {};
 
@@ -63,9 +46,6 @@ protected:
 
     //! Given the application state for the current frame, this callback returns whether the pass needs to be reconstructed.
     NeedsConstructCallback m_needs_construct_callback {};
-
-    //! Queries the pass regarding changes to commands executed in the command submission callback.
-    ChangeRequestCallback m_change_request_callback {};
 
     //! The target that this pass renders to.
     std::optional<RenderTarget> m_target {};

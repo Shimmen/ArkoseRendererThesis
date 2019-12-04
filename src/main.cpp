@@ -1,6 +1,7 @@
 #include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
 #include "rendering/App.h"
+#include "rendering/ResourceManager.h"
 #include "utility/GlobalState.h"
 #include "utility/logging.h"
 
@@ -76,7 +77,8 @@ int main()
     GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
     Backend* backend = createBackend(backendType, window);
 
-    App* app = new App();
+    ResourceManager appResourceManager { *backend };
+    App* app = new App(appResourceManager);
     backend->setApp(app);
 
     LogInfo("ArkoseRenderer: main loop begin.\n");

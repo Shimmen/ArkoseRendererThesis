@@ -139,8 +139,8 @@ Shader::Shader(std::string name, std::vector<ShaderFile> files, ShaderType type)
 
 Shader::~Shader()
 {
-    if (m_handle != NullHandle) {
-        // TODO: Delete the shader and etc stuff
+    if (!m_name.empty()) {
+        // TODO: Maybe tell the resource manager that a shader was removed, so that it can reference count?
     }
 }
 

@@ -3,18 +3,23 @@
 #include "RenderState.h"
 #include "rendering/ResourceManager.h"
 
-App::App()
+App::App(ResourceManager& resourceManager)
+    : m_resourceManager(resourceManager)
 {
 }
 
-void App::setup(ApplicationState appState)
+void App::setup(const ApplicationState&)
 {
+    // Here we can do stuff like CPU work and GPU stuff that is fully or mostly static,
+    // e.g. load textures, load meshes, set vertex buffers.
+
     //m_testTexture = m_resourceManager.loadTexture2D("test-pattern.png", false);
 
-    struct Vertex {
-        vec3 position;
-        vec3 color;
-        vec2 texCoord;
+    m_vertexLayout = VertexLayout {
+        sizeof(Vertex),
+        { { 0, VertexAttributeType::Float4, offsetof(Vertex, position) },
+            { 1, VertexAttributeType::Float3, offsetof(Vertex, color) },
+            { 2, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
     };
 
     std::vector<Vertex> vertices = {
@@ -36,35 +41,38 @@ void App::setup(ApplicationState appState)
         6, 7, 4
     };
 
-    Buffer vertexBuffer = m_resourceManager->createBuffer(vertices, Buffer::Usage::GpuOptimal);
-    Buffer indexBuffer = m_resourceManager->createBuffer(indices, Buffer::Usage::GpuOptimal);
+    m_vertexBuffer = m_resourceManager.createBuffer(vertices, Buffer::Usage::GpuOptimal);
+    m_indexBuffer = m_resourceManager.createBuffer(indices, Buffer::Usage::GpuOptimal);
+    m_indexCount = indices.size();
 
-    RenderState defaultState {};
-    Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
-
-    m_renderPass = std::make_unique<RenderPass>([&](ResourceManager& resourceManager) {
-        RenderTarget windowTarget = resourceManager.getWindowRenderTarget();
-
-        return [&](const ApplicationState& appState, RenderPass::CommandList& commandList) {
-            VertexLayout vertexLayout = {
-                sizeof(Vertex),
-                { { 0, VertexAttributeType::Float4, offsetof(Vertex, position) },
-                    { 1, VertexAttributeType::Float3, offsetof(Vertex, color) },
-                    { 2, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
-            };
-
-            commandList.push_back(std::make_unique<CmdDrawIndexed>(
-                vertexBuffer,
-                vertexLayout,
-                indexBuffer,
-                indices.size(),
-                DrawMode::Triangles,
-                defaultState,
-                shader));
-        };
-    });
+    m_shader = Shader::createBasic("basic", "example.vert", "example.frag");
 }
 
-void App::drawFrame(ApplicationState appState)
+void App::timeStepForFrame(const ApplicationState&)
 {
+    // Here we can do stuff like CPU work, and GPU work that is not pass specific,
+    // e.g. update uniform buffers.
+}
+
+GpuPipeline App::createPipeline(const ApplicationState&)
+{
+    RenderState defaultState {};
+
+    GpuPipeline pipeline {};
+
+    pipeline.addRenderPass("TrianglePass", [&](ResourceManager& resourceManager) {
+        RenderTarget windowTarget = resourceManager.getWindowRenderTarget();
+        return [&](const ApplicationState& appState, RenderPass::CommandList& commandList) {
+            commandList.push_back(std::make_unique<CmdDrawIndexed>(
+                m_vertexBuffer,
+                m_vertexLayout,
+                m_indexBuffer,
+                m_indexCount,
+                DrawMode::Triangles,
+                defaultState,
+                m_shader));
+        };
+    });
+
+    return pipeline;
 }

@@ -8,10 +8,9 @@
 #include "utility/logging.h"
 #include "utility/util.h"
 #include <algorithm>
-#include <chrono>
 #include <cstring>
-#include <set>
 #include <stb_image.h>
+#include <unordered_set>
 
 #include "camera_state.h"
 
@@ -412,7 +411,7 @@ VkSurfaceKHR VulkanBackend::createSurface(VkInstance instance, GLFWwindow* windo
 
 VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 {
-    std::set<uint32_t> queueFamilyIndices = { m_queueInfo.graphicsQueueFamilyIndex, m_queueInfo.computeQueueFamilyIndex, m_queueInfo.presentQueueFamilyIndex };
+    std::unordered_set<uint32_t> queueFamilyIndices = { m_queueInfo.graphicsQueueFamilyIndex, m_queueInfo.computeQueueFamilyIndex, m_queueInfo.presentQueueFamilyIndex };
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     const float queuePriority = 1.0f;
     for (uint32_t familyIndex : queueFamilyIndices) {
@@ -648,6 +647,9 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         LogError("VulkanBackend::executeFrame(): error acquiring next swapchain image.\n");
     }
 
+    //if (m_gpuPipeline.needsReconstruction(appState)) {
+    //    recordCommandBuffers(...)
+    //}
     timeStepForFrame(swapchainImageIndex, elapsedTime, deltaTime);
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
@@ -786,20 +788,23 @@ const VulkanBackend::RenderPassInfo& VulkanBackend::renderPassInfo(const RenderP
 
 void VulkanBackend::recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat)
 {
-    size_t numSwapchainImages = swapchainImageViews.size();
-
-    // TODO: All of these need to be passed in
+    // TODO: All of these need to be passed in. Or just an ApplicationState object..
     bool windowSizeDidChange = true;
     double deltaTime = 1.0 / 60.0;
     double timeSinceStartup = 0.0;
     unsigned int frameIndex = 0;
+    ApplicationState appState {
+        Extent2D(finalTargetExtent.width, finalTargetExtent.height),
+        windowSizeDidChange, deltaTime, timeSinceStartup, frameIndex
+    };
+
+    // TODO: Something like this?
+    //m_gpuPipeline = app().createPipeline(appState);
+
+    size_t numSwapchainImages = swapchainImageViews.size();
 
     for (size_t i = 0; i < numSwapchainImages; ++i) {
 
-        ApplicationState appState {
-            Extent2D(finalTargetExtent.width, finalTargetExtent.height),
-            windowSizeDidChange, deltaTime, timeSinceStartup, frameIndex
-        };
         /*
         // TODO: How are we going to get the backend from here? Ugh, it really should all be the same class
         ResourceManager resourceManager(appState, backend);
@@ -834,11 +839,13 @@ void VulkanBackend::recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D 
     }
 }
 
-void VulkanBackend::timeStepForFrame(uint32_t relFrameIndex, float elapsedTime, float deltaTime)
+void VulkanBackend::timeStepForFrame(uint32_t relFrameIndex, double elapsedTime, double deltaTime)
 {
     // FIXME: this is a bit sketchy.. unhandled is not the same as 'definitely this frame'
     bool windowSizeDidChange = m_unhandledWindowResize;
     ApplicationState appState { m_swapchainExtent, windowSizeDidChange, deltaTime, elapsedTime, relFrameIndex };
+
+    //auto passes = app().dependencyResolvedPasses();
 
     // TODO: How about we don't have any of these needsUpdate pass, and instead just figures out
     //  if there are new commands, which implies that there are updates needed.

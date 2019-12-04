@@ -92,6 +92,7 @@ struct RenderTarget : public Resource {
         Texture2D* texture;
     };
 
+    RenderTarget() = default;
     explicit RenderTarget(Badge<ResourceManager>, Texture2D&&);
     explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> targets);
 
@@ -113,6 +114,7 @@ struct Buffer : public Resource {
         GpuOptimal,
     };
 
+    Buffer() = default;
     Buffer(Badge<ResourceManager>, size_t size, Usage);
 
 private:
@@ -146,6 +148,7 @@ struct Shader {
     static Shader createBasic(std::string name, std::string vertexName, std::string fragmentName);
     static Shader createCompute(std::string name, std::string computeName);
 
+    Shader() = default;
     Shader(std::string name, std::vector<ShaderFile>, ShaderType type);
     ~Shader();
 
@@ -156,8 +159,7 @@ struct Shader {
     //  but maybe that is backend-specific or file specific?
 
 private:
-    std::string m_name;
-    std::vector<ShaderFile> m_files;
-    ShaderType m_type;
-    uint32_t m_handle {};
+    std::string m_name {};
+    std::vector<ShaderFile> m_files {};
+    ShaderType m_type {};
 };

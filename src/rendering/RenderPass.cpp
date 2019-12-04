@@ -7,11 +7,6 @@ RenderPass::RenderPass(RenderPassConstructorFunction function)
 {
 }
 
-RenderPass::~RenderPass()
-{
-    // TODO! Do stuff here?!
-}
-
 const RenderTarget& RenderPass::target() const
 {
     if (!m_target.has_value()) {
@@ -43,18 +38,4 @@ bool RenderPass::needsConstruction(const ApplicationState& appState) const
 void RenderPass::setNeedsConstructionCallback(RenderPass::NeedsConstructCallback callback)
 {
     m_needs_construct_callback = std::move(callback);
-}
-
-RenderPassChangeRequest RenderPass::changeRequest(const ApplicationState& appState) const
-{
-    if (m_change_request_callback) {
-        return m_change_request_callback(appState);
-    } else {
-        return RenderPassChangeRequest::ResubmitCommands;
-    }
-}
-
-void RenderPass::setChangeRequestCallback(RenderPass::ChangeRequestCallback callback)
-{
-    m_change_request_callback = std::move(callback);
 }

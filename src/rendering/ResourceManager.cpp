@@ -2,9 +2,8 @@
 
 #include "utility/util.h"
 
-ResourceManager::ResourceManager(ApplicationState appState, Backend& backend)
-    : m_appState(std::move(appState))
-    , m_backend(backend)
+ResourceManager::ResourceManager(Backend& backend)
+    : m_backend(backend)
 {
 }
 

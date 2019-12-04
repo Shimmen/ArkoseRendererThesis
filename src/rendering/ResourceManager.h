@@ -9,7 +9,7 @@ class ResourceManager {
     // TODO: This is passed to the construct passes and is used to allocate
     //  resources (e.g. textures & buffers) used in the execute pass.
 public:
-    explicit ResourceManager(ApplicationState, Backend& backend);
+    explicit ResourceManager(Backend& backend);
 
     // TODO: Add a nice API for creating & managing resources here
 
@@ -47,7 +47,6 @@ public:
     void setBufferDataImmediately(const Buffer&, const void* data, size_t size, size_t offset = 0);
 
 private:
-    const ApplicationState m_appState;
     Backend& m_backend;
     // TODO: Add some type of references to resources here so it can keep track of stuff.
 };
