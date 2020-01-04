@@ -6,11 +6,11 @@ struct ApplicationState {
 
     ApplicationState() = default;
     ApplicationState(const Extent2D& windowExtent, bool windowSizeDidChange, double deltaTime, double timeSinceStartup, unsigned int frameIndex)
-        : windowExtent(windowExtent)
-        , windowSizeDidChange(windowSizeDidChange)
+        : frameIndex(frameIndex)
         , deltaTime(deltaTime)
         , timeSinceStartup(timeSinceStartup)
-        , frameIndex(frameIndex)
+        , windowExtent(windowExtent)
+        , windowSizeDidChange(windowSizeDidChange)
     {
     }
 

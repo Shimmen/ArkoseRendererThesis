@@ -1,10 +1,11 @@
 #include "App.h"
+#include "AppResourceManager.h"
 #include "Commands.h"
 #include "RenderState.h"
-#include "rendering/ResourceManager.h"
+#include "ResourceManager.h"
 
-App::App(ResourceManager& resourceManager)
-    : m_resourceManager(resourceManager)
+App::App(AppResourceManager& appResourceManager)
+    : m_appResourceManager(appResourceManager)
 {
 }
 
@@ -41,9 +42,9 @@ void App::setup(const ApplicationState&)
         6, 7, 4
     };
 
-    m_vertexBuffer = m_resourceManager.createBuffer(vertices, Buffer::Usage::GpuOptimal);
-    m_indexBuffer = m_resourceManager.createBuffer(indices, Buffer::Usage::GpuOptimal);
     m_indexCount = indices.size();
+    m_vertexBuffer = m_appResourceManager.createStaticBuffer(Buffer::Usage::Vertex, std::move(vertices));
+    m_indexBuffer = m_appResourceManager.createStaticBuffer(Buffer::Usage::Index, std::move(indices));
 
     m_shader = Shader::createBasic("basic", "example.vert", "example.frag");
 }
@@ -65,12 +66,12 @@ GpuPipeline App::createPipeline(const ApplicationState&)
         return [&](const ApplicationState& appState, RenderPass::CommandList& commandList) {
             commandList.push_back(std::make_unique<CmdDrawIndexed>(
                 m_vertexBuffer,
-                m_vertexLayout,
+                m_vertexLayout, // this?
                 m_indexBuffer,
                 m_indexCount,
                 DrawMode::Triangles,
-                defaultState,
-                m_shader));
+                defaultState, // this!
+                m_shader)); // this?
         };
     });
 

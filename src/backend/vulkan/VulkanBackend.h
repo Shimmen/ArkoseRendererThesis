@@ -23,6 +23,8 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     /// Public backend API
 
+    int multiplicity() const override;
+
     bool executeFrame(double elapsedTime, double deltaTime) override;
 
 private:
@@ -31,8 +33,8 @@ private:
 
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
-    void recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
     void timeStepForFrame(uint32_t relFrameIndex, double elapsedTime, double deltaTime);
+    void reconstructPipeline(GpuPipeline&, const ApplicationState&);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
@@ -45,14 +47,25 @@ private:
     //  Additionally, remember that there is a resource manager connected to the app itself. Some shared stuff, like vertex
     //  buffers should have only one copy on the GPU, but others, like a uniform buffer, needs multiple copies.
 
-    void newBuffer(Buffer&);
+    void newBuffer(const Buffer&);
+    void deleteBuffer(const Buffer&);
+    void updateBuffer(const BufferUpdate&);
     VkBuffer buffer(const Buffer&);
 
-    void newFramebuffer(RenderTarget&);
+    void newTexture(const Texture2D&);
+    void deleteTexture(const Texture2D&);
+    void updateTexture(const TextureUpdateFromFile&);
+    //void updateTexture(const TextureUpdateFromData&);
+    VkImage image(const Texture2D&);
+
+    void newRenderTarget(const RenderTarget&);
+    void deleteRenderTarget(const RenderTarget&);
+
+    void newFramebuffer(const RenderTarget&);
     VkFramebuffer framebuffer(const RenderTarget&);
 
     struct RenderPassInfo;
-    void newRenderPass(RenderPass&);
+    void newRenderPass(const RenderPass&);
     const RenderPassInfo& renderPassInfo(const RenderPass&);
 
     struct PipelineInfo {
@@ -165,6 +178,8 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Resource & resource management members
 
+    std::array<std::unique_ptr<ResourceManager>, maxFramesInFlight> m_frameResourceManagers {};
+
     VkQueue m_graphicsQueue {};
 
     VkCommandPool m_commandPool {};
@@ -182,6 +197,19 @@ private:
         std::optional<VkDeviceMemory> memory {};
     };
 
+    struct TextureInfo {
+        VkImage image {};
+        std::optional<VkDeviceMemory> memory {};
+
+        VkFormat format {};
+        VkImageView view {};
+        VkSampler sampler {};
+    };
+
+    struct RenderTargetInfo {
+
+    };
+
     struct RenderPassInfo {
         VkRenderPass renderPass;
         VkPipeline pipeline;
@@ -189,6 +217,9 @@ private:
     };
 
     std::vector<BufferInfo> m_bufferInfos {};
+    std::vector<TextureInfo> m_textureInfos {};
+    std::vector<RenderTargetInfo> m_renderTargetInfos {};
+
     std::vector<VkFramebuffer> m_framebuffers {};
     std::vector<RenderPassInfo> m_renderPassInfos {};
 

@@ -8,8 +8,6 @@
 #include <string>
 #include <vector>
 
-constexpr uint32_t NullHandle = 0u;
-
 class Backend;
 class ResourceManager;
 
@@ -47,34 +45,49 @@ private:
 
 struct Resource {
 public:
-    // TODO: We probably want to require a Badge for access to these
     [[nodiscard]] uint64_t id() const;
-    void registerBackend(Badge<Backend>, uint64_t id);
+    void unregisterBackend(Badge<Backend>) const;
+    void registerBackend(Badge<Backend>, uint64_t id) const;
+
+    static constexpr uint64_t NullId = UINT64_MAX;
 
 private:
-    uint64_t m_id { UINT64_MAX };
+    mutable uint64_t m_id { NullId };
 };
 
-struct Texture2D {
+struct Texture2D : public Resource {
 
-    enum class Components {
-        Grayscale,
-        Rgb,
-        Rgba,
+    enum class Format {
+        RGBA8,
+        Depth32F
     };
 
-    Texture2D(Badge<ResourceManager>, int width, int height, Components, bool srgb = true, bool mipmaps = true);
+    enum class MinFilter {
+        Linear,
+        Nearest,
+    };
+
+    enum class MagFilter {
+        Linear,
+        Nearest,
+    };
+
+    Texture2D() = default;
+    Texture2D(const Texture2D&) = default;
+    Texture2D(Badge<ResourceManager>, int width, int height, Format, MinFilter, MagFilter);
 
     [[nodiscard]] const Extent2D& extent() const { return m_extent; }
-    [[nodiscard]] Components components() const { return m_components; }
-    [[nodiscard]] bool hasMipmaps() const { return m_mipmaps; }
-    [[nodiscard]] bool isSrgb() const { return m_srgb; }
+    [[nodiscard]] Format format() const { return m_format; }
+    [[nodiscard]] MinFilter minFilter() const { return m_minFilter; }
+    [[nodiscard]] MagFilter magFilter() const { return m_magFilter; }
+    [[nodiscard]] bool hasMipmaps() const;
 
 private:
     Extent2D m_extent;
-    Components m_components;
+    Format m_format;
+    MinFilter m_minFilter;
+    MagFilter m_magFilter;
     bool m_mipmaps;
-    bool m_srgb;
 };
 
 struct RenderTarget : public Resource {
@@ -93,11 +106,13 @@ struct RenderTarget : public Resource {
     };
 
     RenderTarget() = default;
+    RenderTarget(const RenderTarget&) = default;
     explicit RenderTarget(Badge<ResourceManager>, Texture2D&&);
-    explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> targets);
+    explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments);
 
     [[nodiscard]] const Extent2D& extent() const;
-    [[nodiscard]] size_t attachmentCount() const;
+    [[nodiscard]] size_t colorAttachmentCount() const;
+    [[nodiscard]] size_t totalAttachmentCount() const;
     [[nodiscard]] bool hasDepthAttachment() const;
     [[nodiscard]] bool isWindowTarget() const;
 
@@ -110,56 +125,26 @@ private:
 struct Buffer : public Resource {
 
     enum class Usage {
+        Vertex,
+        Index,
+        UniformBuffer,
+    };
+
+    enum class MemoryHint {
         TransferOptimal,
         GpuOptimal,
     };
 
     Buffer() = default;
-    Buffer(Badge<ResourceManager>, size_t size, Usage);
+    Buffer(const Buffer&) = default;
+    Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memoryHint = MemoryHint::GpuOptimal);
+
+    size_t size() const { return m_size; }
+    Usage usage() const { return m_usage; }
+    MemoryHint memoryHint() const { return m_memoryHint; }
 
 private:
     size_t m_size { 0 };
-    Usage m_usage { Usage::GpuOptimal };
-};
-
-enum class ShaderFileType {
-    Vertex,
-    Fragment,
-    Compute,
-};
-
-struct ShaderFile {
-    ShaderFile(std::string name, ShaderFileType type);
-
-    [[nodiscard]] ShaderFileType type() const;
-
-private:
-    std::string m_name;
-    ShaderFileType m_type;
-};
-
-enum class ShaderType {
-    Raster,
-    Compute
-};
-
-struct Shader {
-
-    static Shader createBasic(std::string name, std::string vertexName, std::string fragmentName);
-    static Shader createCompute(std::string name, std::string computeName);
-
-    Shader() = default;
-    Shader(std::string name, std::vector<ShaderFile>, ShaderType type);
-    ~Shader();
-
-    [[nodiscard]] ShaderType type() const;
-
-    // TODO: We should maybe add some utility API for shader introspection here..?
-    //  Somehow we need to extract descriptor sets etc.
-    //  but maybe that is backend-specific or file specific?
-
-private:
-    std::string m_name {};
-    std::vector<ShaderFile> m_files {};
-    ShaderType m_type {};
+    Usage m_usage { Usage::Vertex };
+    MemoryHint m_memoryHint { MemoryHint::GpuOptimal };
 };

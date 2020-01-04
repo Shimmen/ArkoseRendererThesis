@@ -2,6 +2,7 @@
 
 #include "RenderState.h"
 #include "Resources.h"
+#include "Shader.h"
 #include <memory>
 #include <utility>
 

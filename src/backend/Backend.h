@@ -22,6 +22,8 @@ public:
         m_app = app;
     }
 
+    virtual int multiplicity() const = 0;
+
 protected:
     [[nodiscard]] static Badge<Backend> backendBadge()
     {

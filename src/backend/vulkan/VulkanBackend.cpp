@@ -489,6 +489,11 @@ void VulkanBackend::createSemaphoresAndFences(VkDevice device)
     }
 }
 
+int VulkanBackend::multiplicity() const
+{
+    return maxFramesInFlight;
+}
+
 void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface)
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
@@ -647,9 +652,6 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         LogError("VulkanBackend::executeFrame(): error acquiring next swapchain image.\n");
     }
 
-    //if (m_gpuPipeline.needsReconstruction(appState)) {
-    //    recordCommandBuffers(...)
-    //}
     timeStepForFrame(swapchainImageIndex, elapsedTime, deltaTime);
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
@@ -744,20 +746,286 @@ void VulkanBackend::translateDrawIndexed(VkCommandBuffer commandBuffer, const Re
     vkCmdDrawIndexed(commandBuffer, command.numIndices, 1, 0, 0, 0);
 }
 
-void VulkanBackend::newBuffer(Buffer& buffer)
+void VulkanBackend::newBuffer(const Buffer& buffer)
 {
-    // TODO: Create buffer, put it in the m_buffers vector, and register this backend with the id as the the vector index
-    buffer.registerBackend(backendBadge(), 123);
+    VkBufferUsageFlags usageFlags = 0u;
+    switch (buffer.usage()) {
+    case Buffer::Usage::Vertex:
+        usageFlags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        break;
+    case Buffer::Usage::Index:
+        usageFlags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        break;
+    case Buffer::Usage::UniformBuffer:
+        usageFlags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        break;
+    }
+
+    VkMemoryPropertyFlags memoryPropertyFlags = 0u;
+    switch (buffer.memoryHint()) {
+    case Buffer::MemoryHint::GpuOptimal:
+        memoryPropertyFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        usageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        break;
+    case Buffer::MemoryHint::TransferOptimal:
+        memoryPropertyFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+        memoryPropertyFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        break;
+    }
+
+    VkDeviceMemory deviceMemory;
+    VkBuffer vkBuffer = createBuffer(buffer.size(), usageFlags, memoryPropertyFlags, deviceMemory);
+
+    BufferInfo bufferInfo {};
+    bufferInfo.buffer = vkBuffer;
+    bufferInfo.memory = deviceMemory;
+
+    // TODO: Use free lists!
+    size_t index = m_bufferInfos.size();
+    m_bufferInfos.push_back(bufferInfo);
+
+    buffer.registerBackend(backendBadge(), index);
+}
+
+void VulkanBackend::deleteBuffer(const Buffer& buffer)
+{
+    if (buffer.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created buffer\n");
+    }
+
+    // TODO: When we have a free list, also maybe remove from the m_bufferInfos vector? But then we should also keep track of generations etc.
+    BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
+    vkDestroyBuffer(m_device, bufferInfo.buffer, nullptr);
+    if (bufferInfo.memory.has_value()) {
+        vkFreeMemory(m_device, bufferInfo.memory.value(), nullptr);
+    }
+
+    buffer.unregisterBackend(backendBadge());
+}
+
+void VulkanBackend::updateBuffer(const BufferUpdate& update)
+{
+    if (update.buffer().id() == Resource::NullId) {
+        LogErrorAndExit("Trying to update an already-deleted or not-yet-created buffer\n");
+    }
+
+    BufferInfo& bufferInfo = m_bufferInfos[update.buffer().id()];
+
+    const std::byte* data = update.data().data();
+    size_t size = update.data().size();
+
+    switch (update.buffer().memoryHint()) {
+    case Buffer::MemoryHint::GpuOptimal:
+        setBufferDataUsingStagingBuffer(bufferInfo.buffer, data, size);
+        break;
+    case Buffer::MemoryHint::TransferOptimal:
+        if (!bufferInfo.memory.has_value()) {
+            LogErrorAndExit("Trying to update transfer optimal buffer that doesn't own it's memory, which currently isn't upported!\n");
+        }
+        setBufferMemoryDirectly(bufferInfo.memory.value(), data, size);
+        break;
+    }
 }
 
 VkBuffer VulkanBackend::buffer(const Buffer& buffer)
 {
-    // TODO: Manage free list, etc.
-    auto& bufferInfo = m_bufferInfos[buffer.id()];
+    BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
     return bufferInfo.buffer;
 }
 
-void VulkanBackend::newFramebuffer(RenderTarget& renderTarget)
+void VulkanBackend::newTexture(const Texture2D& texture)
+{
+    VkFormat format;
+    bool isDepthFormat = false;
+
+    switch (texture.format()) {
+    case Texture2D::Format::RGBA8:
+        format = VK_FORMAT_R8G8B8A8_UNORM;
+        break;
+    case Texture2D::Format::Depth32F:
+        format = VK_FORMAT_D32_SFLOAT;
+        isDepthFormat = true;
+        break;
+    }
+
+    // TODO: For now, since we don't have the information available, we always assume that all images might be sampled or used as attachments!
+    //  In the future we probably want to provide this info or give hints etc. but for now this will have to do..
+    VkImageUsageFlags usageFlags = 0u;
+    usageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    if (isDepthFormat) {
+        usageFlags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    } else {
+        usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+
+    VkMemoryPropertyFlags memoryPropertyFlags = 0u;
+
+    // TODO: For now always keep images in device local memory.
+    memoryPropertyFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    usageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    VkDeviceMemory deviceMemory;
+    VkImage image = createImage2D(texture.extent().width(), texture.extent().height(), format, usageFlags, memoryPropertyFlags, deviceMemory);
+
+    // TODO: Handle things like mipmaps here!
+    VkImageAspectFlags aspectFlags = 0u;
+    if (isDepthFormat) {
+        aspectFlags |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    } else {
+        aspectFlags |= VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+    VkImageView imageView = createImageView2D(image, format, aspectFlags);
+
+    VkFilter minFilter;
+    switch (texture.minFilter()) {
+    case Texture2D::MinFilter::Linear:
+        minFilter = VK_FILTER_LINEAR;
+        break;
+    case Texture2D::MinFilter::Nearest:
+        minFilter = VK_FILTER_NEAREST;
+        break;
+    }
+
+    VkFilter magFilter;
+    switch (texture.magFilter()) {
+    case Texture2D::MagFilter::Linear:
+        magFilter = VK_FILTER_LINEAR;
+        break;
+    case Texture2D::MagFilter::Nearest:
+        magFilter = VK_FILTER_NEAREST;
+        break;
+    }
+
+    VkSamplerCreateInfo samplerCreateInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+    samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerCreateInfo.magFilter = magFilter;
+    samplerCreateInfo.minFilter = minFilter;
+    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerCreateInfo.anisotropyEnable = VK_TRUE;
+    samplerCreateInfo.maxAnisotropy = 16.0f;
+    samplerCreateInfo.compareEnable = VK_FALSE;
+    samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerCreateInfo.mipLodBias = 0.0f;
+    samplerCreateInfo.minLod = 0.0f;
+    samplerCreateInfo.maxLod = 0.0f;
+    VkSampler sampler;
+    if (vkCreateSampler(m_device, &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
+        LogError("Could not create a sampler for the image.\n");
+    }
+
+    TextureInfo textureInfo {};
+    textureInfo.image = image;
+    textureInfo.memory = deviceMemory;
+    textureInfo.format = format;
+    textureInfo.view = imageView;
+    textureInfo.sampler = sampler;
+
+    // TODO: Use free lists!
+    size_t index = m_textureInfos.size();
+    m_textureInfos.push_back(textureInfo);
+
+    texture.registerBackend(backendBadge(), index);
+}
+
+void VulkanBackend::deleteTexture(const Texture2D& texture)
+{
+    if (texture.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created texture\n");
+    }
+
+    // TODO: When we have a free list, also maybe remove from the m_bufferInfos vector? But then we should also keep track of generations etc.
+    TextureInfo& textureInfo = m_textureInfos[texture.id()];
+
+    vkDestroySampler(m_device, textureInfo.sampler, nullptr);
+    vkDestroyImageView(m_device, textureInfo.view, nullptr);
+    vkDestroyImage(m_device, textureInfo.image, nullptr);
+    if (textureInfo.memory.has_value()) {
+        vkFreeMemory(m_device, textureInfo.memory.value(), nullptr);
+    }
+
+    texture.unregisterBackend(backendBadge());
+}
+
+void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
+{
+    if (update.texture().id() == Resource::NullId) {
+        LogErrorAndExit("Trying to update an already-deleted or not-yet-created texture\n");
+    }
+
+    if (!fileio::isFileReadable(update.path())) {
+        LogError("VulkanBackend::updateTexture(): there is no file that can be read at path '%s'.\n", update.path().c_str());
+        return;
+    }
+
+    // TODO: Well, if the texture isn't a float texture
+    ASSERT(!stbi_is_hdr(update.path().c_str()));
+
+    int width, height, numChannels; // FIXME: Check the number of channels instead of forcing RGBA
+    stbi_uc* pixels = stbi_load(update.path().c_str(), &width, &height, &numChannels, STBI_rgb_alpha);
+    if (!pixels) {
+        LogError("VulkanBackend::updateTexture(): stb_image could not read the contents of '%s'.\n", update.path().c_str());
+        stbi_image_free(pixels);
+        return;
+    }
+
+    if (width != update.texture().extent().width() || height != update.texture().extent().height()) {
+        LogErrorAndExit("VulkanBackend::updateTexture(): loaded texture does not match specified extent.\n");
+    }
+
+    VkDeviceSize pixelsSize = width * height * numChannels * sizeof(stbi_uc);
+    VkDeviceMemory stagingMemory;
+    VkBuffer stagingBuffer = createBuffer(pixelsSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
+    if (!setBufferMemoryDirectly(stagingMemory, pixels, pixelsSize)) {
+        LogError("VulkanBackend::updateTexture(): could not set the staging buffer memory.\n");
+    }
+    AT_SCOPE_EXIT([&]() {
+        vkDestroyBuffer(m_device, stagingBuffer, nullptr);
+        vkFreeMemory(m_device, stagingMemory, nullptr);
+        stbi_image_free(pixels);
+    });
+
+    TextureInfo& textureInfo = m_textureInfos[update.texture().id()];
+
+    if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
+        LogError("VulkanBackend::updateTexture(): could not transition the image to transfer layout.\n");
+    }
+    if (!copyBufferToImage(stagingBuffer, textureInfo.image, width, height)) {
+        LogError("VulkanBackend::updateTexture(): could not copy the staging buffer to the image.\n");
+    }
+
+    // TODO: We probably don't wanna use VK_IMAGE_LAYOUT_GENERAL here!
+    if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL)) {
+        LogError("VulkanBackend::updateTexture(): could not transition the image to general layout.\n");
+    }
+    //if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
+    //    LogError("VulkanBackend::updateTexture(): could not transition the image to shader-read-only layout.\n");
+    //}
+}
+
+VkImage VulkanBackend::image(const Texture2D& texture)
+{
+    TextureInfo& imageInfo = m_textureInfos[texture.id()];
+    return imageInfo.image;
+}
+
+void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
+{
+    //renderTarget.isWindowTarget()
+
+    // m_renderTargetInfos
+    // TODO!
+}
+
+void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
+{
+    // TODO!
+}
+
+void VulkanBackend::newFramebuffer(const RenderTarget& renderTarget)
 {
     // TODO: Create framebuffer according to specs, put it in the m_framebuffers vector, and register this backend with the id as the the vector index
     renderTarget.registerBackend(backendBadge(), 456);
@@ -775,7 +1043,7 @@ VkFramebuffer VulkanBackend::framebuffer(const RenderTarget& renderTarget)
     return framebuffer;
 }
 
-void VulkanBackend::newRenderPass(RenderPass& renderPass)
+void VulkanBackend::newRenderPass(const RenderPass& renderPass)
 {
     // TODO: Create stuff according to specs and store away etc..
     renderPass.registerBackend(backendBadge(), 789);
@@ -786,56 +1054,49 @@ const VulkanBackend::RenderPassInfo& VulkanBackend::renderPassInfo(const RenderP
     return m_renderPassInfos[renderPass.id()];
 }
 
-void VulkanBackend::recordCommandBuffers(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat)
+void VulkanBackend::reconstructPipeline(GpuPipeline& pipeline, const ApplicationState& appState)
 {
-    // TODO: All of these need to be passed in. Or just an ApplicationState object..
-    bool windowSizeDidChange = true;
-    double deltaTime = 1.0 / 60.0;
-    double timeSinceStartup = 0.0;
-    unsigned int frameIndex = 0;
-    ApplicationState appState {
-        Extent2D(finalTargetExtent.width, finalTargetExtent.height),
-        windowSizeDidChange, deltaTime, timeSinceStartup, frameIndex
-    };
+    // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
 
-    // TODO: Something like this?
-    //m_gpuPipeline = app().createPipeline(appState);
+    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
 
-    size_t numSwapchainImages = swapchainImageViews.size();
+        auto resourceManager = std::make_unique<ResourceManager>(i);
+        pipeline.constructAll(*resourceManager);
 
-    for (size_t i = 0; i < numSwapchainImages; ++i) {
+        const ResourceManager& previousManager = *m_frameResourceManagers[i];
 
-        /*
-        // TODO: How are we going to get the backend from here? Ugh, it really should all be the same class
-        ResourceManager resourceManager(appState, backend);
+        // Delete old resources
+        for (auto& buffer : previousManager.buffers()) {
+            deleteBuffer(buffer);
+        }
+        for (auto& texture : previousManager.textures()) {
+            deleteTexture(texture);
+        }
+        for (auto& renderTarget : previousManager.renderTargets()) {
+            deleteRenderTarget(renderTarget);
+        }
 
-        app().passTree().forEachPassInOrder([](const RenderPass& pass) {
-            pass.construct(resourceManager);
+        // Create new resources
+        for (auto& buffer : resourceManager->buffers()) {
+            newBuffer(buffer);
+        }
+        for (auto& texture : resourceManager->textures()) {
+            newTexture(texture);
+        }
+        for (auto& renderTarget : resourceManager->renderTargets()) {
+            newRenderTarget(renderTarget);
+        }
 
-            ResourceManager& previourResourceManager = m_resourceManagerForPass[pass];
-            ResourceChangeList changeList = resourceManager.changeListRelativeTo(previousResourceManager);
+        // Perform the instant actions
+        for (auto& bufferUpdate : resourceManager->bufferUpdates()) {
+            updateBuffer(bufferUpdate);
+        }
+        for (auto& textureUpdate : resourceManager->textureUpdates()) {
+            updateTexture(textureUpdate);
+        }
 
-            for (auto& bufferChange : changeList.buffers) {
-                if (bufferChange.type == ResourceManager::Change::Create) {
-                    newBuffer(bufferChange.buffer);
-                } else if (bufferChange.type == ResourceManager::Change::Remove) {
-                    // todo
-                }
-            }
-            for (auto& textureChange : changeList.textures) {
-                // todo
-            }
-            for (auto& todoChange : changeList.otherStuffStuff) {
-                // todo
-            }
-            for (auto& immediateBufferUpdates : changeList.immediateBufferUpdates) {
-                // todo
-            }
-
-            // Replace previous resource manager
-            m_resourceManagerForPass[pass] = resourceManager;
-        });
-        */
+        // Replace previous resource manager
+        m_frameResourceManagers[i] = std::move(resourceManager);
     }
 }
 
@@ -844,6 +1105,10 @@ void VulkanBackend::timeStepForFrame(uint32_t relFrameIndex, double elapsedTime,
     // FIXME: this is a bit sketchy.. unhandled is not the same as 'definitely this frame'
     bool windowSizeDidChange = m_unhandledWindowResize;
     ApplicationState appState { m_swapchainExtent, windowSizeDidChange, deltaTime, elapsedTime, relFrameIndex };
+
+    if (m_gpuPipeline.needsReconstruction(appState)) {
+        reconstructPipeline(m_gpuPipeline, appState);
+    }
 
     //auto passes = app().dependencyResolvedPasses();
 
@@ -1264,7 +1529,7 @@ VulkanBackend::ManagedImage VulkanBackend::createImageViewFromImagePath(const st
 
 void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat)
 {
-    recordCommandBuffers(finalTargetFormat, finalTargetExtent, swapchainImageViews, depthImageView, depthFormat);
+    //recordCommandBuffers(finalTargetFormat, finalTargetExtent, swapchainImageViews, depthImageView, depthFormat);
 
     VkDescriptorSetLayoutBinding cameraStateUboLayoutBinding = {};
     cameraStateUboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

@@ -4,11 +4,11 @@
 #include "GpuPipeline.h"
 #include "RenderPass.h"
 
-class ResourceManager;
+class AppResourceManager;
 
 class App {
 public:
-    explicit App(ResourceManager&);
+    explicit App(AppResourceManager&);
 
     // Maybe these could be called by main and only the result of createPipeline is passed to the backend?
     void setup(const ApplicationState&);
@@ -19,7 +19,7 @@ public:
     GpuPipeline createPipeline(const ApplicationState&);
 
 private:
-    ResourceManager& m_resourceManager;
+    AppResourceManager& m_appResourceManager;
 
     // FIXME: App subclass specific stuff below
     struct Vertex {

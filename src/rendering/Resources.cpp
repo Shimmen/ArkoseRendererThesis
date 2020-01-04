@@ -1,18 +1,22 @@
 #include "Resources.h"
 
-#include "rendering/ShaderManager.h"
 #include "utility/logging.h"
 #include "utility/util.h"
 
 uint64_t Resource::id() const
 {
-    if (m_id == UINT64_MAX) {
+    if (m_id == Resource::NullId) {
         LogErrorAndExit("Requested resource does not have an attached backend!\n");
     }
     return m_id;
 }
 
-void Resource::registerBackend(Badge<Backend>, uint64_t id)
+void Resource::unregisterBackend(Badge<Backend>) const
+{
+    m_id = Resource::NullId;
+}
+
+void Resource::registerBackend(Badge<Backend>, uint64_t id) const
 {
     ASSERT(id != UINT64_MAX);
     if (m_id != UINT64_MAX) {
@@ -21,24 +25,31 @@ void Resource::registerBackend(Badge<Backend>, uint64_t id)
     m_id = id;
 }
 
-Texture2D::Texture2D(Badge<ResourceManager>, int width, int height, Components components, bool srgb, bool mipmaps)
+Texture2D::Texture2D(Badge<ResourceManager>, int width, int height, Format format, MinFilter minFilter, MagFilter magFilter)
     : m_extent(width, height)
-    , m_components(components)
-    , m_srgb(srgb)
-    , m_mipmaps(mipmaps)
+    , m_format(format)
+    , m_minFilter(minFilter)
+    , m_magFilter(magFilter)
 {
 }
 
+bool Texture2D::hasMipmaps() const
+{
+    // TODO: Use min filter to figure out the answer!
+    return false;
+}
+
 RenderTarget::RenderTarget(Badge<ResourceManager>, Texture2D&& colorTexture)
-    : m_attachments()
+    : m_attachments {}
 {
     Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
     m_attachments.push_back(colorAttachment);
 }
 
-RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> targets)
+RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments)
+    : m_attachments {}
 {
-    for (const Attachment& attachment : targets) {
+    for (const Attachment& attachment : attachments) {
         if (attachment.type == AttachmentType::Depth) {
             m_depthAttachment = attachment;
         } else {
@@ -46,25 +57,29 @@ RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachm
         }
     }
 
-    if (attachmentCount() < 1) {
-        LogErrorAndExit("RenderTarget error: tried to create with less than one color attachments!\n");
+    if (totalAttachmentCount() < 1) {
+        LogErrorAndExit("RenderTarget error: tried to create with less than one attachments!\n");
     }
-    /*
-    Extent2D firstExtent = m_attachments.front().texture->extent;
+
+    if (colorAttachmentCount() < 1) {
+        return;
+    }
+
+    Extent2D firstExtent = m_attachments.front().texture->extent();
+
     for (auto& attachment : m_attachments) {
-        if (attachment.texture->extent != firstExtent) {
+        if (attachment.texture->extent() != firstExtent) {
             LogErrorAndExit("RenderTarget error: tried to create with attachments of different sizes: (%ix%i) vs (%ix%i)\n",
-                attachment.texture->extent.width(), attachment.texture->extent.height(),
+                attachment.texture->extent().width(), attachment.texture->extent().height(),
                 firstExtent.width(), firstExtent.height());
         }
     }
 
-    if (m_depthAttachment.has_value() && m_depthAttachment->texture->extent != firstExtent) {
+    if (m_depthAttachment.has_value() && m_depthAttachment->texture->extent() != firstExtent) {
         LogErrorAndExit("RenderTarget error: tried to create with depth attachments of non-matching size: (%ix%i) vs (%ix%i)\n",
-            m_depthAttachment->texture->extent.width(), m_depthAttachment->texture->extent.height(),
+            m_depthAttachment->texture->extent().width(), m_depthAttachment->texture->extent().height(),
             firstExtent.width(), firstExtent.height());
     }
-    */
 }
 
 const Extent2D& RenderTarget::extent() const
@@ -72,9 +87,14 @@ const Extent2D& RenderTarget::extent() const
     return m_attachments.front().texture->extent();
 }
 
-size_t RenderTarget::attachmentCount() const
+size_t RenderTarget::colorAttachmentCount() const
 {
     return m_attachments.size();
+}
+
+size_t RenderTarget::totalAttachmentCount() const
+{
+    return colorAttachmentCount() + (hasDepthAttachment() ? 1 : 0);
 }
 
 bool RenderTarget::hasDepthAttachment() const
@@ -87,64 +107,9 @@ bool RenderTarget::isWindowTarget() const
     return m_isWindowTarget;
 }
 
-Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage)
+Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memoryHint)
     : m_size(size)
     , m_usage(usage)
+    , m_memoryHint(memoryHint)
 {
-}
-
-ShaderFile::ShaderFile(std::string name, ShaderFileType type)
-    : m_name(std::move(name))
-    , m_type(type)
-{
-    auto& manager = ShaderManager::instance();
-    switch (manager.loadAndCompileImmediately(name)) {
-    case ShaderManager::ShaderStatus::FileNotFound:
-        LogErrorAndExit("Shader file '%s' not found, exiting.\n");
-    case ShaderManager::ShaderStatus::CompileError: {
-        std::string errorMessage = manager.shaderError(name).value();
-        LogError("Shader file '%s' has compile errors:\n");
-        LogError("  %s\n", errorMessage.c_str());
-        LogErrorAndExit("Exiting due to bad shader at startup.\n");
-    }
-    default:
-        break;
-    }
-}
-
-ShaderFileType ShaderFile::type() const
-{
-    return m_type;
-}
-
-Shader Shader::createBasic(std::string name, std::string vertexName, std::string fragmentName)
-{
-    ShaderFile vertexFile { std::move(vertexName), ShaderFileType::Vertex };
-    ShaderFile fragmentFile { std::move(fragmentName), ShaderFileType::Fragment };
-    return Shader(std::move(name), { vertexFile, fragmentFile }, ShaderType::Raster);
-}
-
-Shader Shader::createCompute(std::string name, std::string computeName)
-{
-    ShaderFile computeFile { std::move(computeName), ShaderFileType::Compute };
-    return Shader(std::move(name), { computeFile }, ShaderType::Compute);
-}
-
-Shader::Shader(std::string name, std::vector<ShaderFile> files, ShaderType type)
-    : m_name(std::move(name))
-    , m_files(std::move(files))
-    , m_type(type)
-{
-}
-
-Shader::~Shader()
-{
-    if (!m_name.empty()) {
-        // TODO: Maybe tell the resource manager that a shader was removed, so that it can reference count?
-    }
-}
-
-ShaderType Shader::type() const
-{
-    return m_type;
 }

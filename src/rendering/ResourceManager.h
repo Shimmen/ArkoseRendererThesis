@@ -1,7 +1,10 @@
 #pragma once
 
-#include "rendering/ApplicationState.h"
-#include "rendering/Resources.h"
+#include "ApplicationState.h"
+#include "ResourceChange.h"
+#include "Resources.h"
+#include "utility/util.h"
+#include <unordered_map>
 
 class Backend;
 
@@ -9,7 +12,9 @@ class ResourceManager {
     // TODO: This is passed to the construct passes and is used to allocate
     //  resources (e.g. textures & buffers) used in the execute pass.
 public:
-    explicit ResourceManager(Backend& backend);
+    explicit ResourceManager(int frameAssociation);
+
+    void setCurrentPass(std::string);
 
     // TODO: Add a nice API for creating & managing resources here
 
@@ -30,23 +35,53 @@ public:
     [[nodiscard]] RenderTarget getWindowRenderTarget();
     [[nodiscard]] RenderTarget createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
-    [[nodiscard]] Texture2D loadTexture2D(std::string imagePath, bool generateMipmaps);
-    [[nodiscard]] Texture2D createTexture2D(int width, int height, Texture2D::Components, bool srgb, bool mipmaps);
-    [[nodiscard]] Texture2D getTexture2D(std::string renderPass, std::string name);
+    [[nodiscard]] Texture2D loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps);
+    [[nodiscard]] Texture2D createTexture2D(int width, int height, Texture2D::Format);
+    [[nodiscard]] std::optional<Texture2D> getTexture2D(const std::string& renderPass, const std::string& name);
 
     [[nodiscard]] Buffer createBuffer(size_t size, Buffer::Usage);
-    [[nodiscard]] Buffer createBuffer(const void* data, size_t size, Buffer::Usage);
-
     template<typename T>
-    [[nodiscard]] Buffer createBuffer(const std::vector<T>& inData, Buffer::Usage usage)
-    {
-        size_t dataSize = inData.size() * sizeof(T);
-        return createBuffer(inData.data(), dataSize, usage);
-    }
+    [[nodiscard]] Buffer createBuffer(std::vector<T>&& inData, Buffer::Usage usage);
+    [[nodiscard]] Buffer createBuffer(const std::byte* data, size_t size, Buffer::Usage);
 
-    void setBufferDataImmediately(const Buffer&, const void* data, size_t size, size_t offset = 0);
+    void assignName(const std::string& name, const Buffer&);
+    void assignName(const std::string& name, const Texture2D&);
+    void assignName(const std::string& name, const RenderTarget&);
+
+    void setBufferDataImmediately(const Buffer&, const std::byte* data, size_t size, size_t offset = 0);
+
+
+    const std::vector<Buffer>& buffers() const;
+    const std::vector<Texture2D>& textures() const;
+    const std::vector<RenderTarget>& renderTargets() const;
+    const std::vector<BufferUpdate>& bufferUpdates() const;
+    const std::vector<TextureUpdateFromFile>& textureUpdates() const;
+
+protected:
+    std::string makeQualifiedName(const std::string& pass, const std::string& name);
 
 private:
-    Backend& m_backend;
-    // TODO: Add some type of references to resources here so it can keep track of stuff.
+    int m_frameAssociation;
+
+    std::optional<std::string> m_current_pass_name;
+
+    std::unordered_map<std::string, Buffer> m_name_buffer_map;
+    std::unordered_map<std::string, Texture2D> m_name_texture_map;
+    std::unordered_map<std::string, RenderTarget> m_name_render_target_map;
+
+    std::vector<BufferUpdate> m_immediate_buffer_updates;
+    std::vector<TextureUpdateFromFile> m_immediate_texture_updates;
+
+    std::vector<Buffer> m_buffers;
+    std::vector<Texture2D> m_textures;
+    std::vector<RenderTarget> m_renderTargets;
 };
+
+template<typename T>
+[[nodiscard]] Buffer ResourceManager::createBuffer(std::vector<T>&& inData, Buffer::Usage usage)
+{
+    size_t dataSize = inData.size() * sizeof(T);
+    auto* binaryData = reinterpret_cast<const std::byte*>(inData.data());
+    ASSERT(binaryData != nullptr);
+    return createBuffer(binaryData, dataSize, usage);
+}

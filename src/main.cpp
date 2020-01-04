@@ -1,6 +1,7 @@
 #include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
 #include "rendering/App.h"
+#include "rendering/AppResourceManager.h"
 #include "rendering/ResourceManager.h"
 #include "utility/GlobalState.h"
 #include "utility/logging.h"
@@ -77,7 +78,7 @@ int main()
     GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
     Backend* backend = createBackend(backendType, window);
 
-    ResourceManager appResourceManager { *backend };
+    AppResourceManager appResourceManager { backend->multiplicity() };
     App* app = new App(appResourceManager);
     backend->setApp(app);
 

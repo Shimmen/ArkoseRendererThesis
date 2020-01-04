@@ -6,14 +6,19 @@ set(CMAKE_CXX_STANDARD 17)
 add_executable(ArkoseRenderer
         src/main.cpp
         src/backend/vulkan/VulkanBackend.cpp
-        src/rendering/ShaderManager.cpp
+        src/rendering/Shader.cpp
+        #src/rendering/ShaderManager.cpp
         src/rendering/ResourceManager.cpp
+        src/rendering/AppResourceManager.cpp
         src/rendering/App.cpp
         src/rendering/Resources.cpp
         src/rendering/RenderPass.cpp
         src/rendering/GpuPipeline.cpp
         src/utility/fileio.cpp
         src/utility/Random.cpp)
+
+#target_compile_options(ArkoseRenderer PRIVATE -Wall)
+target_compile_options(ArkoseRenderer PRIVATE -Wimplicit-fallthrough)
 
 target_include_directories(ArkoseRenderer PRIVATE src/)
 target_include_directories(ArkoseRenderer PRIVATE shaders/shared)
