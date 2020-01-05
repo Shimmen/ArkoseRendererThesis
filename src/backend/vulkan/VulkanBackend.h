@@ -61,9 +61,6 @@ private:
     void newRenderTarget(const RenderTarget&);
     void deleteRenderTarget(const RenderTarget&);
 
-    void newFramebuffer(const RenderTarget&);
-    VkFramebuffer framebuffer(const RenderTarget&);
-
     struct RenderPassInfo;
     void newRenderPass(const RenderPass&);
     const RenderPassInfo& renderPassInfo(const RenderPass&);
@@ -207,7 +204,8 @@ private:
     };
 
     struct RenderTargetInfo {
-
+        VkFramebuffer framebuffer {};
+        VkRenderPass compatibleRenderPass {};
     };
 
     struct RenderPassInfo {

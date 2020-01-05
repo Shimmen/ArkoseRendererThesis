@@ -22,7 +22,8 @@ RenderTarget ResourceManager::getWindowRenderTarget()
     //m_backend.
 
     // TODO: Implement properly!
-    return RenderTarget({}, createTexture2D(1024, 1024, Texture2D::Format::RGBA8));
+    Texture2D texture = createTexture2D(1024, 1024, Texture2D::Format::RGBA8);
+    return RenderTarget({}, texture);
 }
 
 RenderTarget ResourceManager::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)

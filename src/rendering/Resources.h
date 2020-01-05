@@ -92,22 +92,22 @@ private:
 
 struct RenderTarget : public Resource {
 
-    enum class AttachmentType {
-        Color0,
-        Color1,
-        Color2,
-        Color3,
-        Depth
+    enum class AttachmentType : unsigned int {
+        Color0 = 0,
+        Color1 = 1,
+        Color2 = 2,
+        Color3 = 3,
+        Depth = UINT_MAX
     };
 
     struct Attachment {
         AttachmentType type;
-        Texture2D* texture;
+        Texture2D texture;
     };
 
     RenderTarget() = default;
     RenderTarget(const RenderTarget&) = default;
-    explicit RenderTarget(Badge<ResourceManager>, Texture2D&&);
+    explicit RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture);
     explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments);
 
     [[nodiscard]] const Extent2D& extent() const;
@@ -116,9 +116,10 @@ struct RenderTarget : public Resource {
     [[nodiscard]] bool hasDepthAttachment() const;
     [[nodiscard]] bool isWindowTarget() const;
 
+    [[nodiscard]] const std::vector<Attachment>& sortedAttachments() const { return m_attachments; }
+
 private:
     std::vector<Attachment> m_attachments {};
-    std::optional<Attachment> m_depthAttachment {};
     bool m_isWindowTarget { false };
 };
 

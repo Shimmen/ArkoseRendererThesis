@@ -713,7 +713,8 @@ void VulkanBackend::translateRenderPass(VkCommandBuffer commandBuffer, const Ren
 
     VulkanBackend::RenderPassInfo info = renderPassInfo(renderPass);
     renderPassBeginInfo.renderPass = info.renderPass;
-    renderPassBeginInfo.framebuffer = framebuffer(renderPass.target());
+    // TODO: Hmm, but the render pass is created before we establish render targets, i.e. framebuffers. Or can we let our layering take care of that somehow?
+    renderPassBeginInfo.framebuffer = nullptr;//framebuffer(renderPass.target());
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipeline);
@@ -783,7 +784,6 @@ void VulkanBackend::newBuffer(const Buffer& buffer)
     // TODO: Use free lists!
     size_t index = m_bufferInfos.size();
     m_bufferInfos.push_back(bufferInfo);
-
     buffer.registerBackend(backendBadge(), index);
 }
 
@@ -927,7 +927,6 @@ void VulkanBackend::newTexture(const Texture2D& texture)
     // TODO: Use free lists!
     size_t index = m_textureInfos.size();
     m_textureInfos.push_back(textureInfo);
-
     texture.registerBackend(backendBadge(), index);
 }
 
@@ -1014,33 +1013,175 @@ VkImage VulkanBackend::image(const Texture2D& texture)
 
 void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
 {
+    // TODO: Handle this case:
+    //  maybe like, before calling this, check if it's a window target and then just have another function that provides it for us!
     //renderTarget.isWindowTarget()
 
-    // m_renderTargetInfos
-    // TODO!
+    std::vector<VkImageView> allAttachmentImageViews {};
+    std::vector<VkAttachmentDescription> allAttachments {};
+    std::vector<VkAttachmentReference> colorAttachmentRefs {};
+    std::optional<VkAttachmentReference> depthAttachmentRef {};
+
+    for (auto& [type, texture] : renderTarget.sortedAttachments()) {
+
+        // If the attachments are sorted properly (i.e. depth very last) then this should never happen!
+        // This is important for the VkAttachmentReference attachment index later in this loop.
+        ASSERT(!depthAttachmentRef.has_value());
+
+        TextureInfo& textureInfo = m_textureInfos[texture.id()];
+
+        // TODO: Handle multisampling, clearing, storing, and stencil stuff!
+        VkAttachmentDescription attachment = {};
+        attachment.format = textureInfo.format;
+        attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+        VkImageLayout finalLayout;
+        if (type == RenderTarget::AttachmentType::Depth) {
+            finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        } else {
+            finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
+
+        // TODO: What should this be in our case? Do we need to keep track of what happened to the image before this pass?
+        //  If so, we might stuff that information in the TextureInfo struct for the specific texture. But I think this works?
+        attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachment.finalLayout = finalLayout;
+
+        uint32_t attachmentIndex = allAttachments.size();
+        allAttachments.push_back(attachment);
+        allAttachmentImageViews.push_back(textureInfo.view);
+
+        if (type == RenderTarget::AttachmentType::Depth) {
+            VkAttachmentReference attachmentRef = {};
+            attachmentRef.attachment = attachmentIndex;
+            attachmentRef.layout = finalLayout;
+            depthAttachmentRef = attachmentRef;
+        } else {
+            VkAttachmentReference attachmentRef = {};
+            attachmentRef.attachment = attachmentIndex;
+            attachmentRef.layout = finalLayout;
+            colorAttachmentRefs.push_back(attachmentRef);
+        }
+    }
+
+    // TODO: How do we want to support multiple subpasses in the future?
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = colorAttachmentRefs.size();
+    subpass.pColorAttachments = colorAttachmentRefs.data();
+    if (depthAttachmentRef.has_value()) {
+        subpass.pDepthStencilAttachment = &depthAttachmentRef.value();
+    }
+
+
+    // For screen render target stuff
+    /*
+    VkAttachmentDescription colorAttachment = {};
+    colorAttachment.format = finalTargetFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentDescription depthAttachment = {};
+    depthAttachment.format = depthFormat;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference colorAttachmentRef = {};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef = {};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+    // setup subpass dependency to make sure we have the right stuff before drawing to a swapchain image
+    // see https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Rendering_and_presentation for info...
+    VkSubpassDependency subpassDependency = {};
+    subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependency.dstSubpass = 0; // i.e. the first and only subpass we have here
+    subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.srcAccessMask = 0;
+    subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo renderPassCreateInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+    renderPassCreateInfo.attachmentCount = allAttachments.size();
+    renderPassCreateInfo.pAttachments = allAttachments.data();
+    renderPassCreateInfo.subpassCount = 1;
+    renderPassCreateInfo.pSubpasses = &subpass;
+    renderPassCreateInfo.dependencyCount = 1;
+    renderPassCreateInfo.pDependencies = &subpassDependency;
+     */
+
+    VkRenderPassCreateInfo renderPassCreateInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+    renderPassCreateInfo.attachmentCount = allAttachments.size();
+    renderPassCreateInfo.pAttachments = allAttachments.data();
+    renderPassCreateInfo.subpassCount = 1;
+    renderPassCreateInfo.pSubpasses = &subpass;
+    renderPassCreateInfo.dependencyCount = 0;
+    renderPassCreateInfo.pDependencies = nullptr;
+
+    VkRenderPass renderPass {};
+    if (vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create render pass\n");
+    }
+
+    VkFramebufferCreateInfo framebufferCreateInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+    framebufferCreateInfo.renderPass = renderPass;
+    framebufferCreateInfo.attachmentCount = allAttachmentImageViews.size();
+    framebufferCreateInfo.pAttachments = allAttachmentImageViews.data();
+    framebufferCreateInfo.width = renderTarget.extent().width();
+    framebufferCreateInfo.height = renderTarget.extent().height();
+    framebufferCreateInfo.layers = 1;
+
+    VkFramebuffer framebuffer;
+    if (vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create framebuffer\n");
+    }
+
+    RenderTargetInfo renderTargetInfo {};
+    renderTargetInfo.compatibleRenderPass = renderPass;
+    renderTargetInfo.framebuffer = framebuffer;
+
+    // TODO: Use free lists!
+    size_t index = m_renderTargetInfos.size();
+    m_renderTargetInfos.push_back(renderTargetInfo);
+    renderTarget.registerBackend(backendBadge(), index);
+
 }
 
 void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
 {
-    // TODO!
-}
-
-void VulkanBackend::newFramebuffer(const RenderTarget& renderTarget)
-{
-    // TODO: Create framebuffer according to specs, put it in the m_framebuffers vector, and register this backend with the id as the the vector index
-    renderTarget.registerBackend(backendBadge(), 456);
-}
-
-VkFramebuffer VulkanBackend::framebuffer(const RenderTarget& renderTarget)
-{
-    if (renderTarget.isWindowTarget()) {
-        // TODO: Now we actually have to get the one for this frame!
-        ASSERT_NOT_REACHED();
+    if (renderTarget.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render target\n");
     }
 
-    // TODO: Manage free list, etc.
-    VkFramebuffer framebuffer = m_framebuffers[renderTarget.id()];
-    return framebuffer;
+    // TODO: When we have a free list, also maybe remove from the m_renderTargetInfos vector? But then we should also keep track of generations etc.
+    RenderTargetInfo& renderTargetInfo = m_renderTargetInfos[renderTarget.id()];
+    vkDestroyFramebuffer(m_device, renderTargetInfo.framebuffer, nullptr);
+    vkDestroyRenderPass(m_device, renderTargetInfo.compatibleRenderPass, nullptr);
+
+    renderTarget.unregisterBackend(backendBadge());
 }
 
 void VulkanBackend::newRenderPass(const RenderPass& renderPass)

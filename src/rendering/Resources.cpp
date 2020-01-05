@@ -39,67 +39,94 @@ bool Texture2D::hasMipmaps() const
     return false;
 }
 
-RenderTarget::RenderTarget(Badge<ResourceManager>, Texture2D&& colorTexture)
+RenderTarget::RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture)
     : m_attachments {}
 {
-    Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
+    Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = colorTexture };
     m_attachments.push_back(colorAttachment);
 }
 
 RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments)
     : m_attachments {}
 {
+    // TODO: This is all very messy and could probably be cleaned up a fair bit!
+
     for (const Attachment& attachment : attachments) {
-        if (attachment.type == AttachmentType::Depth) {
-            m_depthAttachment = attachment;
-        } else {
-            m_attachments.emplace_back(attachment);
-        }
+        m_attachments.emplace_back(attachment);
     }
 
     if (totalAttachmentCount() < 1) {
         LogErrorAndExit("RenderTarget error: tried to create with less than one attachments!\n");
     }
 
-    if (colorAttachmentCount() < 1) {
+    if (totalAttachmentCount() < 2) {
         return;
     }
 
-    Extent2D firstExtent = m_attachments.front().texture->extent();
+    Extent2D firstExtent = m_attachments.front().texture.extent();
 
     for (auto& attachment : m_attachments) {
-        if (attachment.texture->extent() != firstExtent) {
+        if (attachment.texture.extent() != firstExtent) {
             LogErrorAndExit("RenderTarget error: tried to create with attachments of different sizes: (%ix%i) vs (%ix%i)\n",
-                attachment.texture->extent().width(), attachment.texture->extent().height(),
+                attachment.texture.extent().width(), attachment.texture.extent().height(),
                 firstExtent.width(), firstExtent.height());
         }
     }
 
-    if (m_depthAttachment.has_value() && m_depthAttachment->texture->extent() != firstExtent) {
-        LogErrorAndExit("RenderTarget error: tried to create with depth attachments of non-matching size: (%ix%i) vs (%ix%i)\n",
-            m_depthAttachment->texture->extent().width(), m_depthAttachment->texture->extent().height(),
-            firstExtent.width(), firstExtent.height());
+    // Keep attachments sorted from Color0, Color1, .. ColorN, Depth
+    std::sort(m_attachments.begin(), m_attachments.end(), [](const Attachment& left, const Attachment& right) {
+        return left.type < right.type;
+    });
+
+    // Make sure we don't have duplicated attachment types & that the color attachments aren't sparse
+    if (m_attachments.front().type != AttachmentType::Depth && m_attachments.front().type != AttachmentType::Color0) {
+        LogErrorAndExit("RenderTarget error: sparse color attachments in render target\n");
+    }
+    std::optional<AttachmentType> lastType {};
+    for (auto& attachment : m_attachments) {
+        if (lastType.has_value()) {
+            if (attachment.type == lastType.value()) {
+                LogErrorAndExit("RenderTarget error: duplicate attachment types in render target\n");
+            }
+            if (attachment.type != AttachmentType::Depth) {
+                auto lastVal = static_cast<unsigned int>(attachment.type);
+                auto currVal = static_cast<unsigned int>(lastType.value());
+                if (currVal != lastVal + 1) {
+                    LogErrorAndExit("RenderTarget error: sparse color attachments in render target\n");
+                }
+            }
+        }
     }
 }
 
 const Extent2D& RenderTarget::extent() const
 {
-    return m_attachments.front().texture->extent();
+    return m_attachments.front().texture.extent();
 }
 
 size_t RenderTarget::colorAttachmentCount() const
 {
-    return m_attachments.size();
+    size_t total = totalAttachmentCount();
+    if (hasDepthAttachment()) {
+        return total - 1;
+    } else {
+        return total;
+    }
 }
 
 size_t RenderTarget::totalAttachmentCount() const
 {
-    return colorAttachmentCount() + (hasDepthAttachment() ? 1 : 0);
+    return m_attachments.size();
 }
 
 bool RenderTarget::hasDepthAttachment() const
 {
-    return m_depthAttachment.has_value();
+    if (m_attachments.empty()) {
+        return false;
+    }
+
+    const Attachment& last = m_attachments.back();
+    return last.type == AttachmentType::Depth;
 }
 
 bool RenderTarget::isWindowTarget() const
