@@ -161,8 +161,12 @@ private:
     std::vector<VkImage> m_swapchainImages {};
     std::vector<VkImageView> m_swapchainImageViews {};
 
-    // These render to the swapchain, but they are also command buffer specific, so maybe they shouldn't be here..
-    std::vector<VkFramebuffer> m_targetFramebuffers {}; // TODO: Actually, remove this fully!
+    VkFormat m_depthImageFormat {};
+    VkImage m_depthImage {};
+    VkImageView m_depthImageView {};
+    VkDeviceMemory m_depthImageMemory {};
+
+    //
 
     static constexpr size_t maxFramesInFlight { 2 };
     size_t m_currentFrameIndex { 0 };
@@ -170,12 +174,6 @@ private:
     std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores {};
     std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores {};
     std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences {};
-
-    // Swapchain depth image, for when applicable
-    VkFormat m_depthImageFormat {};
-    VkImage m_depthImage {};
-    VkImageView m_depthImageView {};
-    VkDeviceMemory m_depthImageMemory {};
 
     ///////////////////////////////////////////////////////////////////////////
     /// Resource & resource management members
@@ -238,7 +236,6 @@ private:
     VkDescriptorSetLayout m_exDescriptorSetLayout {};
     std::vector<VkDescriptorSet> m_exDescriptorSets {};
     VkPipeline m_exGraphicsPipeline {};
-    VkRenderPass m_exRenderPass {};
     VkPipelineLayout m_exPipelineLayout {};
 
     struct ManagedBuffer {
