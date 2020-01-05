@@ -107,6 +107,7 @@ struct RenderTarget : public Resource {
 
     RenderTarget() = default;
     RenderTarget(const RenderTarget&) = default;
+    explicit RenderTarget(Badge<ResourceManager>);
     explicit RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture);
     explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments);
 

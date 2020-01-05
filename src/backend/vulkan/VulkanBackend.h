@@ -60,6 +60,8 @@ private:
 
     void newRenderTarget(const RenderTarget&);
     void deleteRenderTarget(const RenderTarget&);
+    void setupWindowRenderTargets();
+    void destroyWindowRenderTargets();
 
     struct RenderPassInfo;
     void newRenderPass(const RenderPass&);
@@ -154,11 +156,13 @@ private:
 
     Extent2D m_swapchainExtent {};
     uint32_t m_numSwapchainImages {};
+
+    VkFormat m_swapchainImageFormat {};
     std::vector<VkImage> m_swapchainImages {};
     std::vector<VkImageView> m_swapchainImageViews {};
 
     // These render to the swapchain, but they are also command buffer specific, so maybe they shouldn't be here..
-    std::vector<VkFramebuffer> m_targetFramebuffers {};
+    std::vector<VkFramebuffer> m_targetFramebuffers {}; // TODO: Actually, remove this fully!
 
     static constexpr size_t maxFramesInFlight { 2 };
     size_t m_currentFrameIndex { 0 };
@@ -168,6 +172,7 @@ private:
     std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences {};
 
     // Swapchain depth image, for when applicable
+    VkFormat m_depthImageFormat {};
     VkImage m_depthImage {};
     VkImageView m_depthImageView {};
     VkDeviceMemory m_depthImageMemory {};
@@ -175,7 +180,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Resource & resource management members
 
-    std::array<std::unique_ptr<ResourceManager>, maxFramesInFlight> m_frameResourceManagers {};
+    std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
 
     VkQueue m_graphicsQueue {};
 
@@ -208,17 +213,19 @@ private:
         VkRenderPass compatibleRenderPass {};
     };
 
+    std::vector<BufferInfo> m_bufferInfos {};
+    std::vector<TextureInfo> m_textureInfos {};
+    std::vector<RenderTargetInfo> m_renderTargetInfos {};
+    std::vector<RenderTargetInfo> m_windowRenderTargetInfos {};
+
+    //
+
     struct RenderPassInfo {
         VkRenderPass renderPass;
         VkPipeline pipeline;
         VkPipelineLayout pipelineLayout;
     };
 
-    std::vector<BufferInfo> m_bufferInfos {};
-    std::vector<TextureInfo> m_textureInfos {};
-    std::vector<RenderTargetInfo> m_renderTargetInfos {};
-
-    std::vector<VkFramebuffer> m_framebuffers {};
     std::vector<RenderPassInfo> m_renderPassInfos {};
 
     ///////////////////////////////////////////////////////////////////////////

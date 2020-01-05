@@ -17,13 +17,10 @@ void ResourceManager::setCurrentPass(std::string pass)
 
 RenderTarget ResourceManager::getWindowRenderTarget()
 {
-    // TODO: Should we set up a stack of attachments represented on the inside of the backend, or should
-    //  this just be like a fake front-end for the Textures etc it represresents? ey?
-    //m_backend.
-
-    // TODO: Implement properly!
-    Texture2D texture = createTexture2D(1024, 1024, Texture2D::Format::RGBA8);
-    return RenderTarget({}, texture);
+    // NOTE: We don't want to add this to the list of render targets, since it's implied that it will always exist!
+    // (we need to do this to avoid constructor ambiguity)
+    auto badge = Badge<ResourceManager>();
+    return RenderTarget { badge };
 }
 
 RenderTarget ResourceManager::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)

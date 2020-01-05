@@ -491,7 +491,8 @@ void VulkanBackend::createSemaphoresAndFences(VkDevice device)
 
 int VulkanBackend::multiplicity() const
 {
-    return maxFramesInFlight;
+    ASSERT(m_numSwapchainImages > 0);
+    return m_numSwapchainImages;
 }
 
 void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface)
@@ -578,15 +579,16 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     }
 
     m_swapchainExtent = { swapchainExtent.width, swapchainExtent.height };
+    m_swapchainImageFormat = surfaceFormat.format;
+    m_depthImageFormat = VK_FORMAT_D32_SFLOAT;
 
     // FIXME: For now also create a depth image, but later we probably don't want one on the final presentation images
     //  so it doesn't really make sense to have it here anyway. I guess that's an excuse for the code structure.. :)
     // FIXME: Should we add an explicit image transition for the depth image..?
-    VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
-    m_depthImage = createImage2D(swapchainExtent.width, swapchainExtent.height, depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_depthImageMemory);
-    m_depthImageView = createImageView2D(m_depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+    m_depthImage = createImage2D(swapchainExtent.width, swapchainExtent.height, m_depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_depthImageMemory);
+    m_depthImageView = createImageView2D(m_depthImage, m_depthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    createTheDrawingStuff(surfaceFormat.format, swapchainExtent, m_swapchainImageViews, m_depthImageView, depthFormat);
+    createTheDrawingStuff(m_swapchainImageFormat, swapchainExtent, m_swapchainImageViews, m_depthImageView, m_depthImageFormat);
 }
 
 void VulkanBackend::destroySwapchain()
@@ -714,7 +716,7 @@ void VulkanBackend::translateRenderPass(VkCommandBuffer commandBuffer, const Ren
     VulkanBackend::RenderPassInfo info = renderPassInfo(renderPass);
     renderPassBeginInfo.renderPass = info.renderPass;
     // TODO: Hmm, but the render pass is created before we establish render targets, i.e. framebuffers. Or can we let our layering take care of that somehow?
-    renderPassBeginInfo.framebuffer = nullptr;//framebuffer(renderPass.target());
+    renderPassBeginInfo.framebuffer = nullptr; //framebuffer(renderPass.target());
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipeline);
@@ -1013,10 +1015,6 @@ VkImage VulkanBackend::image(const Texture2D& texture)
 
 void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
 {
-    // TODO: Handle this case:
-    //  maybe like, before calling this, check if it's a window target and then just have another function that provides it for us!
-    //renderTarget.isWindowTarget()
-
     std::vector<VkImageView> allAttachmentImageViews {};
     std::vector<VkAttachmentDescription> allAttachments {};
     std::vector<VkAttachmentReference> colorAttachmentRefs {};
@@ -1077,62 +1075,6 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
         subpass.pDepthStencilAttachment = &depthAttachmentRef.value();
     }
 
-
-    // For screen render target stuff
-    /*
-    VkAttachmentDescription colorAttachment = {};
-    colorAttachment.format = finalTargetFormat;
-    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentDescription depthAttachment = {};
-    depthAttachment.format = depthFormat;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference colorAttachmentRef = {};
-    colorAttachmentRef.attachment = 0;
-    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef = {};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-    // setup subpass dependency to make sure we have the right stuff before drawing to a swapchain image
-    // see https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Rendering_and_presentation for info...
-    VkSubpassDependency subpassDependency = {};
-    subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    subpassDependency.dstSubpass = 0; // i.e. the first and only subpass we have here
-    subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    subpassDependency.srcAccessMask = 0;
-    subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo renderPassCreateInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
-    renderPassCreateInfo.attachmentCount = allAttachments.size();
-    renderPassCreateInfo.pAttachments = allAttachments.data();
-    renderPassCreateInfo.subpassCount = 1;
-    renderPassCreateInfo.pSubpasses = &subpass;
-    renderPassCreateInfo.dependencyCount = 1;
-    renderPassCreateInfo.pDependencies = &subpassDependency;
-     */
-
     VkRenderPassCreateInfo renderPassCreateInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
     renderPassCreateInfo.attachmentCount = allAttachments.size();
     renderPassCreateInfo.pAttachments = allAttachments.data();
@@ -1167,7 +1109,6 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     size_t index = m_renderTargetInfos.size();
     m_renderTargetInfos.push_back(renderTargetInfo);
     renderTarget.registerBackend(backendBadge(), index);
-
 }
 
 void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
@@ -1182,6 +1123,106 @@ void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
     vkDestroyRenderPass(m_device, renderTargetInfo.compatibleRenderPass, nullptr);
 
     renderTarget.unregisterBackend(backendBadge());
+}
+
+void VulkanBackend::setupWindowRenderTargets()
+{
+    VkAttachmentDescription colorAttachment = {};
+    colorAttachment.format = m_swapchainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentDescription depthAttachment = {};
+    depthAttachment.format = m_depthImageFormat;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    std::array<VkAttachmentDescription, 2> allAttachments = {
+        colorAttachment,
+        depthAttachment
+    };
+
+    VkAttachmentReference colorAttachmentRef = {};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef = {};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+    // Setup subpass dependency to make sure we have the right stuff before drawing to a swapchain image.
+    // see https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Rendering_and_presentation for info.
+    VkSubpassDependency subpassDependency = {};
+    subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependency.dstSubpass = 0; // i.e. the first and only subpass we have here
+    subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.srcAccessMask = 0;
+    subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo renderPassCreateInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+    renderPassCreateInfo.attachmentCount = allAttachments.size();
+    renderPassCreateInfo.pAttachments = allAttachments.data();
+    renderPassCreateInfo.subpassCount = 1;
+    renderPassCreateInfo.pSubpasses = &subpass;
+    renderPassCreateInfo.dependencyCount = 1;
+    renderPassCreateInfo.pDependencies = &subpassDependency;
+
+    VkRenderPass renderPass {};
+    if (vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create window render pass\n");
+    }
+
+    m_windowRenderTargetInfos.resize(m_numSwapchainImages);
+    for (size_t it = 0; it < m_numSwapchainImages; ++it) {
+
+        std::array<VkImageView, 2> attachmentImageViews = {
+            m_swapchainImageViews[it],
+            m_depthImageView
+        };
+
+        VkFramebufferCreateInfo framebufferCreateInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+        framebufferCreateInfo.renderPass = renderPass;
+        framebufferCreateInfo.attachmentCount = attachmentImageViews.size();
+        framebufferCreateInfo.pAttachments = attachmentImageViews.data();
+        framebufferCreateInfo.width = m_swapchainExtent.width();
+        framebufferCreateInfo.height = m_swapchainExtent.height();
+        framebufferCreateInfo.layers = 1;
+
+        VkFramebuffer framebuffer;
+        if (vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create window framebuffer\n");
+        }
+
+        m_windowRenderTargetInfos[it].compatibleRenderPass = renderPass;
+        m_windowRenderTargetInfos[it].framebuffer = framebuffer;
+    }
+}
+
+void VulkanBackend::destroyWindowRenderTargets()
+{
+    for (RenderTargetInfo& renderTargetInfo : m_windowRenderTargetInfos) {
+        vkDestroyFramebuffer(m_device, renderTargetInfo.framebuffer, nullptr);
+    }
+
+    VkRenderPass sharedRenderPass = m_windowRenderTargetInfos[0].compatibleRenderPass;
+    vkDestroyRenderPass(m_device, sharedRenderPass, nullptr);
 }
 
 void VulkanBackend::newRenderPass(const RenderPass& renderPass)
@@ -1199,6 +1240,7 @@ void VulkanBackend::reconstructPipeline(GpuPipeline& pipeline, const Application
 {
     // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
 
+    m_frameResourceManagers.resize(m_numSwapchainImages);
     for (size_t i = 0; i < m_numSwapchainImages; ++i) {
 
         auto resourceManager = std::make_unique<ResourceManager>(i);

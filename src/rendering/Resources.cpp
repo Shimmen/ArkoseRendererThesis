@@ -39,6 +39,12 @@ bool Texture2D::hasMipmaps() const
     return false;
 }
 
+RenderTarget::RenderTarget(Badge<ResourceManager>)
+    : m_attachments()
+    , m_isWindowTarget(true)
+{
+}
+
 RenderTarget::RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture)
     : m_attachments {}
 {
@@ -101,11 +107,15 @@ RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachm
 
 const Extent2D& RenderTarget::extent() const
 {
+    ASSERT(!isWindowTarget());
+
     return m_attachments.front().texture.extent();
 }
 
 size_t RenderTarget::colorAttachmentCount() const
 {
+    ASSERT(!isWindowTarget());
+
     size_t total = totalAttachmentCount();
     if (hasDepthAttachment()) {
         return total - 1;
@@ -116,11 +126,15 @@ size_t RenderTarget::colorAttachmentCount() const
 
 size_t RenderTarget::totalAttachmentCount() const
 {
+    ASSERT(!isWindowTarget());
+
     return m_attachments.size();
 }
 
 bool RenderTarget::hasDepthAttachment() const
 {
+    ASSERT(!isWindowTarget());
+
     if (m_attachments.empty()) {
         return false;
     }
