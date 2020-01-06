@@ -1318,7 +1318,10 @@ void VulkanBackend::timeStepForFrame(uint32_t relFrameIndex, double elapsedTime,
     cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
     cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
 
-    if (!setBufferMemoryDirectly(m_exCameraStateBufferMemories[relFrameIndex], &cameraState, sizeof(CameraState))) {
+    const Buffer& uniformBuffer = m_exCameraStateBuffers[relFrameIndex];
+    const BufferInfo& cameraStateUniformBufferInfo = m_bufferInfos[uniformBuffer.id()];
+    ASSERT(cameraStateUniformBufferInfo.memory.has_value());
+    if (!setBufferMemoryDirectly(cameraStateUniformBufferInfo.memory.value(), &cameraState, sizeof(CameraState))) {
         LogError("VulkanBackend::timeStepForFrame(): could not update the uniform buffer.\n");
     }
 }
@@ -1752,18 +1755,19 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     //
     // Create uniform buffers
     //
-    m_exCameraStateBuffers.resize(numSwapchainImages);
-    m_exCameraStateBufferMemories.resize(numSwapchainImages);
+    if (!m_exCameraStateBuffers.empty()) {
+        for (const Buffer& buffer : m_exCameraStateBuffers) {
+            deleteBuffer(buffer);
+        }
+        m_exCameraStateBuffers.clear();
+    }
     for (size_t it = 0; it < numSwapchainImages; ++it) {
-
-        VkDeviceMemory memory;
-        VkBuffer buffer = createBuffer(sizeof(CameraState), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, memory);
-
-        m_exCameraStateBuffers[it] = buffer;
-        m_exCameraStateBufferMemories[it] = memory;
-
-        // TODO: Don't manage the memory like this!
-        m_managedBuffers.push_back({ buffer, memory });
+        Buffer buffer;
+        buffer.m_size = sizeof(CameraState);
+        buffer.m_usage = Buffer::Usage::UniformBuffer;
+        buffer.m_memoryHint = Buffer::MemoryHint::TransferOptimal;
+        newBuffer(buffer);
+        m_exCameraStateBuffers.push_back(buffer);
     }
 
     //
@@ -1964,7 +1968,8 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
 
         for (size_t i = 0; i < numSwapchainImages; ++i) {
             VkDescriptorBufferInfo descriptorBufferInfo = {};
-            descriptorBufferInfo.buffer = m_exCameraStateBuffers[i];
+            const BufferInfo& cameraStateUniformBufferInfo = m_bufferInfos[m_exCameraStateBuffers[i].id()];
+            descriptorBufferInfo.buffer = cameraStateUniformBufferInfo.buffer;
             descriptorBufferInfo.range = VK_WHOLE_SIZE; //sizeof(CameraState);
             descriptorBufferInfo.offset = 0;
 

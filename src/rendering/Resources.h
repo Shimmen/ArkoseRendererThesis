@@ -126,6 +126,9 @@ private:
 
 struct Buffer : public Resource {
 
+    // TODO: Remove at some later date, this is just for testing!
+    friend class VulkanBackend;
+
     enum class Usage {
         Vertex,
         Index,

@@ -230,8 +230,8 @@ private:
     /// Extra stuff that shouldn't be here at all - TODO: remove this
 
     // FIXME: This is all stuff specific for rendering the example triangle
-    std::vector<VkBuffer> m_exCameraStateBuffers {};
-    std::vector<VkDeviceMemory> m_exCameraStateBufferMemories {};
+    std::vector<Buffer> m_exCameraStateBuffers {};
+
     VkDescriptorPool m_exDescriptorPool {};
     VkDescriptorSetLayout m_exDescriptorSetLayout {};
     std::vector<VkDescriptorSet> m_exDescriptorSets {};
