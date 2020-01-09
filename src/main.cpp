@@ -1,13 +1,15 @@
 #include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
 #include "rendering/App.h"
-#include "rendering/AppResourceManager.h"
 #include "rendering/ResourceManager.h"
+#include "rendering/StaticResourceManager.h"
 #include "utility/GlobalState.h"
 #include "utility/logging.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+
+#include "app/TestApp.h"
 
 enum class BackendType {
     Vulkan
@@ -78,9 +80,11 @@ int main()
     GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
     Backend* backend = createBackend(backendType, window);
 
-    AppResourceManager appResourceManager { backend->multiplicity() };
-    App* app = new App(appResourceManager);
-    backend->setApp(app);
+    // TODO: I don't like the ownership of this. It feels like most of this should be done fully by the backend..?
+    App* app = new TestApp();
+    StaticResourceManager staticResourceManager { };
+    app->setup(staticResourceManager);
+    backend->createStaticResources(staticResourceManager);
 
     LogInfo("ArkoseRenderer: main loop begin.\n");
 
@@ -105,6 +109,8 @@ int main()
     }
     GlobalState::getMutable().setApplicationRunning(false);
     LogInfo("ArkoseRenderer: main loop end.\n");
+
+    backend->destroyStaticResources(staticResourceManager);
 
     delete app;
     delete backend;

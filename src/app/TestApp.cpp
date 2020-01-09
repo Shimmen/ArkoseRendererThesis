@@ -1,15 +1,6 @@
-#include "App.h"
-#include "AppResourceManager.h"
-#include "Commands.h"
-#include "RenderState.h"
-#include "ResourceManager.h"
+#include "TestApp.h"
 
-App::App(AppResourceManager& appResourceManager)
-    : m_appResourceManager(appResourceManager)
-{
-}
-
-void App::setup(const ApplicationState&)
+void TestApp::setup(StaticResourceManager& staticResources)
 {
     // Here we can do stuff like CPU work and GPU stuff that is fully or mostly static,
     // e.g. load textures, load meshes, set vertex buffers.
@@ -43,19 +34,13 @@ void App::setup(const ApplicationState&)
     };
 
     m_indexCount = indices.size();
-    m_vertexBuffer = m_appResourceManager.createStaticBuffer(Buffer::Usage::Vertex, std::move(vertices));
-    m_indexBuffer = m_appResourceManager.createStaticBuffer(Buffer::Usage::Index, std::move(indices));
+    m_vertexBuffer = &staticResources.createBuffer(Buffer::Usage::Vertex, std::move(vertices));
+    m_indexBuffer = &staticResources.createBuffer(Buffer::Usage::Index, std::move(indices));
 
     m_shader = Shader::createBasic("basic", "example.vert", "example.frag");
 }
 
-void App::timeStepForFrame(const ApplicationState&)
-{
-    // Here we can do stuff like CPU work, and GPU work that is not pass specific,
-    // e.g. update uniform buffers.
-}
-
-GpuPipeline App::createPipeline(const ApplicationState&)
+GpuPipeline TestApp::createPipeline(const ApplicationState&)
 {
     RenderState defaultState {};
 
@@ -65,13 +50,13 @@ GpuPipeline App::createPipeline(const ApplicationState&)
         RenderTarget windowTarget = resourceManager.getWindowRenderTarget();
         return [&](const ApplicationState& appState, RenderPass::CommandList& commandList) {
             commandList.push_back(std::make_unique<CmdDrawIndexed>(
-                m_vertexBuffer,
-                m_vertexLayout, // this?
-                m_indexBuffer,
+                *m_vertexBuffer,
+                m_vertexLayout,
+                *m_indexBuffer,
                 m_indexCount,
                 DrawMode::Triangles,
-                defaultState, // this!
-                m_shader)); // this?
+                defaultState,
+                m_shader));
         };
     });
 

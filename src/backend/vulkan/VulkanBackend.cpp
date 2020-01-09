@@ -483,12 +483,6 @@ void VulkanBackend::createSemaphoresAndFences(VkDevice device)
     }
 }
 
-int VulkanBackend::multiplicity() const
-{
-    ASSERT(m_numSwapchainImages > 0);
-    return m_numSwapchainImages;
-}
-
 void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface)
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
@@ -623,6 +617,36 @@ void VulkanBackend::recreateSwapchain()
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
 
     m_unhandledWindowResize = false;
+}
+
+void VulkanBackend::createStaticResources(StaticResourceManager& staticResourceManager)
+{
+    ResourceManager& resourceManager = staticResourceManager.internal(backendBadge());
+
+    for (auto& buffer : resourceManager.buffers()) {
+        newBuffer(buffer);
+    }
+    for (auto& texture : resourceManager.textures()) {
+        newTexture(texture);
+    }
+    for (auto& bufferUpdate : resourceManager.bufferUpdates()) {
+        updateBuffer(bufferUpdate);
+    }
+    for (auto& textureUpdate : resourceManager.textureUpdates()) {
+        updateTexture(textureUpdate);
+    }
+}
+
+void VulkanBackend::destroyStaticResources(StaticResourceManager& staticResourceManager)
+{
+    ResourceManager& resourceManager = staticResourceManager.internal(backendBadge());
+
+    for (auto& buffer : resourceManager.buffers()) {
+        deleteBuffer(buffer);
+    }
+    for (auto& texture : resourceManager.textures()) {
+        deleteTexture(texture);
+    }
 }
 
 bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
@@ -1239,7 +1263,7 @@ void VulkanBackend::reconstructPipeline(GpuPipeline& pipeline, const Application
     m_frameResourceManagers.resize(m_numSwapchainImages);
     for (size_t i = 0; i < m_numSwapchainImages; ++i) {
 
-        auto resourceManager = std::make_unique<ResourceManager>(i);
+        auto resourceManager = std::make_unique<ResourceManager>();
         pipeline.constructAll(*resourceManager);
 
         const ResourceManager& previousManager = *m_frameResourceManagers[i];

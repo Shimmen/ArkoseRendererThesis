@@ -4,13 +4,13 @@ project(ArkoseRenderer)
 set(CMAKE_CXX_STANDARD 17)
 
 add_executable(ArkoseRenderer
+        src/app/TestApp.cpp
         src/main.cpp
         src/backend/vulkan/VulkanBackend.cpp
         src/rendering/Shader.cpp
         #src/rendering/ShaderManager.cpp
         src/rendering/ResourceManager.cpp
-        src/rendering/AppResourceManager.cpp
-        src/rendering/App.cpp
+        src/rendering/StaticResourceManager.cpp
         src/rendering/Resources.cpp
         src/rendering/RenderPass.cpp
         src/rendering/GpuPipeline.cpp

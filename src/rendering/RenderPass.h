@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 
+// TODO: Rename to something like 'Node' or 'RenderNode' (but I guess it shouldn't just be for rendering (also GPGPU) so maybe a bad name?
 class RenderPass : public Resource {
 public:
     // FIXME: We probably want a command list type that the RenderPasses can't read from, but only add to!

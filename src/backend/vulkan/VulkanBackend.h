@@ -3,6 +3,7 @@
 #include "../Backend.h"
 #include "VulkanQueueInfo.h"
 #include "rendering/App.h"
+#include "rendering/StaticResourceManager.h"
 #include <array>
 
 #include <vulkan/vulkan.h>
@@ -23,7 +24,8 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     /// Public backend API
 
-    int multiplicity() const override;
+    void createStaticResources(StaticResourceManager&) override;
+    void destroyStaticResources(StaticResourceManager&) override;
 
     bool executeFrame(double elapsedTime, double deltaTime) override;
 

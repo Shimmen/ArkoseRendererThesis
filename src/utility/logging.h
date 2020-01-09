@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util.h"
 #include <cstdarg>
 #include <cstdio>
 
@@ -58,5 +59,5 @@ inline void LogError(const char* format, ...)
         fflush(stderr);
         va_end(vaList);
     }
-    exit(12345);
+    ASSERT(false);
 }

@@ -4,7 +4,7 @@
 
 class BufferUpdate {
 public:
-    BufferUpdate(Buffer buffer, std::vector<std::byte>&& data)
+    BufferUpdate(Buffer& buffer, std::vector<std::byte>&& data)
         : m_buffer(buffer)
         , m_data(data)
     {
@@ -14,13 +14,13 @@ public:
     const std::vector<std::byte>& data() const { return m_data; }
 
 private:
-    Buffer m_buffer;
+    Buffer& m_buffer;
     std::vector<std::byte> m_data;
 };
 
 class TextureUpdate {
 public:
-    explicit TextureUpdate(const Texture2D& texture, bool generateMipmaps)
+    explicit TextureUpdate(Texture2D& texture, bool generateMipmaps)
         : m_texture(texture)
         , m_generateMipmaps(generateMipmaps)
     {
@@ -30,13 +30,13 @@ public:
     bool generateMipmaps() const { return m_generateMipmaps; }
 
 private:
-    Texture2D m_texture;
+    Texture2D& m_texture;
     bool m_generateMipmaps;
 };
 
 class TextureUpdateFromFile : public TextureUpdate {
 public:
-    TextureUpdateFromFile(const Texture2D& texture, std::string path, bool generateMipmaps)
+    TextureUpdateFromFile(Texture2D& texture, std::string path, bool generateMipmaps)
         : TextureUpdate(texture, generateMipmaps)
         , m_path(std::move(path))
     {
