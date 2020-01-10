@@ -702,8 +702,11 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     return true;
 }
 
-void VulkanBackend::translateRenderPass(VkCommandBuffer commandBuffer, const RenderPass& renderPass, const ResourceManager& resourceManager)
+void VulkanBackend::executeRenderGraphNode(VkCommandBuffer commandBuffer, const RenderGraphNode& renderPass, const ResourceManager& resourceManager)
 {
+    // TODO: Re-implement!
+
+    /*
     VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 
     Extent2D extent = renderPass.target().extent();
@@ -748,16 +751,17 @@ void VulkanBackend::translateRenderPass(VkCommandBuffer commandBuffer, const Ren
         auto& type = cmd->type();
 
         if (type == typeid(CmdDrawIndexed)) {
-            translateDrawIndexed(commandBuffer, resourceManager, *dynamic_cast<const CmdDrawIndexed*>(cmd));
+            executeDrawIndexed(commandBuffer, resourceManager, *dynamic_cast<const CmdDrawIndexed*>(cmd));
         } else {
             ASSERT_NOT_REACHED();
         }
     }
 
     vkCmdEndRenderPass(commandBuffer);
+    */
 }
 
-void VulkanBackend::translateDrawIndexed(VkCommandBuffer commandBuffer, const ResourceManager& resourceManager, const CmdDrawIndexed& command)
+void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const ResourceManager& resourceManager, const CmdDrawIndexed& command)
 {
     VkBuffer vertexBuffer = buffer(command.vertexBuffer);
     VkBuffer indexBuffer = buffer(command.indexBuffer);
@@ -766,7 +770,7 @@ void VulkanBackend::translateDrawIndexed(VkCommandBuffer commandBuffer, const Re
     VkDeviceSize offsets[] = { 0 };
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16); // TODO: Index type!
     vkCmdDrawIndexed(commandBuffer, command.numIndices, 1, 0, 0, 0);
 }
 
@@ -1674,7 +1678,7 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
     renderState.unregisterBackend(backendBadge());
 }
 
-void VulkanBackend::reconstructPipeline(GpuPipeline& pipeline, const ApplicationState& appState)
+void VulkanBackend::reconstructPipeline(RenderGraph& pipeline, const ApplicationState& appState)
 {
     // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
 

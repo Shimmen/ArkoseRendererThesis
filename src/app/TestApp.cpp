@@ -31,11 +31,11 @@ void TestApp::setup(StaticResourceManager& staticResources)
     m_indexBuffer = &staticResources.createBuffer(Buffer::Usage::Index, std::move(indices));
 }
 
-GpuPipeline TestApp::createPipeline(const ApplicationState& appState)
+RenderGraph TestApp::createPipeline(const ApplicationState& appState)
 {
-    GpuPipeline pipeline {};
+    RenderGraph graph {};
 
-    pipeline.addRenderPass("TrianglePass", [&](ResourceManager& resourceManager) {
+    graph.addNode("example-triangle", [&](ResourceManager& resourceManager) {
 
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
@@ -64,7 +64,7 @@ GpuPipeline TestApp::createPipeline(const ApplicationState& appState)
         RenderTarget& windowTarget = resourceManager.getWindowRenderTarget();
         RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState);
 
-        return [&](const ApplicationState& appState, RenderPass::CommandList& commandList) {
+        return [&](const ApplicationState& appState, CommandList& commandList) {
 
             // TODO: This doesn't seem optimal! We can't have it on the stack because stack allocated data will go out of scope,
             //  and we don't wanna heap alloc every frame. Hmm, let's think about that. Maybe have some custom arena allocator for that?
@@ -77,19 +77,15 @@ GpuPipeline TestApp::createPipeline(const ApplicationState& appState)
             cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
             cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
 
-            commandList.push_back(std::make_unique<CmdUpdateBuffer>(
-                cameraUniformBuffer,
-                &cameraState,
-                sizeof(CameraState)));
-
-            commandList.push_back(std::make_unique<CmdSetRenderState>(renderState));
-            commandList.push_back(std::make_unique<CmdDrawIndexed>(
+            commandList.add<CmdUpdateBuffer>(cameraUniformBuffer, &cameraState, sizeof(CameraState));
+            commandList.add<CmdSetRenderState>(renderState);
+            commandList.add<CmdDrawIndexed>(
                 *m_vertexBuffer,
                 *m_indexBuffer,
                 m_indexCount,
-                DrawMode::Triangles));
+                DrawMode::Triangles);
         };
     });
 
-    return pipeline;
+    return graph;
 }

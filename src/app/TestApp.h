@@ -5,7 +5,7 @@
 class TestApp : public App {
 public:
     void setup(StaticResourceManager&) override;
-    GpuPipeline createPipeline(const ApplicationState&) override;
+    RenderGraph createPipeline(const ApplicationState&) override;
 
 private:
     struct Vertex {

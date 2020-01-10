@@ -36,13 +36,13 @@ private:
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
     void timeStepForFrame(uint32_t relFrameIndex, double elapsedTime, double deltaTime);
-    void reconstructPipeline(GpuPipeline&, const ApplicationState&);
+    void reconstructPipeline(RenderGraph&, const ApplicationState&);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
-    void translateRenderPass(VkCommandBuffer, const RenderPass&, const ResourceManager&);
-    void translateDrawIndexed(VkCommandBuffer, const ResourceManager&, const CmdDrawIndexed&);
+    void executeRenderGraphNode(VkCommandBuffer, const RenderGraphNode&, const ResourceManager&);
+    void executeDrawIndexed(VkCommandBuffer, const ResourceManager&, const CmdDrawIndexed&);
 
     // TODO: How are we going to keep track of the multiple separate sets of resources for the different swapchain images??
     //  We probably only want to call app.createPipeline() once and only keep one GpuPipeline. So how should it be managed?
@@ -181,7 +181,7 @@ private:
     VkCommandPool m_commandPool {};
     VkCommandPool m_transientCommandPool {};
 
-    GpuPipeline m_gpuPipeline {};
+    RenderGraph m_gpuPipeline {};
 
     std::vector<VkCommandBuffer> m_commandBuffers {};
 

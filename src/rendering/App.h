@@ -1,8 +1,8 @@
 #pragma once
 
 #include "ApplicationState.h"
-#include "GpuPipeline.h"
-#include "RenderPass.h"
+#include "RenderGraph.h"
+#include "RenderGraphNode.h"
 #include "StaticResourceManager.h"
 
 class App {
@@ -14,5 +14,5 @@ public:
 
     //! Called exactly once, which implies that the actual pipeline is fixed throughout the lifetime of the app
     //! However, note that each render pass doesn't need to be the same per frame, since they can make different command
-    virtual GpuPipeline createPipeline(const ApplicationState&) = 0;
+    virtual RenderGraph createPipeline(const ApplicationState&) = 0;
 };

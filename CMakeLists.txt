@@ -12,8 +12,8 @@ add_executable(ArkoseRenderer
         src/rendering/ResourceManager.cpp
         src/rendering/StaticResourceManager.cpp
         src/rendering/Resources.cpp
-        src/rendering/RenderPass.cpp
-        src/rendering/GpuPipeline.cpp
+        src/rendering/RenderGraphNode.cpp
+        src/rendering/RenderGraph.cpp
         src/utility/fileio.cpp
         src/utility/Random.cpp)
 
