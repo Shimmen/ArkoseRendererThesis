@@ -65,14 +65,8 @@ private:
     void setupWindowRenderTargets();
     void destroyWindowRenderTargets();
 
-    struct RenderPassInfo;
-    void newRenderPass(const RenderPass&);
-    const RenderPassInfo& renderPassInfo(const RenderPass&);
-
-    struct PipelineInfo {
-        VkDescriptorSetLayout descriptorSetLayout;
-        VkPipelineLayout pipelineLayout;
-    };
+    void newRenderState(const RenderState&);
+    void deleteRenderState(const RenderState&);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Swapchain management
@@ -213,20 +207,19 @@ private:
         VkRenderPass compatibleRenderPass {};
     };
 
+    struct RenderStateInfo {
+        VkDescriptorPool descriptorPool {};
+        VkDescriptorSet descriptorSet {};
+        VkDescriptorSetLayout descriptorSetLayout {};
+        VkPipelineLayout pipelineLayout {};
+        VkPipeline pipeline {};
+    };
+
     std::vector<BufferInfo> m_bufferInfos {};
     std::vector<TextureInfo> m_textureInfos {};
     std::vector<RenderTargetInfo> m_renderTargetInfos {};
     std::vector<RenderTargetInfo> m_windowRenderTargetInfos {};
-
-    //
-
-    struct RenderPassInfo {
-        VkRenderPass renderPass;
-        VkPipeline pipeline;
-        VkPipelineLayout pipelineLayout;
-    };
-
-    std::vector<RenderPassInfo> m_renderPassInfos {};
+    std::vector<RenderStateInfo> m_renderStateInfos {};
 
     ///////////////////////////////////////////////////////////////////////////
     /// Extra stuff that shouldn't be here at all - TODO: remove this

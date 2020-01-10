@@ -154,3 +154,40 @@ Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memo
     , m_memoryHint(memoryHint)
 {
 }
+
+ShaderBinding::ShaderBinding(uint32_t index, ShaderFileType shaderFileType, const Buffer* buffer)
+    : bindingIndex(index)
+    , shaderFileType(shaderFileType)
+    , type(ShaderBindingType::UniformBuffer) // TODO: Technically this could be some other type of buffer here (e.g. shader storage buffer)
+    , buffer(buffer)
+    , texture(nullptr)
+{
+}
+
+ShaderBinding::ShaderBinding(uint32_t index, ShaderFileType shaderFileType, const Texture2D* texture)
+    : bindingIndex(index)
+    , shaderFileType(shaderFileType)
+    , type(ShaderBindingType::TextureSampler)
+    , buffer(nullptr)
+    , texture(texture)
+{
+}
+
+ShaderBindingSet::ShaderBindingSet(std::initializer_list<ShaderBinding> list)
+    : m_shaderBindings(list)
+{
+    std::sort(m_shaderBindings.begin(), m_shaderBindings.end(), [](const ShaderBinding& left, const ShaderBinding& right) {
+        return left.bindingIndex < right.bindingIndex;
+    });
+
+    for (int i = 0; i < m_shaderBindings.size() - 1; ++i) {
+        if (m_shaderBindings[i].bindingIndex == m_shaderBindings[i + 1].bindingIndex) {
+            LogErrorAndExit("ShaderBindingSet error: duplicate bindings\n");
+        }
+    }
+}
+
+const std::vector<ShaderBinding>& ShaderBindingSet::shaderBindings() const
+{
+    return m_shaderBindings;
+}

@@ -12,6 +12,7 @@ enum class ShaderFileType {
 struct ShaderFile {
     ShaderFile(std::string name, ShaderFileType type);
 
+    [[nodiscard]] const std::string& name() const;
     [[nodiscard]] ShaderFileType type() const;
 
 private:
@@ -34,6 +35,7 @@ struct Shader {
     ~Shader();
 
     [[nodiscard]] ShaderType type() const;
+    [[nodiscard]] const std::vector<ShaderFile>& files() const;
 
     // TODO: We should maybe add some utility API for shader introspection here..?
     //  Somehow we need to extract descriptor sets etc.

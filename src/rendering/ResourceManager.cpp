@@ -17,12 +17,11 @@ void ResourceManager::setCurrentPass(std::string pass)
     m_current_pass_name = std::move(pass);
 }
 
-RenderTarget ResourceManager::getWindowRenderTarget()
+RenderTarget& ResourceManager::getWindowRenderTarget()
 {
     // NOTE: We don't want to add this to the list of render targets, since it's implied that it will always exist!
-    // (we need to do this to avoid constructor ambiguity)
-    auto badge = Badge<ResourceManager>();
-    return RenderTarget { badge };
+    static RenderTarget sharedWindowRenderTarget { Badge<ResourceManager>() };
+    return sharedWindowRenderTarget;
 }
 
 RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)
@@ -45,20 +44,20 @@ Texture2D& ResourceManager::createTexture2D(int width, int height, Texture2D::Fo
     return m_textures.back();
 }
 
-Buffer& ResourceManager::createBuffer(size_t size, Buffer::Usage usage)
+Buffer& ResourceManager::createBuffer(size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
     ASSERT(size > 0);
     if (m_buffers.size() >= m_buffers.capacity()) {
         LogErrorAndExit("Reached max capacity of buffers, update the capacity!\n");
     }
-    Buffer buffer = { {}, size, usage };
+    Buffer buffer = { {}, size, usage, memoryHint };
     m_buffers.push_back(buffer);
     return m_buffers.back();
 }
 
-Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer::Usage usage)
+Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
-    Buffer& buffer = createBuffer(size, usage);
+    Buffer& buffer = createBuffer(size, usage, memoryHint);
     setBufferDataImmediately(buffer, data, size);
     return buffer;
 }
@@ -80,6 +79,19 @@ Texture2D& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool
     m_immediate_texture_updates.emplace_back(texture, imagePath, generateMipmaps);
 
     return texture;
+}
+
+RenderState& ResourceManager::createRenderState(
+    const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
+    const Shader& shader, const ShaderBindingSet& shaderBindingSet,
+    const Viewport& viewport, const BlendState& blendState)
+{
+    if (m_renderStates.size() >= m_renderStates.capacity()) {
+        LogErrorAndExit("Reached max capacity of render states, update the capacity!\n");
+    }
+    RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState };
+    m_renderStates.push_back(renderState);
+    return m_renderStates.back();
 }
 
 void ResourceManager::publish(const std::string& name, const Buffer& buffer)
@@ -142,6 +154,11 @@ const std::vector<Texture2D>& ResourceManager::textures() const
 const std::vector<RenderTarget>& ResourceManager::renderTargets() const
 {
     return m_renderTargets;
+}
+
+const std::vector<RenderState>& ResourceManager::renderStates() const
+{
+    return m_renderStates;
 }
 
 const std::vector<BufferUpdate>& ResourceManager::bufferUpdates() const

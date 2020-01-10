@@ -1,8 +1,10 @@
 #pragma once
 
+#include "Shader.h"
 #include "utility/Badge.h"
 #include "utility/copying.h"
 #include "utility/mathkit.h"
+#include "utility/util.h"
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -142,7 +144,7 @@ struct Buffer : public Resource {
 
     Buffer() = default;
     Buffer(const Buffer&) = default;
-    Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memoryHint = MemoryHint::GpuOptimal);
+    Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint);
 
     size_t size() const { return m_size; }
     Usage usage() const { return m_usage; }
@@ -152,4 +154,95 @@ private:
     size_t m_size { 0 };
     Usage m_usage { Usage::Vertex };
     MemoryHint m_memoryHint { MemoryHint::GpuOptimal };
+};
+
+enum class VertexAttributeType {
+    Float2,
+    Float3,
+    Float4
+};
+
+struct VertexAttribute {
+    uint32_t location {};
+    VertexAttributeType type {};
+    size_t memoryOffset {};
+};
+
+struct VertexLayout {
+    size_t vertexStride {};
+    std::vector<VertexAttribute> attributes {};
+};
+
+struct BlendState {
+    bool enabled { false };
+};
+
+struct Viewport {
+    float x { 0.0f };
+    float y { 0.0f };
+    float width;
+    float height;
+};
+
+enum class ShaderBindingType {
+    UniformBuffer,
+    TextureSampler,
+};
+
+struct ShaderBinding {
+
+    ShaderBinding(uint32_t index, ShaderFileType, const Buffer*);
+    ShaderBinding(uint32_t index, ShaderFileType, const Texture2D*);
+
+    uint32_t bindingIndex;
+    ShaderFileType shaderFileType; // TODO: Later we want flags here I guess, so we can have multiple stuff.
+
+    ShaderBindingType type;
+    const Buffer* buffer;
+    const Texture2D* texture;
+};
+
+struct ShaderBindingSet {
+    ShaderBindingSet(std::initializer_list<ShaderBinding>);
+
+    const std::vector<ShaderBinding>& shaderBindings() const;
+
+private:
+    std::vector<ShaderBinding> m_shaderBindings {};
+};
+
+struct RenderState : public Resource {
+public:
+    RenderState(Badge<ResourceManager>,
+        const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
+        const Shader& shader, const ShaderBindingSet& shaderBindingSet,
+        const Viewport& viewport, const BlendState& blendState)
+        : m_renderTarget(renderTarget)
+        , m_vertexLayout(vertexLayout)
+        , m_shader(shader)
+        , m_shaderBindingSet(shaderBindingSet)
+        , m_viewport(viewport)
+        , m_blendState(blendState)
+    {
+        ASSERT(shader.type() == ShaderType::Raster);
+    }
+
+    const RenderTarget& renderTarget() const { return m_renderTarget; }
+    const VertexLayout& vertexLayout() const { return m_vertexLayout; }
+
+    const Shader& shader() const { return m_shader; }
+    const ShaderBindingSet& shaderBindingSet() const { return m_shaderBindingSet; }
+
+    const Viewport& fixedViewport() const { return m_viewport; }
+    const BlendState& blendState() const { return m_blendState; }
+
+private:
+    const RenderTarget& m_renderTarget;
+    const VertexLayout& m_vertexLayout;
+
+    const Shader& m_shader;
+    const ShaderBindingSet& m_shaderBindingSet;
+
+    const Viewport& m_viewport;
+    const BlendState& m_blendState;
 };

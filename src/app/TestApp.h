@@ -14,9 +14,7 @@ private:
         vec2 texCoord;
     };
 
-    VertexLayout m_vertexLayout {};
     Buffer* m_vertexBuffer {};
     Buffer* m_indexBuffer {};
     size_t m_indexCount {};
-    Shader m_shader {};
 };

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstring>
 #include <stb_image.h>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "camera_state.h"
@@ -733,13 +734,13 @@ void VulkanBackend::translateRenderPass(VkCommandBuffer commandBuffer, const Ren
 
     // TODO: The descriptor set (and maybe the pipeline layout?!) can be tied to per frame updates, so we need to do some stuff here. Unclear..
 
-    VulkanBackend::RenderPassInfo info = renderPassInfo(renderPass);
-    renderPassBeginInfo.renderPass = info.renderPass;
+    //VulkanBackend::RenderPassInfo info = renderPassInfo(renderPass);
+    //renderPassBeginInfo.renderPass = info.renderPass;
     // TODO: Hmm, but the render pass is created before we establish render targets, i.e. framebuffers. Or can we let our layering take care of that somehow?
     renderPassBeginInfo.framebuffer = nullptr; //framebuffer(renderPass.target());
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipeline);
+    //vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipeline);
     //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipelineLayout, 0, 1, &THE_DESCRIPTOR_SET_FOR_FRAME, 0, nullptr); // TODO!
 
     for (; cmdIterator != renderPass.commands().end(); std::advance(cmdIterator, 1)) {
@@ -1245,15 +1246,429 @@ void VulkanBackend::destroyWindowRenderTargets()
     vkDestroyRenderPass(m_device, sharedRenderPass, nullptr);
 }
 
-void VulkanBackend::newRenderPass(const RenderPass& renderPass)
+void VulkanBackend::newRenderState(const RenderState& renderState)
 {
-    // TODO: Create stuff according to specs and store away etc..
-    renderPass.registerBackend(backendBadge(), 789);
+    VkVertexInputBindingDescription bindingDescription = {};
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions {};
+    {
+        const VertexLayout& vertexLayout = renderState.vertexLayout();
+
+        // TODO: What about multiple bindings? Just have multiple VertexLayout:s?
+        uint32_t binding = 0;
+
+        bindingDescription.binding = binding;
+        bindingDescription.stride = vertexLayout.vertexStride;
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        attributeDescriptions.reserve(vertexLayout.attributes.size());
+        for (const VertexAttribute& attribute : vertexLayout.attributes) {
+
+            VkVertexInputAttributeDescription description = {};
+            description.binding = binding;
+            description.location = attribute.location;
+            description.offset = attribute.memoryOffset;
+
+            VkFormat format;
+            switch (attribute.type) {
+            case VertexAttributeType::Float2:
+                format = VK_FORMAT_R32G32_SFLOAT;
+                break;
+            case VertexAttributeType::Float3:
+                format = VK_FORMAT_R32G32B32_SFLOAT;
+                break;
+            case VertexAttributeType::Float4:
+                format = VK_FORMAT_R32G32B32A32_SFLOAT;
+                break;
+            }
+            description.format = format;
+
+            attributeDescriptions.push_back(description);
+        }
+    }
+
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages {};
+    {
+        const Shader& shader = renderState.shader();
+        for (auto& file : shader.files()) {
+
+            // TODO: Go through the ShaderManager later!
+            // TODO: Maybe don't create new modules every time? Currently they are deleted later in this function
+            auto optionalData = fileio::readEntireFileAsByteBuffer(file.name());
+            ASSERT(optionalData.has_value());
+            const auto& binaryData = optionalData.value();
+
+            VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+            moduleCreateInfo.codeSize = binaryData.size();
+            moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(binaryData.data());
+
+            VkShaderModule shaderModule {};
+            if (vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+                LogErrorAndExit("Error trying to create shader module\n");
+            }
+
+            VkPipelineShaderStageCreateInfo stageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+            stageCreateInfo.module = shaderModule;
+            stageCreateInfo.pName = "main";
+
+            VkShaderStageFlagBits stageFlags;
+            switch (file.type()) {
+            case ShaderFileType::Vertex:
+                stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+                break;
+            case ShaderFileType::Fragment:
+                stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+                break;
+            case ShaderFileType::Compute:
+                ASSERT_NOT_REACHED();
+                break;
+            }
+            stageCreateInfo.stage = stageFlags;
+
+            shaderStages.push_back(stageCreateInfo);
+        }
+    }
+
+    //
+    // Create descriptor set layout
+    //
+    VkDescriptorSetLayout descriptorSetLayout {};
+    {
+        const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
+
+        std::vector<VkDescriptorSetLayoutBinding> layoutBindings {};
+        layoutBindings.reserve(bindingSet.shaderBindings().size());
+
+        for (auto& bindingInfo : bindingSet.shaderBindings()) {
+
+            VkDescriptorSetLayoutBinding binding = {};
+            binding.binding = bindingInfo.bindingIndex;
+
+            switch (bindingInfo.type) {
+            case ShaderBindingType::UniformBuffer:
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                break;
+            case ShaderBindingType::TextureSampler:
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            }
+
+            // NOTE: Should be 1 unless we have an array, which we currently don't support.
+            binding.descriptorCount = 1;
+
+            switch (bindingInfo.shaderFileType) {
+            case ShaderFileType::Vertex:
+                binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+                break;
+            case ShaderFileType::Fragment:
+                binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+                break;
+            case ShaderFileType::Compute:
+                ASSERT_NOT_REACHED();
+                break;
+            }
+
+            binding.pImmutableSamplers = nullptr;
+
+            layoutBindings.push_back(binding);
+        }
+
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        descriptorSetLayoutCreateInfo.bindingCount = layoutBindings.size();
+        descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();
+
+        if (vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create descriptor set layout\n");
+        }
+    }
+
+    //
+    // Create pipeline layout
+    //
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+
+    // TODO: Support multiple descriptor sets!
+    pipelineLayoutCreateInfo.setLayoutCount = 1;
+    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+
+    // TODO: Support push constants!
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+    pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+
+    VkPipelineLayout pipelineLayout {};
+    if (vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create pipeline layout\n");
+    }
+
+    //
+    // Create pipeline
+    //
+    VkPipelineVertexInputStateCreateInfo vertInputState = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    vertInputState.vertexBindingDescriptionCount = 1;
+    vertInputState.pVertexBindingDescriptions = &bindingDescription;
+    vertInputState.vertexAttributeDescriptionCount = attributeDescriptions.size();
+    vertInputState.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = { VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+    inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssemblyState.primitiveRestartEnable = VK_FALSE;
+
+    auto& viewportInfo = renderState.fixedViewport();
+
+    VkViewport viewport = {};
+    viewport.x = viewportInfo.x;
+    viewport.y = viewportInfo.y;
+    viewport.width = viewportInfo.width;
+    viewport.height = viewportInfo.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    // TODO: Should we always use the viewport settings if no scissor is specified?
+    VkRect2D scissor = {};
+    scissor.offset = { 0, 0 };
+    scissor.extent.width = uint32_t(viewportInfo.width);
+    scissor.extent.height = uint32_t(viewportInfo.height);
+
+    VkPipelineViewportStateCreateInfo viewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+    viewportState.viewportCount = 1;
+    viewportState.pViewports = &viewport;
+    viewportState.scissorCount = 1;
+    viewportState.pScissors = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+    rasterizer.depthClampEnable = VK_FALSE;
+    rasterizer.rasterizerDiscardEnable = VK_FALSE;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable = VK_FALSE;
+
+    VkPipelineMultisampleStateCreateInfo multisampling = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+    multisampling.sampleShadingEnable = VK_FALSE;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    // TODO: Implement blending!
+    VkPipelineColorBlendStateCreateInfo colorBlending = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+    if (renderState.blendState().enabled) {
+        ASSERT_NOT_REACHED();
+    } else {
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+    }
+
+    VkPipelineDepthStencilStateCreateInfo depthStencilState = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+    depthStencilState.depthTestEnable = VK_TRUE;
+    depthStencilState.depthWriteEnable = VK_TRUE;
+    depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencilState.depthBoundsTestEnable = VK_FALSE;
+    depthStencilState.minDepthBounds = 0.0f;
+    depthStencilState.maxDepthBounds = 1.0f;
+    depthStencilState.stencilTestEnable = VK_FALSE;
+    depthStencilState.front = {};
+    depthStencilState.back = {};
+
+    VkGraphicsPipelineCreateInfo pipelineCreateInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+
+    // stages
+    pipelineCreateInfo.stageCount = shaderStages.size();
+    pipelineCreateInfo.pStages = shaderStages.data();
+
+    // fixed function stuff
+    pipelineCreateInfo.pVertexInputState = &vertInputState;
+    pipelineCreateInfo.pInputAssemblyState = &inputAssemblyState;
+    pipelineCreateInfo.pViewportState = &viewportState;
+    pipelineCreateInfo.pRasterizationState = &rasterizer;
+    pipelineCreateInfo.pMultisampleState = &multisampling;
+    pipelineCreateInfo.pDepthStencilState = &depthStencilState;
+    pipelineCreateInfo.pColorBlendState = &colorBlending;
+    pipelineCreateInfo.pDynamicState = nullptr;
+
+    // pipeline layout
+    pipelineCreateInfo.layout = pipelineLayout;
+
+    // render pass stuff
+    RenderTargetInfo& renderTargetInfo = m_renderTargetInfos[renderState.renderTarget().id()];
+    pipelineCreateInfo.renderPass = renderTargetInfo.compatibleRenderPass;
+    pipelineCreateInfo.subpass = 0; // TODO: How should this be handled?
+
+    // extra stuff (optional for this)
+    pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineCreateInfo.basePipelineIndex = -1;
+
+    VkPipeline graphicsPipeline {};
+    if (vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create graphics pipeline\n");
+    }
+
+    // Remove shader modules, they are no longer needed after creating the pipeline
+    for (auto& stage : shaderStages) {
+        vkDestroyShaderModule(m_device, stage.module, nullptr);
+    }
+
+    //
+    // Create a descriptor pool
+    //
+    VkDescriptorPool descriptorPool {};
+    {
+        // TODO: Maybe in the future we don't want one pool per render state? We could group a lot of stuff together probably.
+
+        std::unordered_map<ShaderBindingType, size_t> bindingTypeIndex {};
+        std::vector<VkDescriptorPoolSize> descriptorPoolSizes {};
+
+        const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
+        for (auto& bindingInfo : bindingSet.shaderBindings()) {
+
+            ShaderBindingType type = bindingInfo.type;
+
+            auto entry = bindingTypeIndex.find(type);
+            if (entry == bindingTypeIndex.end()) {
+
+                VkDescriptorPoolSize poolSize = {};
+                poolSize.descriptorCount = 1;
+
+                switch (bindingInfo.type) {
+                case ShaderBindingType::UniformBuffer:
+                    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    break;
+                case ShaderBindingType::TextureSampler:
+                    poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                }
+
+                bindingTypeIndex[type] = descriptorPoolSizes.size();
+                descriptorPoolSizes.push_back(poolSize);
+
+            } else {
+
+                size_t index = entry->second;
+                VkDescriptorPoolSize& poolSize = descriptorPoolSizes[index];
+                poolSize.descriptorCount += 1;
+            }
+        }
+
+        VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        descriptorPoolCreateInfo.poolSizeCount = descriptorPoolSizes.size();
+        descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
+        descriptorPoolCreateInfo.maxSets = 1; // TODO: Handle multiple descriptor sets!
+
+        if (vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create descriptor pool\n");
+        }
+    }
+
+    //
+    // Create descriptor set(s)
+    //
+    VkDescriptorSet descriptorSet {};
+    {
+        // TODO: Handle multiple descriptor sets!
+
+        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+        descriptorSetAllocateInfo.descriptorSetCount = 1;
+        descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
+
+        if (vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create descriptor set\n");
+        }
+    }
+
+    //
+    // Update descriptor set(s)
+    //
+    {
+        // TODO: Handle multiple descriptor sets!
+
+        std::vector<VkWriteDescriptorSet> descriptorSetWrites {};
+
+        const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
+        for (auto& bindingInfo : bindingSet.shaderBindings()) {
+
+            VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            write.dstSet = descriptorSet;
+
+            write.descriptorCount = 1;
+            write.dstBinding = bindingInfo.bindingIndex;
+
+            write.dstArrayElement = 0;
+
+            VkDescriptorBufferInfo descBufferInfo = {};
+            VkDescriptorImageInfo descImageInfo = {};
+
+            switch (bindingInfo.type) {
+            case ShaderBindingType::UniformBuffer: {
+
+                ASSERT(bindingInfo.buffer);
+                const BufferInfo& bufferInfo = m_bufferInfos[bindingInfo.buffer->id()];
+
+                descBufferInfo.offset = 0;
+                descBufferInfo.range = VK_WHOLE_SIZE;
+                descBufferInfo.buffer = bufferInfo.buffer;
+
+                write.pBufferInfo = &descBufferInfo;
+                break;
+            }
+
+            case ShaderBindingType::TextureSampler: {
+
+                ASSERT(bindingInfo.texture);
+                const TextureInfo& textureInfo = m_textureInfos[bindingInfo.texture->id()];
+
+                descImageInfo.sampler = textureInfo.sampler;
+                descImageInfo.imageView = textureInfo.view;
+
+                // TODO: We should probably keep track of the currentLayout in the TextureInfo!
+                //  Additionally, it's not clear if we always have this layout below in these cases, so this is a bad assumption!
+                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.pImageInfo = &descImageInfo;
+                break;
+            }
+            }
+
+            write.pTexelBufferView = nullptr;
+
+            descriptorSetWrites.push_back(write);
+        }
+
+        vkUpdateDescriptorSets(m_device, descriptorSetWrites.size(), descriptorSetWrites.data(), 0, nullptr);
+    }
+
+    RenderStateInfo renderStateInfo {};
+    renderStateInfo.descriptorSetLayout = descriptorSetLayout;
+    renderStateInfo.descriptorSet = descriptorSet;
+    renderStateInfo.descriptorPool = descriptorPool;
+    renderStateInfo.pipelineLayout = pipelineLayout;
+    renderStateInfo.pipeline = graphicsPipeline;
+
+    // TODO: Use free lists!
+    size_t index = m_renderStateInfos.size();
+    m_renderStateInfos.push_back(renderStateInfo);
+    renderState.registerBackend(backendBadge(), index);
 }
 
-const VulkanBackend::RenderPassInfo& VulkanBackend::renderPassInfo(const RenderPass& renderPass)
+void VulkanBackend::deleteRenderState(const RenderState& renderState)
 {
-    return m_renderPassInfos[renderPass.id()];
+    if (renderState.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render state\n");
+    }
+
+    // TODO: When we have a free list, also maybe remove from the m_renderStateInfos vector? But then we should also keep track of generations etc.
+    RenderStateInfo& renderStateInfo = m_renderStateInfos[renderState.id()];
+
+    // ?? does this need to be performed before we destroy the stuff below?
+    //vkFreeCommandBuffers(m_device, m_commandPool, m_commandBuffers.size(), m_commandBuffers.data());
+
+    vkDestroyDescriptorPool(m_device, renderStateInfo.descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(m_device, renderStateInfo.descriptorSetLayout, nullptr);
+    vkDestroyPipeline(m_device, renderStateInfo.pipeline, nullptr);
+    vkDestroyPipelineLayout(m_device, renderStateInfo.pipelineLayout, nullptr);
+
+    renderState.unregisterBackend(backendBadge());
 }
 
 void VulkanBackend::reconstructPipeline(GpuPipeline& pipeline, const ApplicationState& appState)
@@ -1278,6 +1693,9 @@ void VulkanBackend::reconstructPipeline(GpuPipeline& pipeline, const Application
         for (auto& renderTarget : previousManager.renderTargets()) {
             deleteRenderTarget(renderTarget);
         }
+        for (auto& renderState : previousManager.renderStates()) {
+            deleteRenderState(renderState);
+        }
 
         // Create new resources
         for (auto& buffer : resourceManager->buffers()) {
@@ -1288,6 +1706,9 @@ void VulkanBackend::reconstructPipeline(GpuPipeline& pipeline, const Application
         }
         for (auto& renderTarget : resourceManager->renderTargets()) {
             newRenderTarget(renderTarget);
+        }
+        for (auto& renderState : resourceManager->renderStates()) {
+            newRenderState(renderState);
         }
 
         // Perform the instant actions

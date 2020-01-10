@@ -27,6 +27,6 @@ private:
 template<typename T>
 Buffer& StaticResourceManager::createBuffer(Buffer::Usage usage, std::vector<T>&& data)
 {
-    Buffer& buffer = m_resourceManager.createBuffer<T>(std::move(data), usage);
+    Buffer& buffer = m_resourceManager.createBuffer<T>(std::move(data), usage, Buffer::MemoryHint::GpuOptimal);
     return buffer;
 }

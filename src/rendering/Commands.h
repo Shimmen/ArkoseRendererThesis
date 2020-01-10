@@ -1,6 +1,5 @@
 #pragma once
 
-#include "RenderState.h"
 #include "Resources.h"
 #include "Shader.h"
 #include <memory>
@@ -17,49 +16,51 @@ struct FrontendCommand {
     }
 };
 
-enum class VertexAttributeType {
-    Float2,
-    Float3,
-    Float4
-};
-
-struct VertexAttribute {
-    int location {};
-    VertexAttributeType type {};
-    size_t memoryOffset {};
-};
-
-struct VertexLayout {
-    size_t vertexStride {};
-    std::vector<VertexAttribute> attributes {};
-};
-
 enum class DrawMode {
     Triangles
 };
 
 struct CmdDrawIndexed : public FrontendCommand {
 
-    CmdDrawIndexed(Buffer& vBuf, VertexLayout vLay, Buffer& iBuf, size_t numI, DrawMode dMode, RenderState state, Shader& shad)
+    CmdDrawIndexed(Buffer& vBuf, Buffer& iBuf, size_t numI, DrawMode dMode)
         : vertexBuffer(vBuf)
-        , vertexLayout(std::move(vLay))
         , indexBuffer(iBuf)
         , numIndices(numI)
         , mode(dMode)
-        , renderState(state)
-        , shader(shad)
     {
     }
 
     Buffer& vertexBuffer;
-    VertexLayout vertexLayout;
 
     Buffer& indexBuffer;
     size_t numIndices;
     DrawMode mode { DrawMode::Triangles };
+};
 
-    RenderState renderState;
-    Shader& shader;
+struct CmdSetRenderState : public FrontendCommand {
+
+    CmdSetRenderState(RenderState& renderState)
+        : renderState(renderState)
+    {
+    }
+
+    RenderState& renderState;
+};
+
+struct CmdUpdateBuffer : public FrontendCommand {
+
+    CmdUpdateBuffer(Buffer& buffer, void* source, size_t size, size_t offset = 0u)
+        : buffer(buffer)
+        , source(source)
+        , size(size)
+        , offset(offset)
+    {
+    }
+
+    Buffer& buffer;
+    void* source;
+    size_t size;
+    size_t offset;
 };
 
 struct ClearColor {

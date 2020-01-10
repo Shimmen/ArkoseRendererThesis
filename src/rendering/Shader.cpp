@@ -23,6 +23,11 @@ ShaderFile::ShaderFile(std::string name, ShaderFileType type)
     */
 }
 
+const std::string& ShaderFile::name() const
+{
+    return m_name;
+}
+
 ShaderFileType ShaderFile::type() const
 {
     return m_type;
@@ -58,4 +63,9 @@ Shader::~Shader()
 ShaderType Shader::type() const
 {
     return m_type;
+}
+
+const std::vector<ShaderFile>&  Shader::files() const
+{
+    return m_files;
 }
