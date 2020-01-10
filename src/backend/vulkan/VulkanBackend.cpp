@@ -1020,12 +1020,16 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     }
 
     // TODO: We probably don't wanna use VK_IMAGE_LAYOUT_GENERAL here!
-    if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL)) {
-        LogError("VulkanBackend::updateTexture(): could not transition the image to general layout.\n");
+    VkImageLayout finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout)) {
+        LogError("VulkanBackend::updateTexture(): could not transition the image to the specified image layout.\n");
     }
     //if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
     //    LogError("VulkanBackend::updateTexture(): could not transition the image to shader-read-only layout.\n");
     //}
+
+    textureInfo.currentLayout = finalLayout;
 }
 
 VkImage VulkanBackend::image(const Texture2D& texture)
@@ -1620,9 +1624,8 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
                 descImageInfo.sampler = textureInfo.sampler;
                 descImageInfo.imageView = textureInfo.view;
 
-                // TODO: We should probably keep track of the currentLayout in the TextureInfo!
-                //  Additionally, it's not clear if we always have this layout below in these cases, so this is a bad assumption!
-                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                ASSERT(textureInfo.currentLayout == VK_IMAGE_LAYOUT_GENERAL || textureInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                descImageInfo.imageLayout = textureInfo.currentLayout;
 
                 write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 write.pImageInfo = &descImageInfo;

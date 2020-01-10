@@ -200,6 +200,8 @@ private:
         VkFormat format {};
         VkImageView view {};
         VkSampler sampler {};
+
+        VkImageLayout currentLayout {};
     };
 
     struct RenderTargetInfo {
