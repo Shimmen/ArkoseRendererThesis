@@ -214,9 +214,9 @@ private:
 struct RenderState : public Resource {
 public:
     RenderState(Badge<ResourceManager>,
-        const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
-        const Shader& shader, const ShaderBindingSet& shaderBindingSet,
-        const Viewport& viewport, const BlendState& blendState)
+        const RenderTarget& renderTarget, VertexLayout vertexLayout,
+        Shader shader, ShaderBindingSet shaderBindingSet,
+        Viewport viewport, BlendState blendState)
         : m_renderTarget(renderTarget)
         , m_vertexLayout(vertexLayout)
         , m_shader(shader)
@@ -238,11 +238,11 @@ public:
 
 private:
     const RenderTarget& m_renderTarget;
-    const VertexLayout& m_vertexLayout;
+    VertexLayout m_vertexLayout;
 
-    const Shader& m_shader;
-    const ShaderBindingSet& m_shaderBindingSet;
+    Shader m_shader;
+    ShaderBindingSet m_shaderBindingSet;
 
-    const Viewport& m_viewport;
-    const BlendState& m_blendState;
+    Viewport m_viewport;
+    BlendState m_blendState;
 };

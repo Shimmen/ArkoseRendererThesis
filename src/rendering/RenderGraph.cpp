@@ -2,22 +2,11 @@
 
 #include <utility/logging.h>
 
-bool RenderGraph::needsReconstruction(const ApplicationState& appState) const
-{
-    for (const auto& [name, renderPass] : m_nodes) {
-        if (renderPass->needsConstruction(appState)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-void RenderGraph::constructAll(ResourceManager& resourceManager)
+void RenderGraph::constructAll(ResourceManager& resourceManager, const ApplicationState& appState)
 {
     for (const auto& [name, node] : m_nodes) {
         resourceManager.setCurrentPass(name);
-        node->construct(resourceManager);
+        node->construct(resourceManager, appState);
     }
 }
 
@@ -37,7 +26,7 @@ void RenderGraph::addNode(const std::string& name, std::unique_ptr<RenderGraphNo
     m_nodes[name] = std::move(node);
 }
 
-void RenderGraph::forEachNodeInResolvedOrder(const std::function<void(const RenderGraphNode&)>& callback)
+void RenderGraph::forEachNodeInResolvedOrder(const std::function<void(const RenderGraphNode&)>& callback) const
 {
     // TODO: This is obviously a temporary limitation, hehe..
     ASSERT(m_nodes.size() == 1);

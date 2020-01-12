@@ -85,6 +85,8 @@ int main()
     StaticResourceManager staticResourceManager { };
     app->setup(staticResourceManager);
     backend->createStaticResources(staticResourceManager);
+    auto renderGraph = app->mainRenderGraph();
+    backend->setMainRenderGraph(*renderGraph);
 
     LogInfo("ArkoseRenderer: main loop begin.\n");
 

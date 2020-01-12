@@ -31,17 +31,17 @@ void TestApp::setup(StaticResourceManager& staticResources)
     m_indexBuffer = &staticResources.createBuffer(Buffer::Usage::Index, std::move(indices));
 }
 
-RenderGraph TestApp::createPipeline(const ApplicationState& appState)
+std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
 {
-    RenderGraph graph {};
+    auto graph = std::make_unique<RenderGraph>();
 
-    graph.addNode("example-triangle", [&](ResourceManager& resourceManager) {
+    graph->addNode("example-triangle", [&](ResourceManager& resourceManager, const ApplicationState& appState) {
 
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
 
         Buffer& cameraUniformBuffer = resourceManager.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        Texture2D& testTexture = resourceManager.loadTexture2D("test-pattern.png", true, false);
+        Texture2D& testTexture = resourceManager.loadTexture2D("assets/test-pattern.png", true, false);
 
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),
@@ -55,8 +55,8 @@ RenderGraph TestApp::createPipeline(const ApplicationState& appState)
         ShaderBindingSet shaderBindingSet { uniformBufferBinding, textureSamplerBinding };
 
         Viewport viewport;
-        viewport.width = appState.windowExtent.width();
-        viewport.height = appState.windowExtent.height();
+        viewport.width = appState.windowExtent().width();
+        viewport.height = appState.windowExtent().height();
 
         BlendState blendState;
         blendState.enabled = false;
@@ -70,9 +70,9 @@ RenderGraph TestApp::createPipeline(const ApplicationState& appState)
             //  and we don't wanna heap alloc every frame. Hmm, let's think about that. Maybe have some custom arena allocator for that?
             static CameraState cameraState {};
 
-            cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, appState.timeSinceStartup * 3.1415f / 2.0f);
+            cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, appState.elapsedTime() * 3.1415f / 2.0f);
             cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
-            float aspectRatio = float(appState.windowExtent.width()) / float(appState.windowExtent.height());
+            float aspectRatio = float(appState.windowExtent().width()) / float(appState.windowExtent().height());
             cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), aspectRatio, 0.1f);
             cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
             cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;

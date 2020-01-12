@@ -7,27 +7,12 @@ RenderGraphNode::RenderGraphNode(NodeConstructorFunction function)
 {
 }
 
-void RenderGraphNode::construct(ResourceManager& resourceManager)
+void RenderGraphNode::construct(ResourceManager& resourceManager, const ApplicationState& appState)
 {
-    m_command_submission_callback = m_constructor_function(resourceManager);
+    m_command_submission_callback = m_constructor_function(resourceManager, appState);
 }
 
 void RenderGraphNode::execute(const ApplicationState& appState, CommandList& commandList)
 {
     m_command_submission_callback(appState, commandList);
-}
-
-bool RenderGraphNode::needsConstruction(const ApplicationState& appState) const
-{
-    if (m_needs_construct_callback) {
-        return m_needs_construct_callback(appState);
-    } else {
-        // FIXME: The appState.frameIndex == 0 part should probably be automatic. It always needs to construct stuff before the first frame.
-        return appState.frameIndex == 0 || appState.windowSizeDidChange;
-    }
-}
-
-void RenderGraphNode::setNeedsConstructionCallback(RenderGraphNode::NeedsConstructCallback callback)
-{
-    m_needs_construct_callback = std::move(callback);
 }

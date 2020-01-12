@@ -17,7 +17,7 @@ public:
     explicit VulkanBackend(GLFWwindow*);
     ~VulkanBackend() override;
 
-    VulkanBackend(VulkanBackend&&) = default;
+    VulkanBackend(VulkanBackend&&) = delete;
     VulkanBackend(VulkanBackend&) = delete;
     VulkanBackend& operator=(VulkanBackend&) = delete;
 
@@ -27,6 +27,8 @@ public:
     void createStaticResources(StaticResourceManager&) override;
     void destroyStaticResources(StaticResourceManager&) override;
 
+    void setMainRenderGraph(RenderGraph&) override;
+
     bool executeFrame(double elapsedTime, double deltaTime) override;
 
 private:
@@ -35,19 +37,15 @@ private:
 
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
-    void timeStepForFrame(uint32_t relFrameIndex, double elapsedTime, double deltaTime);
-    void reconstructPipeline(RenderGraph&, const ApplicationState&);
-
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
+    void executeRenderGraph(VkCommandBuffer, const ApplicationState&, const RenderGraph&, const ResourceManager&);
     void executeRenderGraphNode(VkCommandBuffer, const RenderGraphNode&, const ResourceManager&);
     void executeDrawIndexed(VkCommandBuffer, const ResourceManager&, const CmdDrawIndexed&);
 
-    // TODO: How are we going to keep track of the multiple separate sets of resources for the different swapchain images??
-    //  We probably only want to call app.createPipeline() once and only keep one GpuPipeline. So how should it be managed?
-    //  Additionally, remember that there is a resource manager connected to the app itself. Some shared stuff, like vertex
-    //  buffers should have only one copy on the GPU, but others, like a uniform buffer, needs multiple copies.
+    void reconstructRenderGraph(RenderGraph&, const ApplicationState&);
+    void destroyRenderGraph(RenderGraph&);
 
     void newBuffer(const Buffer&);
     void deleteBuffer(const Buffer&);
@@ -65,7 +63,7 @@ private:
     void setupWindowRenderTargets();
     void destroyWindowRenderTargets();
 
-    void newRenderState(const RenderState&);
+    void newRenderState(const RenderState&, uint32_t swapchainImageIndex);
     void deleteRenderState(const RenderState&);
 
     ///////////////////////////////////////////////////////////////////////////
@@ -73,7 +71,7 @@ private:
 
     void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
     void destroySwapchain();
-    void recreateSwapchain();
+    [[nodiscard]] Extent2D recreateSwapchain();
 
     ///////////////////////////////////////////////////////////////////////////
     /// Temporary drawing - TODO: remove these
@@ -165,7 +163,7 @@ private:
     //
 
     static constexpr size_t maxFramesInFlight { 2 };
-    size_t m_currentFrameIndex { 0 };
+    uint32_t m_currentFrameIndex { 0 };
 
     std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores {};
     std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores {};
@@ -181,9 +179,9 @@ private:
     VkCommandPool m_commandPool {};
     VkCommandPool m_transientCommandPool {};
 
-    RenderGraph m_gpuPipeline {};
+    std::vector<VkCommandBuffer> m_frameCommandBuffers {};
 
-    std::vector<VkCommandBuffer> m_commandBuffers {};
+    RenderGraph* m_renderGraph {};
 
     struct BufferInfo {
         VkBuffer buffer {};

@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanQueueInfo.h"
+#include "rendering/ShaderManager.h"
 #include "utility/fileio.h"
 #include "utility/logging.h"
 #include "utility/util.h"
@@ -60,6 +61,10 @@ VulkanBackend::~VulkanBackend()
 {
     // Before destroying stuff, make sure it's done with all scheduled work
     vkDeviceWaitIdle(m_device);
+
+    vkFreeCommandBuffers(m_device, m_commandPool, m_frameCommandBuffers.size(), m_frameCommandBuffers.data());
+
+    destroyRenderGraph(*m_renderGraph);
 
     destroySwapchain();
 
@@ -577,6 +582,19 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
 
     setupWindowRenderTargets();
 
+    // Create main command buffers, one per swapchain image
+    m_frameCommandBuffers.resize(m_numSwapchainImages);
+    {
+        VkCommandBufferAllocateInfo commandBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        commandBufferAllocateInfo.commandPool = m_commandPool;
+        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // (can be submitted to a queue for execution, but cannot be called from other command buffers)
+        commandBufferAllocateInfo.commandBufferCount = m_frameCommandBuffers.size();
+
+        if (vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, m_frameCommandBuffers.data()) != VK_SUCCESS) {
+            LogErrorAndExit("VulkanBackend::createAndSetupSwapchain(): could not create the main command buffers, exiting.\n");
+        }
+    }
+
     createTheDrawingStuff(m_swapchainImageFormat, swapchainExtent, m_swapchainImageViews, m_depthImageView, m_depthImageFormat);
 }
 
@@ -597,7 +615,7 @@ void VulkanBackend::destroySwapchain()
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
 }
 
-void VulkanBackend::recreateSwapchain()
+Extent2D VulkanBackend::recreateSwapchain()
 {
     while (true) {
         // As long as we are minimized, don't do anything
@@ -618,6 +636,8 @@ void VulkanBackend::recreateSwapchain()
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
 
     m_unhandledWindowResize = false;
+
+    return m_swapchainExtent;
 }
 
 void VulkanBackend::createStaticResources(StaticResourceManager& staticResourceManager)
@@ -627,11 +647,11 @@ void VulkanBackend::createStaticResources(StaticResourceManager& staticResourceM
     for (auto& buffer : resourceManager.buffers()) {
         newBuffer(buffer);
     }
-    for (auto& texture : resourceManager.textures()) {
-        newTexture(texture);
-    }
     for (auto& bufferUpdate : resourceManager.bufferUpdates()) {
         updateBuffer(bufferUpdate);
+    }
+    for (auto& texture : resourceManager.textures()) {
+        newTexture(texture);
     }
     for (auto& textureUpdate : resourceManager.textureUpdates()) {
         updateTexture(textureUpdate);
@@ -650,6 +670,15 @@ void VulkanBackend::destroyStaticResources(StaticResourceManager& staticResource
     }
 }
 
+void VulkanBackend::setMainRenderGraph(RenderGraph& renderGraph)
+{
+    ASSERT(m_renderGraph == nullptr);
+    m_renderGraph = &renderGraph;
+
+    ApplicationState appState { m_swapchainExtent, 0.0, 0.0, 0 };
+    reconstructRenderGraph(renderGraph, appState);
+}
+
 bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
 {
     uint32_t currentFrameMod = m_currentFrameIndex % maxFramesInFlight;
@@ -658,12 +687,16 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (frame %u).\n", m_currentFrameIndex);
     }
 
+    ApplicationState appState { m_swapchainExtent, deltaTime, elapsedTime, m_currentFrameIndex };
+
     uint32_t swapchainImageIndex;
     VkResult acquireResult = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[currentFrameMod], VK_NULL_HANDLE, &swapchainImageIndex);
 
     if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
         // Since we couldn't acquire an image to draw to, recreate the swapchain and report that it didn't work
-        recreateSwapchain();
+        Extent2D newWindowExtent = recreateSwapchain();
+        appState = appState.updateWindowExtent(newWindowExtent);
+        reconstructRenderGraph(*m_renderGraph, appState);
         return false;
     }
     if (acquireResult == VK_SUBOPTIMAL_KHR) {
@@ -675,7 +708,34 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         LogError("VulkanBackend::executeFrame(): error acquiring next swapchain image.\n");
     }
 
-    timeStepForFrame(swapchainImageIndex, elapsedTime, deltaTime);
+    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+    // TODO This should be moved out of here very soon!  TODO
+    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+    CameraState cameraState = {};
+    cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f);
+    cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
+    float aspectRatio = float(m_swapchainExtent.width()) / float(m_swapchainExtent.height());
+    cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), aspectRatio, 0.1f);
+
+    cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
+    cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
+
+    const Buffer& uniformBuffer = m_exCameraStateBuffers[swapchainImageIndex];
+    const BufferInfo& cameraStateUniformBufferInfo = m_bufferInfos[uniformBuffer.id()];
+    ASSERT(cameraStateUniformBufferInfo.memory.has_value());
+    if (!setBufferMemoryDirectly(cameraStateUniformBufferInfo.memory.value(), &cameraState, sizeof(CameraState))) {
+        LogError("VulkanBackend::executeFrame(): could not update the uniform buffer.\n");
+    }
+    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+    // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+
+    if (m_renderGraph) {
+        VkCommandBuffer commandBuffer = m_frameCommandBuffers[swapchainImageIndex];
+        const ResourceManager& resourceManager = *m_frameResourceManagers[swapchainImageIndex];
+        executeRenderGraph(commandBuffer, appState, *m_renderGraph, resourceManager);
+    }
+
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
     // Present results (synced on the semaphores)
@@ -692,7 +752,9 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         VkResult presentResult = vkQueuePresentKHR(m_presentQueue, &presentInfo);
 
         if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || m_unhandledWindowResize) {
-            recreateSwapchain();
+            Extent2D newWindowExtent = recreateSwapchain();
+            appState = appState.updateWindowExtent(newWindowExtent);
+            reconstructRenderGraph(*m_renderGraph, appState);
         } else if (presentResult != VK_SUCCESS) {
             LogError("VulkanBackend::executeFrame(): could not present swapchain (frame %u).\n", m_currentFrameIndex);
         }
@@ -702,8 +764,24 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     return true;
 }
 
-void VulkanBackend::executeRenderGraphNode(VkCommandBuffer commandBuffer, const RenderGraphNode& renderPass, const ResourceManager& resourceManager)
+void VulkanBackend::executeRenderGraph(VkCommandBuffer commandBuffer, const ApplicationState& appState, const RenderGraph& renderGraph, const ResourceManager& resourceManager)
 {
+    CommandList cmdList {};
+
+    renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
+        //executeRenderGraphNode(commandBuffer, node, resourceManager);
+
+        //node.execute(appState, cmdList);
+    });
+}
+
+void VulkanBackend::executeRenderGraphNode(VkCommandBuffer commandBuffer, const RenderGraphNode& node, const ResourceManager& resourceManager)
+{
+    // TODO: The called has to create a command buffer for each node!
+
+    //CommandList cmdList {};
+    //node.execute(appState, )
+
     // TODO: Re-implement!
 
     /*
@@ -950,6 +1028,7 @@ void VulkanBackend::newTexture(const Texture2D& texture)
     textureInfo.format = format;
     textureInfo.view = imageView;
     textureInfo.sampler = sampler;
+    textureInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // TODO: Use free lists!
     size_t index = m_textureInfos.size();
@@ -1254,7 +1333,7 @@ void VulkanBackend::destroyWindowRenderTargets()
     vkDestroyRenderPass(m_device, sharedRenderPass, nullptr);
 }
 
-void VulkanBackend::newRenderState(const RenderState& renderState)
+void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swapchainImageIndex)
 {
     VkVertexInputBindingDescription bindingDescription = {};
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions {};
@@ -1301,7 +1380,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
 
             // TODO: Go through the ShaderManager later!
             // TODO: Maybe don't create new modules every time? Currently they are deleted later in this function
-            auto optionalData = fileio::readEntireFileAsByteBuffer(file.name());
+            auto optionalData = fileio::readEntireFileAsByteBuffer("shaders/" + file.name() + ".spv");
             ASSERT(optionalData.has_value());
             const auto& binaryData = optionalData.value();
 
@@ -1499,8 +1578,14 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     pipelineCreateInfo.layout = pipelineLayout;
 
     // render pass stuff
-    RenderTargetInfo& renderTargetInfo = m_renderTargetInfos[renderState.renderTarget().id()];
-    pipelineCreateInfo.renderPass = renderTargetInfo.compatibleRenderPass;
+    const RenderTarget& renderTarget = renderState.renderTarget();
+    const RenderTargetInfo* renderTargetInfo {};
+    if (renderTarget.isWindowTarget()) {
+        renderTargetInfo = &m_windowRenderTargetInfos[swapchainImageIndex];
+    } else {
+        renderTargetInfo = &m_renderTargetInfos[renderTarget.id()];
+    }
+    pipelineCreateInfo.renderPass = renderTargetInfo->compatibleRenderPass;
     pipelineCreateInfo.subpass = 0; // TODO: How should this be handled?
 
     // extra stuff (optional for this)
@@ -1591,6 +1676,8 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
         // TODO: Handle multiple descriptor sets!
 
         std::vector<VkWriteDescriptorSet> descriptorSetWrites {};
+        std::vector<VkDescriptorBufferInfo> descBufferInfos {};
+        std::vector<VkDescriptorImageInfo> descImageInfos {};
 
         const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
         for (auto& bindingInfo : bindingSet.shaderBindings()) {
@@ -1603,20 +1690,21 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
 
             write.dstArrayElement = 0;
 
-            VkDescriptorBufferInfo descBufferInfo = {};
-            VkDescriptorImageInfo descImageInfo = {};
-
             switch (bindingInfo.type) {
             case ShaderBindingType::UniformBuffer: {
 
                 ASSERT(bindingInfo.buffer);
                 const BufferInfo& bufferInfo = m_bufferInfos[bindingInfo.buffer->id()];
 
+                VkDescriptorBufferInfo descBufferInfo {};
                 descBufferInfo.offset = 0;
                 descBufferInfo.range = VK_WHOLE_SIZE;
                 descBufferInfo.buffer = bufferInfo.buffer;
 
-                write.pBufferInfo = &descBufferInfo;
+                descBufferInfos.push_back(descBufferInfo);
+                write.pBufferInfo = &descBufferInfos.back();
+                write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
                 break;
             }
 
@@ -1625,14 +1713,17 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
                 ASSERT(bindingInfo.texture);
                 const TextureInfo& textureInfo = m_textureInfos[bindingInfo.texture->id()];
 
+                VkDescriptorImageInfo descImageInfo {};
                 descImageInfo.sampler = textureInfo.sampler;
                 descImageInfo.imageView = textureInfo.view;
 
                 ASSERT(textureInfo.currentLayout == VK_IMAGE_LAYOUT_GENERAL || textureInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 descImageInfo.imageLayout = textureInfo.currentLayout;
 
+                descImageInfos.push_back(descImageInfo);
+                write.pImageInfo = &descImageInfos.back();
                 write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                write.pImageInfo = &descImageInfo;
+
                 break;
             }
             }
@@ -1667,9 +1758,6 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
     // TODO: When we have a free list, also maybe remove from the m_renderStateInfos vector? But then we should also keep track of generations etc.
     RenderStateInfo& renderStateInfo = m_renderStateInfos[renderState.id()];
 
-    // ?? does this need to be performed before we destroy the stuff below?
-    //vkFreeCommandBuffers(m_device, m_commandPool, m_commandBuffers.size(), m_commandBuffers.data());
-
     vkDestroyDescriptorPool(m_device, renderStateInfo.descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(m_device, renderStateInfo.descriptorSetLayout, nullptr);
     vkDestroyPipeline(m_device, renderStateInfo.pipeline, nullptr);
@@ -1678,103 +1766,81 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
     renderState.unregisterBackend(backendBadge());
 }
 
-void VulkanBackend::reconstructPipeline(RenderGraph& pipeline, const ApplicationState& appState)
+void VulkanBackend::reconstructRenderGraph(RenderGraph& renderGraph, const ApplicationState& appState)
 {
     // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
 
     m_frameResourceManagers.resize(m_numSwapchainImages);
-    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
+    for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
 
         auto resourceManager = std::make_unique<ResourceManager>();
-        pipeline.constructAll(*resourceManager);
-
-        const ResourceManager& previousManager = *m_frameResourceManagers[i];
+        renderGraph.constructAll(*resourceManager, appState);
 
         // Delete old resources
-        for (auto& buffer : previousManager.buffers()) {
-            deleteBuffer(buffer);
-        }
-        for (auto& texture : previousManager.textures()) {
-            deleteTexture(texture);
-        }
-        for (auto& renderTarget : previousManager.renderTargets()) {
-            deleteRenderTarget(renderTarget);
-        }
-        for (auto& renderState : previousManager.renderStates()) {
-            deleteRenderState(renderState);
+        if (m_frameResourceManagers[swapchainImageIndex]) {
+            auto& previousManager = *m_frameResourceManagers[swapchainImageIndex];
+
+            for (auto& buffer : previousManager.buffers()) {
+                deleteBuffer(buffer);
+            }
+            for (auto& texture : previousManager.textures()) {
+                deleteTexture(texture);
+            }
+            for (auto& renderTarget : previousManager.renderTargets()) {
+                deleteRenderTarget(renderTarget);
+            }
+            for (auto& renderState : previousManager.renderStates()) {
+                deleteRenderState(renderState);
+            }
         }
 
         // Create new resources
         for (auto& buffer : resourceManager->buffers()) {
             newBuffer(buffer);
         }
+        for (auto& bufferUpdate : resourceManager->bufferUpdates()) {
+            updateBuffer(bufferUpdate);
+        }
         for (auto& texture : resourceManager->textures()) {
             newTexture(texture);
+        }
+        for (auto& textureUpdate : resourceManager->textureUpdates()) {
+            updateTexture(textureUpdate);
         }
         for (auto& renderTarget : resourceManager->renderTargets()) {
             newRenderTarget(renderTarget);
         }
         for (auto& renderState : resourceManager->renderStates()) {
-            newRenderState(renderState);
-        }
-
-        // Perform the instant actions
-        for (auto& bufferUpdate : resourceManager->bufferUpdates()) {
-            updateBuffer(bufferUpdate);
-        }
-        for (auto& textureUpdate : resourceManager->textureUpdates()) {
-            updateTexture(textureUpdate);
+            newRenderState(renderState, swapchainImageIndex);
         }
 
         // Replace previous resource manager
-        m_frameResourceManagers[i] = std::move(resourceManager);
+        m_frameResourceManagers[swapchainImageIndex] = std::move(resourceManager);
     }
 }
 
-void VulkanBackend::timeStepForFrame(uint32_t relFrameIndex, double elapsedTime, double deltaTime)
+void VulkanBackend::destroyRenderGraph(RenderGraph&)
 {
-    // FIXME: this is a bit sketchy.. unhandled is not the same as 'definitely this frame'
-    bool windowSizeDidChange = m_unhandledWindowResize;
-    ApplicationState appState { m_swapchainExtent, windowSizeDidChange, deltaTime, elapsedTime, relFrameIndex };
+    for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
 
-    if (m_gpuPipeline.needsReconstruction(appState)) {
-        reconstructPipeline(m_gpuPipeline, appState);
-    }
-
-    //auto passes = app().dependencyResolvedPasses();
-
-    // TODO: How about we don't have any of these needsUpdate pass, and instead just figures out
-    //  if there are new commands, which implies that there are updates needed.
-
-    // TODO: However, it could be tricky if we don't know if command buffers need rerecording util after we have called execute(), maybe?
-    /*
-    for (const RenderPass& pass : app().passTree()) {
-        RenderPass::CommandList commandList {};
-
-        // NOTE: This function both fills out the command list and performs updates etc. to its own resources
-        pass.execute(appState, commandList);
-
-        if (commandList != previousCommandList ) { // maybeJustForThisRelFrameIndex? Or maybe globally new command list?
-            // todo: now we actually have to rerecord the command buffers!
+        if (!m_frameResourceManagers[swapchainImageIndex]) {
+            continue;
         }
-    }
-    */
 
-    // Update the uniform buffer(s)
-    CameraState cameraState = {};
-    cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f);
-    cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
-    float aspectRatio = float(m_swapchainExtent.width()) / float(m_swapchainExtent.height());
-    cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), aspectRatio, 0.1f);
+        auto& oldManager = *m_frameResourceManagers[swapchainImageIndex];
 
-    cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
-    cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
-
-    const Buffer& uniformBuffer = m_exCameraStateBuffers[relFrameIndex];
-    const BufferInfo& cameraStateUniformBufferInfo = m_bufferInfos[uniformBuffer.id()];
-    ASSERT(cameraStateUniformBufferInfo.memory.has_value());
-    if (!setBufferMemoryDirectly(cameraStateUniformBufferInfo.memory.value(), &cameraState, sizeof(CameraState))) {
-        LogError("VulkanBackend::timeStepForFrame(): could not update the uniform buffer.\n");
+        for (auto& buffer : oldManager.buffers()) {
+            deleteBuffer(buffer);
+        }
+        for (auto& texture : oldManager.textures()) {
+            deleteTexture(texture);
+        }
+        for (auto& renderTarget : oldManager.renderTargets()) {
+            deleteRenderTarget(renderTarget);
+        }
+        for (auto& renderState : oldManager.renderStates()) {
+            deleteRenderState(renderState);
+        }
     }
 }
 
@@ -2034,6 +2100,16 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
 
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
+
+        LogWarning("VulkanBackend::transitionImageLayout(): transitioning to new layout VK_IMAGE_LAYOUT_GENERAL, which isn't great.\n");
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
 
     } else {
         LogErrorAndExit("VulkanBackend::transitionImageLayout(): old & new layout combination unsupported by application, exiting.\n");
@@ -2456,19 +2532,6 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     }
 
     //
-    // Create command buffers
-    //
-    m_commandBuffers.resize(numSwapchainImages);
-    {
-        VkCommandBufferAllocateInfo commandBufferAllocateInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        commandBufferAllocateInfo.commandPool = m_commandPool;
-        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // Can be submitted to a queue for execution, but cannot be called from other command buffers.
-        commandBufferAllocateInfo.commandBufferCount = m_commandBuffers.size();
-
-        ASSERT(vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, m_commandBuffers.data()) == VK_SUCCESS);
-    }
-
-    //
     // Write commands to command buffers
     //
 
@@ -2497,13 +2560,13 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
     VkBuffer vertexBuffer = createDeviceLocalBuffer(vertices, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     VkBuffer indexBuffer = createDeviceLocalBuffer(indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
-    for (size_t it = 0; it < m_commandBuffers.size(); ++it) {
+    for (size_t it = 0; it < m_frameCommandBuffers.size(); ++it) {
 
         VkCommandBufferBeginInfo commandBufferBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
         commandBufferBeginInfo.flags = 0u;
         commandBufferBeginInfo.pInheritanceInfo = nullptr;
 
-        ASSERT(vkBeginCommandBuffer(m_commandBuffers[it], &commandBufferBeginInfo) == VK_SUCCESS);
+        ASSERT(vkBeginCommandBuffer(m_frameCommandBuffers[it], &commandBufferBeginInfo) == VK_SUCCESS);
         {
             RenderTargetInfo& renderTargetInfo = m_windowRenderTargetInfos[it];
 
@@ -2519,29 +2582,27 @@ void VulkanBackend::createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D
             renderPassBeginInfo.clearValueCount = clearValues.size();
             renderPassBeginInfo.pClearValues = clearValues.data();
 
-            vkCmdBeginRenderPass(m_commandBuffers[it], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBeginRenderPass(m_frameCommandBuffers[it], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
             {
-                vkCmdBindPipeline(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exGraphicsPipeline);
+                vkCmdBindPipeline(m_frameCommandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exGraphicsPipeline);
 
-                vkCmdBindDescriptorSets(m_commandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exPipelineLayout, 0, 1, &m_exDescriptorSets[it], 0, nullptr);
+                vkCmdBindDescriptorSets(m_frameCommandBuffers[it], VK_PIPELINE_BIND_POINT_GRAPHICS, m_exPipelineLayout, 0, 1, &m_exDescriptorSets[it], 0, nullptr);
 
                 VkBuffer vertexBuffers[] = { vertexBuffer };
                 VkDeviceSize offsets[] = { 0 };
-                vkCmdBindVertexBuffers(m_commandBuffers[it], 0, 1, vertexBuffers, offsets);
-                vkCmdBindIndexBuffer(m_commandBuffers[it], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdBindVertexBuffers(m_frameCommandBuffers[it], 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(m_frameCommandBuffers[it], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-                vkCmdDrawIndexed(m_commandBuffers[it], indices.size(), 1, 0, 0, 0);
+                vkCmdDrawIndexed(m_frameCommandBuffers[it], indices.size(), 1, 0, 0, 0);
             }
-            vkCmdEndRenderPass(m_commandBuffers[it]);
+            vkCmdEndRenderPass(m_frameCommandBuffers[it]);
         }
-        ASSERT(vkEndCommandBuffer(m_commandBuffers[it]) == VK_SUCCESS);
+        ASSERT(vkEndCommandBuffer(m_frameCommandBuffers[it]) == VK_SUCCESS);
     }
 }
 
 void VulkanBackend::destroyTheDrawingStuff()
 {
-    vkFreeCommandBuffers(m_device, m_commandPool, m_commandBuffers.size(), m_commandBuffers.data());
-
     vkDestroyDescriptorPool(m_device, m_exDescriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(m_device, m_exDescriptorSetLayout, nullptr);
     vkDestroyPipeline(m_device, m_exGraphicsPipeline, nullptr);
@@ -2558,7 +2619,7 @@ void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSem
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &m_commandBuffers[imageIndex];
+    submitInfo.pCommandBuffers = &m_frameCommandBuffers[imageIndex];
 
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signal;

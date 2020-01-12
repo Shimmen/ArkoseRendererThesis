@@ -16,13 +16,12 @@ public:
     NON_COPYABLE(RenderGraph);
     RenderGraph(RenderGraph&&) noexcept = default;
 
-    bool needsReconstruction(const ApplicationState&) const;
-    void constructAll(ResourceManager&);
+    void constructAll(ResourceManager&, const ApplicationState&);
 
     void addNode(const std::string& name, const RenderGraphNode::NodeConstructorFunction&);
     void addNode(const std::string& name, std::unique_ptr<RenderGraphNode>);
 
-    void forEachNodeInResolvedOrder(const std::function<void(const RenderGraphNode&)>&);
+    void forEachNodeInResolvedOrder(const std::function<void(const RenderGraphNode&)>&) const;
 
 private:
     std::unordered_map<std::string, std::unique_ptr<RenderGraphNode>> m_nodes;

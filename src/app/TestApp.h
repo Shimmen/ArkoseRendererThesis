@@ -5,7 +5,7 @@
 class TestApp : public App {
 public:
     void setup(StaticResourceManager&) override;
-    RenderGraph createPipeline(const ApplicationState&) override;
+    std::unique_ptr<RenderGraph> mainRenderGraph() override;
 
 private:
     struct Vertex {

@@ -11,8 +11,5 @@ public:
     virtual ~App() {}
 
     virtual void setup(StaticResourceManager&) = 0;
-
-    //! Called exactly once, which implies that the actual pipeline is fixed throughout the lifetime of the app
-    //! However, note that each render pass doesn't need to be the same per frame, since they can make different command
-    virtual RenderGraph createPipeline(const ApplicationState&) = 0;
+    virtual std::unique_ptr<RenderGraph> mainRenderGraph() = 0;
 };

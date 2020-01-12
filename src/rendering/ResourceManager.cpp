@@ -10,6 +10,7 @@ ResourceManager::ResourceManager()
     m_buffers.reserve(maxNumBuffers);
     m_textures.reserve(maxNumTextures);
     m_renderTargets.reserve(maxNumRenderTargets);
+    m_renderStates.reserve(maxNumRenderStates);
 }
 
 void ResourceManager::setCurrentPass(std::string pass)
