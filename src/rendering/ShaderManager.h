@@ -6,6 +6,7 @@
 #include <thread>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 class ShaderManager {
 public:
@@ -13,11 +14,6 @@ public:
         Good,
         FileNotFound,
         CompileError,
-    };
-
-    struct SpirV {
-        const uint32_t* code;
-        const size_t size;
     };
 
     static ShaderManager& instance();
@@ -35,8 +31,7 @@ public:
 
     ShaderStatus loadAndCompileImmediately(const std::string& name);
 
-    //! The return value should be used immediately since there are no lifetime guarantees beyond the calling scope
-    SpirV spirv(const std::string& name) const;
+    const std::vector<uint32_t>& spirv(const std::string& name) const;
 
 private:
     explicit ShaderManager(std::string basePath);
@@ -61,7 +56,7 @@ private:
         std::string lastCompileError {};
 
         std::string glslSource {};
-        std::string spirvBinary {};
+        std::vector<uint32_t> spirvBinary {};
     };
 
     bool compileGlslToSpirv(ShaderData& data) const;

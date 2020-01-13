@@ -14,7 +14,7 @@ ShaderFile::ShaderFile(std::string name, ShaderFileType type)
     case ShaderManager::ShaderStatus::CompileError: {
         std::string errorMessage = manager.shaderError(m_name).value();
         LogError("Shader file '%s' has compile errors:\n", m_name.c_str());
-        LogError("  %s\n", errorMessage.c_str());
+        LogError("%s\n", errorMessage.c_str());
         LogErrorAndExit("Exiting due to bad shader at startup.\n");
     }
     default:

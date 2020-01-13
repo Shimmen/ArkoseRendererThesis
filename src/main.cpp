@@ -1,7 +1,6 @@
 #include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
 #include "rendering/App.h"
-#include "rendering/ResourceManager.h"
 #include "rendering/ShaderManager.h"
 #include "utility/logging.h"
 

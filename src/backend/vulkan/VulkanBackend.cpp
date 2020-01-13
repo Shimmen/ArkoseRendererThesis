@@ -1400,15 +1400,11 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
         const Shader& shader = renderState.shader();
         for (auto& file : shader.files()) {
 
-            // TODO: Go through the ShaderManager later!
             // TODO: Maybe don't create new modules every time? Currently they are deleted later in this function
-            auto optionalData = fileio::readEntireFileAsByteBuffer("shaders/" + file.name() + ".spv");
-            ASSERT(optionalData.has_value());
-            const auto& binaryData = optionalData.value();
-
             VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-            moduleCreateInfo.codeSize = binaryData.size();
-            moduleCreateInfo.pCode = reinterpret_cast<const uint32_t*>(binaryData.data());
+            const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(file.name());
+            moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
+            moduleCreateInfo.pCode = spirv.data();
 
             VkShaderModule shaderModule {};
             if (vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {

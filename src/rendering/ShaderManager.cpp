@@ -5,6 +5,7 @@
 #include "utility/util.h"
 #include <chrono>
 #include <cstddef>
+#include <shaderc/shaderc.hpp>
 #include <thread>
 
 // TODO: Implement Windows support!
@@ -144,7 +145,7 @@ ShaderManager::ShaderStatus ShaderManager::loadAndCompileImmediately(const std::
     return ShaderStatus::Good;
 }
 
-ShaderManager::SpirV ShaderManager::spirv(const std::string& name) const
+const std::vector<uint32_t>& ShaderManager::spirv(const std::string& name) const
 {
     auto path = resolvePath(name);
 
@@ -157,8 +158,7 @@ ShaderManager::SpirV ShaderManager::spirv(const std::string& name) const
     ASSERT(result != m_loadedShaders.end());
 
     const ShaderData& data = result->second;
-    auto* code = reinterpret_cast<const uint32_t*>(data.spirvBinary.c_str()); // TODO: Do we need to consider memory alignment for uint32_t?
-    return { .code = code, .size = data.spirvBinary.size() };
+    return data.spirvBinary;
 }
 
 uint64_t ShaderManager::getFileEditTimestamp(const std::string& path) const
@@ -175,23 +175,73 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
 {
     ASSERT(!data.glslSource.empty());
 
+    shaderc::Compiler compiler {};
+    shaderc::CompileOptions options {};
+
+    class Includer : public shaderc::CompileOptions::IncluderInterface {
+    public:
+        explicit Includer(const ShaderManager& shaderManager)
+            : m_shaderManager(shaderManager)
+        {
+        }
+
+        struct FileData {
+            std::string path;
+            std::string content;
+        };
+
+        shaderc_include_result* GetInclude(const char* requested_source, shaderc_include_type type, const char* requesting_source, size_t include_depth) override
+        {
+            auto* data = new shaderc_include_result();
+
+            auto* fileData = new FileData();
+            fileData->path = m_shaderManager.resolvePath(requested_source);
+            fileData->content = fileio::readEntireFile(fileData->path).value();
+            data->user_data = fileData;
+
+            data->source_name = fileData->path.c_str();
+            data->source_name_length = fileData->path.size();
+
+            data->content = fileData->content.c_str();
+            data->content_length = fileData->content.size();
+
+            LogInfo("Getting include '%s' from '%s' with depth %d!\n", requested_source, requesting_source, include_depth);
+            return data;
+        }
+
+        void ReleaseInclude(shaderc_include_result* data) override
+        {
+            delete (FileData*)data->user_data;
+            delete data;
+        }
+
+    private:
+        const ShaderManager& m_shaderManager;
+    };
+    options.SetIncluder(std::make_unique<Includer>(*this));
+
+    // TODO: Why doesn't the automatic inferring work?!
+    shaderc_shader_kind kind = shaderc_glsl_infer_from_source;
+    bool isProbablyVert = data.name.find(".vert") != std::string::npos;
+    bool isProbablyFrag = data.name.find(".frag") != std::string::npos;
+    if (isProbablyVert && !isProbablyFrag)
+        kind = shaderc_glsl_vertex_shader;
+    else if (isProbablyFrag && !isProbablyVert)
+        kind = shaderc_glsl_fragment_shader;
+    else
+        ASSERT_NOT_REACHED();
+
+    shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(data.glslSource, kind, data.name.c_str(), options);
+
     // Note that we only should overwrite the binary if it compiled correctly!
-
-    // TODO: Actually compile GLSL to SPIR-V!
-    auto spirvPath = data.path + ".spv";
-    auto maybeSpirv = fileio::readEntireFile(spirvPath);
-
-    if (maybeSpirv.has_value()) {
-        data.spirvBinary = maybeSpirv.value();
+    if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
+        data.lastEditSuccessfullyCompiled = false;
+        data.lastCompileError = module.GetErrorMessage();
+    } else {
         data.lastEditSuccessfullyCompiled = true;
         data.lastCompileError.clear();
-    } else {
-        data.lastEditSuccessfullyCompiled = false;
-        data.lastCompileError = "Compiling not yet implemented!!\n";
+        data.spirvBinary = std::vector<uint32_t>(module.cbegin(), module.cend());
     }
-
-
-
 
     return data.lastEditSuccessfullyCompiled;
 }

@@ -34,6 +34,12 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glfw-3.3)
 target_link_libraries(ArkoseRenderer glfw)
 
+set(SHADERC_SKIP_TESTS CACHE BOOL TRUE)
+set(EFFCEE_BUILD_TESTING CACHE BOOL FALSE FORCE)
+add_subdirectory(deps/shaderc)
+target_include_directories(ArkoseRenderer PUBLIC ${shaderc_SOURCE_DIR}/libshaderc_util/include)
+target_link_libraries(ArkoseRenderer shaderc)
+
 add_subdirectory(deps/stb_image)
 target_link_libraries(ArkoseRenderer stb_image)
 
