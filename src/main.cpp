@@ -56,17 +56,17 @@ GLFWwindow* createWindow(BackendType backendType, WindowType windowType, Extent2
     return window;
 }
 
-Backend* createBackend(BackendType backendType, GLFWwindow* window)
+std::unique_ptr<Backend> createBackend(BackendType backendType, GLFWwindow* window, App& app)
 {
-    Backend* backend;
+    std::unique_ptr<Backend> backend;
 
     switch (backendType) {
     case BackendType::Vulkan:
-        backend = new VulkanBackend(window);
+        backend = std::make_unique<VulkanBackend>(window, app);
         break;
     }
 
-    glfwSetWindowUserPointer(window, backend);
+    glfwSetWindowUserPointer(window, backend.get());
     return backend;
 }
 
@@ -78,44 +78,36 @@ int main()
 
     BackendType backendType = BackendType::Vulkan;
     GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
-    Backend* backend = createBackend(backendType, window);
 
-    // TODO: I don't like the ownership of this. It feels like most of this should be done fully by the backend..?
-    App* app = new TestApp();
-    StaticResourceManager staticResourceManager { };
-    app->setup(staticResourceManager);
-    backend->createStaticResources(staticResourceManager);
-    auto renderGraph = app->mainRenderGraph();
-    backend->setMainRenderGraph(*renderGraph);
+    {
+        auto app = std::make_unique<TestApp>();
+        auto backend = createBackend(backendType, window, *app);
 
-    LogInfo("ArkoseRenderer: main loop begin.\n");
+        LogInfo("ArkoseRenderer: main loop begin.\n");
 
-    // TODO: It's (probably) important that this is set to true before any frontend code is run,
-    //  in case it has logic for stopping if the application exits etc.
-    GlobalState::getMutable().setApplicationRunning(true);
+        // TODO: It's (probably) important that this is set to true before any frontend code is run,
+        //  in case it has logic for stopping if the application exits etc.
+        GlobalState::getMutable().setApplicationRunning(true);
 
-    glfwSetTime(0.0);
-    double lastTime = 0.0;
-    while (!glfwWindowShouldClose(window)) {
+        glfwSetTime(0.0);
+        double lastTime = 0.0;
+        while (!glfwWindowShouldClose(window)) {
 
-        glfwPollEvents();
+            glfwPollEvents();
 
-        double elapsedTime = glfwGetTime();
-        double deltaTime = elapsedTime - lastTime;
-        lastTime = elapsedTime;
+            double elapsedTime = glfwGetTime();
+            double deltaTime = elapsedTime - lastTime;
+            lastTime = elapsedTime;
 
-        bool frameExecuted = false;
-        while (!frameExecuted) {
-            frameExecuted = backend->executeFrame(elapsedTime, deltaTime);
+            bool frameExecuted = false;
+            while (!frameExecuted) {
+                frameExecuted = backend->executeFrame(elapsedTime, deltaTime);
+            }
         }
+        GlobalState::getMutable().setApplicationRunning(false);
+        LogInfo("ArkoseRenderer: main loop end.\n");
     }
-    GlobalState::getMutable().setApplicationRunning(false);
-    LogInfo("ArkoseRenderer: main loop end.\n");
 
-    backend->destroyStaticResources(staticResourceManager);
-
-    delete app;
-    delete backend;
     glfwDestroyWindow(window);
     glfwTerminate();
 

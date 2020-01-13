@@ -14,8 +14,8 @@ constexpr bool vulkanDebugMode = true;
 
 class VulkanBackend final : public Backend {
 public:
-    explicit VulkanBackend(GLFWwindow*);
-    ~VulkanBackend() override;
+    VulkanBackend(GLFWwindow*, App&);
+    ~VulkanBackend();
 
     VulkanBackend(VulkanBackend&&) = delete;
     VulkanBackend(VulkanBackend&) = delete;
@@ -24,19 +24,9 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     /// Public backend API
 
-    void createStaticResources(StaticResourceManager&) override;
-    void destroyStaticResources(StaticResourceManager&) override;
-
-    void setMainRenderGraph(RenderGraph&) override;
-
     bool executeFrame(double elapsedTime, double deltaTime) override;
 
 private:
-    ///////////////////////////////////////////////////////////////////////////
-    /// Rendering of a single frame
-
-    void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
-
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
@@ -46,6 +36,9 @@ private:
 
     void reconstructRenderGraph(RenderGraph&, const ApplicationState&);
     void destroyRenderGraph(RenderGraph&);
+
+    void createStaticResources();
+    void destroyStaticResources();
 
     void newBuffer(const Buffer&);
     void deleteBuffer(const Buffer&);
@@ -74,15 +67,11 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Swapchain management
 
+    void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
+
     void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
     void destroySwapchain();
     [[nodiscard]] Extent2D recreateSwapchain();
-
-    ///////////////////////////////////////////////////////////////////////////
-    /// Temporary drawing - TODO: remove these
-
-    void createTheDrawingStuff(VkFormat finalTargetFormat, VkExtent2D finalTargetExtent, const std::vector<VkImageView>& swapchainImageViews, VkImageView depthImageView, VkFormat depthFormat);
-    void destroyTheDrawingStuff();
 
     ///////////////////////////////////////////////////////////////////////////
     /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.
@@ -96,18 +85,11 @@ private:
     bool setBufferMemoryDirectly(VkDeviceMemory, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
     bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
 
-    template<typename T>
-    VkBuffer createDeviceLocalBuffer(const std::vector<T>& data, VkBufferUsageFlags);
-    VkBuffer createDeviceLocalBuffer(VkDeviceSize, const void* data, VkBufferUsageFlags);
-
     VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
 
     bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height) const;
-
-    struct ManagedImage;
-    ManagedImage createImageViewFromImagePath(const std::string& imagePath);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Utilities for setting up the backend
@@ -177,16 +159,19 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Resource & resource management members
 
+    App& m_app;
+
+    std::unique_ptr<StaticResourceManager> m_staticResourceManager {};
     std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
 
     VkQueue m_graphicsQueue {};
 
-    VkCommandPool m_commandPool {};
+    VkCommandPool m_renderGraphFrameCommandPool {};
     VkCommandPool m_transientCommandPool {};
 
     std::vector<VkCommandBuffer> m_frameCommandBuffers {};
 
-    RenderGraph* m_renderGraph {};
+    std::unique_ptr<RenderGraph> m_renderGraph {};
 
     struct BufferInfo {
         VkBuffer buffer {};
@@ -225,41 +210,4 @@ private:
     std::vector<RenderTargetInfo> m_renderTargetInfos {};
     std::vector<RenderTargetInfo> m_windowRenderTargetInfos {};
     std::vector<RenderStateInfo> m_renderStateInfos {};
-
-    ///////////////////////////////////////////////////////////////////////////
-    /// Extra stuff that shouldn't be here at all - TODO: remove this
-
-    // FIXME: This is all stuff specific for rendering the example triangle
-    std::vector<Buffer> m_exCameraStateBuffers {};
-
-    VkDescriptorPool m_exDescriptorPool {};
-    VkDescriptorSetLayout m_exDescriptorSetLayout {};
-    std::vector<VkDescriptorSet> m_exDescriptorSets {};
-    VkPipeline m_exGraphicsPipeline {};
-    VkPipelineLayout m_exPipelineLayout {};
-
-    struct ManagedBuffer {
-        VkBuffer buffer;
-        VkDeviceMemory memory;
-    };
-
-    struct ManagedImage {
-        VkSampler sampler;
-        VkImageView view;
-        VkImage image;
-        VkDeviceMemory memory;
-    };
-
-    // Buffers in this list will be destroyed and their memory freed when the context is destroyed
-    // FIXME: This is also kind of specific to the example triangle. When the resource management is in place this is redundant
-    std::vector<ManagedBuffer> m_managedBuffers {};
-    std::vector<ManagedImage> m_managedImages {};
 };
-
-template<typename T>
-VkBuffer VulkanBackend::createDeviceLocalBuffer(const std::vector<T>& data, VkBufferUsageFlags usage)
-{
-    size_t numBytes = data.size() * sizeof(data[0]);
-    const void* dataPointer = static_cast<const void*>(data.data());
-    return createDeviceLocalBuffer(numBytes, dataPointer, usage);
-}
