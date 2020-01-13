@@ -26,6 +26,9 @@ public:
     ShaderManager(ShaderManager&) = delete;
     ShaderManager(ShaderManager&&) = delete;
 
+    void startFileWatching(unsigned msBetweenPolls);
+    void stopFileWatching();
+
     [[nodiscard]] std::string resolvePath(const std::string& name) const;
     [[nodiscard]] std::optional<std::string> shaderError(const std::string& name) const;
     [[nodiscard]] std::optional<uint32_t> shaderVersion(const std::string& name) const;
@@ -39,8 +42,7 @@ private:
     explicit ShaderManager(std::string basePath);
     ~ShaderManager() = default;
 
-    bool fileWatcherActive() const;
-    void startFileWatching(unsigned msBetweenPolls);
+    uint64_t getFileEditTimestamp(const std::string&) const;
 
     struct ShaderData {
         ShaderData() = default;
@@ -69,4 +71,5 @@ private:
 
     std::unique_ptr<std::thread> m_fileWatcherThread {};
     mutable std::mutex m_shaderDataMutex {};
+    volatile bool m_fileWatchingActive { false };
 };

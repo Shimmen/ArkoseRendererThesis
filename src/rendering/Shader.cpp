@@ -1,26 +1,25 @@
 #include "Shader.h"
 
 #include "rendering/ShaderManager.h"
+#include <utility/logging.h>
 
 ShaderFile::ShaderFile(std::string name, ShaderFileType type)
     : m_name(std::move(name))
     , m_type(type)
 {
-    /*
     auto& manager = ShaderManager::instance();
-    switch (manager.loadAndCompileImmediately(name)) {
+    switch (manager.loadAndCompileImmediately(m_name)) {
     case ShaderManager::ShaderStatus::FileNotFound:
         LogErrorAndExit("Shader file '%s' not found, exiting.\n");
     case ShaderManager::ShaderStatus::CompileError: {
-        std::string errorMessage = manager.shaderError(name).value();
-        LogError("Shader file '%s' has compile errors:\n");
+        std::string errorMessage = manager.shaderError(m_name).value();
+        LogError("Shader file '%s' has compile errors:\n", m_name.c_str());
         LogError("  %s\n", errorMessage.c_str());
         LogErrorAndExit("Exiting due to bad shader at startup.\n");
     }
     default:
         break;
     }
-    */
 }
 
 const std::string& ShaderFile::name() const
@@ -65,7 +64,7 @@ ShaderType Shader::type() const
     return m_type;
 }
 
-const std::vector<ShaderFile>&  Shader::files() const
+const std::vector<ShaderFile>& Shader::files() const
 {
     return m_files;
 }

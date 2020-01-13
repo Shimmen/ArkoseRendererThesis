@@ -56,10 +56,10 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
 
     m_staticResourceManager = std::make_unique<StaticResourceManager>();
-    app.setup(*m_staticResourceManager);
+    m_app.setup(*m_staticResourceManager);
     createStaticResources();
 
-    m_renderGraph = app.mainRenderGraph();
+    m_renderGraph = m_app.mainRenderGraph();
     ApplicationState appState { m_swapchainExtent, 0.0, 0.0, 0 };
     reconstructRenderGraph(*m_renderGraph, appState);
 
@@ -803,7 +803,7 @@ void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const C
     std::vector<VkClearValue> clearValues {};
 
     if (clearCmd) {
-        VkClearColorValue clearColorValue = { clearCmd->clearColor.r, clearCmd->clearColor.g, clearCmd->clearColor.b, clearCmd->clearColor.a };
+        VkClearColorValue clearColorValue = { { clearCmd->clearColor.r, clearCmd->clearColor.g, clearCmd->clearColor.b, clearCmd->clearColor.a } };
         VkClearDepthStencilValue clearDepthStencilValue = { clearCmd->clearDepth, clearCmd->clearStencil };
 
         if (renderTarget.isWindowTarget()) {

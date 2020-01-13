@@ -8,7 +8,7 @@ add_executable(ArkoseRenderer
         src/main.cpp
         src/backend/vulkan/VulkanBackend.cpp
         src/rendering/Shader.cpp
-        #src/rendering/ShaderManager.cpp
+        src/rendering/ShaderManager.cpp
         src/rendering/ResourceManager.cpp
         src/rendering/StaticResourceManager.cpp
         src/rendering/Resources.cpp
@@ -18,7 +18,7 @@ add_executable(ArkoseRenderer
         src/utility/fileio.cpp
         src/utility/Random.cpp)
 
-#target_compile_options(ArkoseRenderer PRIVATE -Wall)
+target_compile_options(ArkoseRenderer PRIVATE -Wall)
 target_compile_options(ArkoseRenderer PRIVATE -Wimplicit-fallthrough)
 
 target_include_directories(ArkoseRenderer PRIVATE src/)

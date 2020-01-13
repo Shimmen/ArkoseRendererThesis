@@ -2,8 +2,7 @@
 #include "backend/vulkan/VulkanBackend.h"
 #include "rendering/App.h"
 #include "rendering/ResourceManager.h"
-#include "rendering/StaticResourceManager.h"
-#include "utility/GlobalState.h"
+#include "rendering/ShaderManager.h"
 #include "utility/logging.h"
 
 #define GLFW_INCLUDE_NONE
@@ -20,7 +19,7 @@ enum class WindowType {
     Fullscreen
 };
 
-GLFWwindow* createWindow(BackendType backendType, WindowType windowType, Extent2D windowSize)
+GLFWwindow* createWindow(BackendType backendType, WindowType windowType, const Extent2D& windowSize)
 {
     std::string windowTitle = "Arkose Renderer";
 
@@ -83,11 +82,8 @@ int main()
         auto app = std::make_unique<TestApp>();
         auto backend = createBackend(backendType, window, *app);
 
+        ShaderManager::instance().startFileWatching(250);
         LogInfo("ArkoseRenderer: main loop begin.\n");
-
-        // TODO: It's (probably) important that this is set to true before any frontend code is run,
-        //  in case it has logic for stopping if the application exits etc.
-        GlobalState::getMutable().setApplicationRunning(true);
 
         glfwSetTime(0.0);
         double lastTime = 0.0;
@@ -104,8 +100,9 @@ int main()
                 frameExecuted = backend->executeFrame(elapsedTime, deltaTime);
             }
         }
-        GlobalState::getMutable().setApplicationRunning(false);
+
         LogInfo("ArkoseRenderer: main loop end.\n");
+        ShaderManager::instance().stopFileWatching();
     }
 
     glfwDestroyWindow(window);
