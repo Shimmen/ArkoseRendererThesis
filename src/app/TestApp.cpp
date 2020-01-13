@@ -63,11 +63,8 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
         RenderTarget& windowTarget = resourceManager.getWindowRenderTarget();
         RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState);
 
-        return [&](const ApplicationState& appState, CommandList& commandList) {
-            // TODO: This doesn't seem optimal! We can't have it on the stack because stack allocated data will go out of scope,
-            //  and we don't wanna heap alloc every frame. Hmm, let's think about that. Maybe have some custom arena allocator for that?
-            static CameraState cameraState {};
-
+        return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
+            auto& cameraState = frameAllocator.allocate<CameraState>();
             cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, appState.elapsedTime() * 3.1415f / 2.0f);
             cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
             float aspectRatio = float(appState.windowExtent().width()) / float(appState.windowExtent().height());

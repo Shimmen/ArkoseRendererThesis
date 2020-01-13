@@ -6,13 +6,14 @@
 #include "ResourceManager.h"
 #include "Resources.h"
 #include "utility/copying.h"
+#include "utility/FrameAllocator.h"
 #include <functional>
 #include <memory>
 #include <string>
 
 class RenderGraphNode : public Resource {
 public:
-    using CommandSubmissionCallback = std::function<void(const ApplicationState&, CommandList&)>;
+    using CommandSubmissionCallback = std::function<void(const ApplicationState&, CommandList&, FrameAllocator&)>;
     using NodeConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&, const ApplicationState&)>;
 
     explicit RenderGraphNode(NodeConstructorFunction);
@@ -24,7 +25,7 @@ public:
     void construct(ResourceManager&, const ApplicationState&);
 
     //! Executes the node and returns the commands that need to be performed.
-    void execute(const ApplicationState&, CommandList&) const;
+    void execute(const ApplicationState&, CommandList&, FrameAllocator&) const;
 
 protected:
     //! Call this function to regenerate the node resources.

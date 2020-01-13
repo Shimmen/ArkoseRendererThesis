@@ -4,6 +4,7 @@
 #include "VulkanQueueInfo.h"
 #include "rendering/App.h"
 #include "rendering/StaticResourceManager.h"
+#include "utility/FrameAllocator.h"
 #include <array>
 
 #include <vulkan/vulkan.h>
@@ -30,7 +31,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
-    void executeRenderGraph(VkCommandBuffer, const ApplicationState&, const RenderGraph&, uint32_t swapchainImageIndex);
+    void executeRenderGraph(const ApplicationState&, const RenderGraph&, uint32_t swapchainImageIndex);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*, uint32_t swapchainImageIndex);
     void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
@@ -163,6 +164,9 @@ private:
 
     std::unique_ptr<StaticResourceManager> m_staticResourceManager {};
     std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
+
+    static constexpr size_t frameAllocatorSize { 2048 };
+    std::vector<std::unique_ptr<FrameAllocator>> m_frameAllocators {};
 
     VkQueue m_graphicsQueue {};
 

@@ -62,6 +62,11 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     m_renderGraph = app.mainRenderGraph();
     ApplicationState appState { m_swapchainExtent, 0.0, 0.0, 0 };
     reconstructRenderGraph(*m_renderGraph, appState);
+
+    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
+        auto allocator = std::make_unique<FrameAllocator>(frameAllocatorSize);
+        m_frameAllocators.push_back(std::move(allocator));
+    }
 }
 
 VulkanBackend::~VulkanBackend()
@@ -692,8 +697,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     }
 
     ASSERT(m_renderGraph);
-    VkCommandBuffer commandBuffer = m_frameCommandBuffers[swapchainImageIndex];
-    executeRenderGraph(commandBuffer, appState, *m_renderGraph, swapchainImageIndex);
+    executeRenderGraph(appState, *m_renderGraph, swapchainImageIndex);
 
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
@@ -723,19 +727,23 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     return true;
 }
 
-void VulkanBackend::executeRenderGraph(VkCommandBuffer commandBuffer, const ApplicationState& appState, const RenderGraph& renderGraph, uint32_t swapchainImageIndex)
+void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const RenderGraph& renderGraph, uint32_t swapchainImageIndex)
 {
+    FrameAllocator& frameAllocator = *m_frameAllocators[swapchainImageIndex];
+    frameAllocator.reset();
+
     VkCommandBufferBeginInfo commandBufferBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     commandBufferBeginInfo.flags = 0u;
     commandBufferBeginInfo.pInheritanceInfo = nullptr;
 
+    VkCommandBuffer commandBuffer = m_frameCommandBuffers[swapchainImageIndex];
     if (vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
         LogError("VulkanBackend::executeRenderGraph(): error beginning command buffer command!\n");
     }
 
     renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
         CommandList cmdList {};
-        node.execute(appState, cmdList);
+        node.execute(appState, cmdList, frameAllocator);
 
         bool insideRenderPass = false;
 
