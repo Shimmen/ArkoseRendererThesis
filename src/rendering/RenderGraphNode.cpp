@@ -12,7 +12,7 @@ void RenderGraphNode::construct(ResourceManager& resourceManager, const Applicat
     m_command_submission_callback = m_constructor_function(resourceManager, appState);
 }
 
-void RenderGraphNode::execute(const ApplicationState& appState, CommandList& commandList)
+void RenderGraphNode::execute(const ApplicationState& appState, CommandList& commandList) const
 {
     m_command_submission_callback(appState, commandList);
 }

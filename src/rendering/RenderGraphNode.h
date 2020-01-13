@@ -24,7 +24,7 @@ public:
     void construct(ResourceManager&, const ApplicationState&);
 
     //! Executes the node and returns the commands that need to be performed.
-    void execute(const ApplicationState&, CommandList&);
+    void execute(const ApplicationState&, CommandList&) const;
 
 protected:
     //! Call this function to regenerate the node resources.

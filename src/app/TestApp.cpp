@@ -36,7 +36,6 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
     auto graph = std::make_unique<RenderGraph>();
 
     graph->addNode("example-triangle", [&](ResourceManager& resourceManager, const ApplicationState& appState) {
-
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
 
@@ -65,7 +64,6 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
         RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState);
 
         return [&](const ApplicationState& appState, CommandList& commandList) {
-
             // TODO: This doesn't seem optimal! We can't have it on the stack because stack allocated data will go out of scope,
             //  and we don't wanna heap alloc every frame. Hmm, let's think about that. Maybe have some custom arena allocator for that?
             static CameraState cameraState {};
@@ -79,6 +77,7 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
 
             commandList.add<CmdUpdateBuffer>(cameraUniformBuffer, &cameraState, sizeof(CameraState));
             commandList.add<CmdSetRenderState>(renderState);
+            commandList.add<CmdClear>(ClearColor(1.0f, 0.0f, 1.0f), 1.0f);
             commandList.add<CmdDrawIndexed>(
                 *m_vertexBuffer,
                 *m_indexBuffer,

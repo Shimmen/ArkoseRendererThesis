@@ -40,9 +40,9 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
-    void executeRenderGraph(VkCommandBuffer, const ApplicationState&, const RenderGraph&, const ResourceManager&);
-    void executeRenderGraphNode(VkCommandBuffer, const RenderGraphNode&, const ResourceManager&);
-    void executeDrawIndexed(VkCommandBuffer, const ResourceManager&, const CmdDrawIndexed&);
+    void executeRenderGraph(VkCommandBuffer, const ApplicationState&, const RenderGraph&, uint32_t swapchainImageIndex);
+    void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*, uint32_t swapchainImageIndex);
+    void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
     void reconstructRenderGraph(RenderGraph&, const ApplicationState&);
     void destroyRenderGraph(RenderGraph&);
@@ -50,6 +50,7 @@ private:
     void newBuffer(const Buffer&);
     void deleteBuffer(const Buffer&);
     void updateBuffer(const BufferUpdate&);
+    void updateBuffer(const Buffer& buffer, const std::byte*, size_t);
     VkBuffer buffer(const Buffer&);
 
     void newTexture(const Texture2D&);
@@ -58,13 +59,17 @@ private:
     //void updateTexture(const TextureUpdateFromData&);
     VkImage image(const Texture2D&);
 
+    struct RenderTargetInfo;
     void newRenderTarget(const RenderTarget&);
     void deleteRenderTarget(const RenderTarget&);
     void setupWindowRenderTargets();
     void destroyWindowRenderTargets();
+    RenderTargetInfo& renderTargetInfo(const RenderTarget&);
 
+    struct RenderStateInfo;
     void newRenderState(const RenderState&, uint32_t swapchainImageIndex);
     void deleteRenderState(const RenderState&);
+    RenderStateInfo& renderStateInfo(const RenderState&);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Swapchain management

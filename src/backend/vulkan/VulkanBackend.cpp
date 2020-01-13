@@ -595,12 +595,12 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
         }
     }
 
-    createTheDrawingStuff(m_swapchainImageFormat, swapchainExtent, m_swapchainImageViews, m_depthImageView, m_depthImageFormat);
+    //createTheDrawingStuff(m_swapchainImageFormat, swapchainExtent, m_swapchainImageViews, m_depthImageView, m_depthImageFormat);
 }
 
 void VulkanBackend::destroySwapchain()
 {
-    destroyTheDrawingStuff();
+    //destroyTheDrawingStuff();
 
     destroyWindowRenderTargets();
 
@@ -711,6 +711,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
     // TODO This should be moved out of here very soon!  TODO
     // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+    /*
     CameraState cameraState = {};
     cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f);
     cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
@@ -726,15 +727,14 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     if (!setBufferMemoryDirectly(cameraStateUniformBufferInfo.memory.value(), &cameraState, sizeof(CameraState))) {
         LogError("VulkanBackend::executeFrame(): could not update the uniform buffer.\n");
     }
+    */
     // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
     // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
     // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 
-    if (m_renderGraph) {
-        VkCommandBuffer commandBuffer = m_frameCommandBuffers[swapchainImageIndex];
-        const ResourceManager& resourceManager = *m_frameResourceManagers[swapchainImageIndex];
-        executeRenderGraph(commandBuffer, appState, *m_renderGraph, resourceManager);
-    }
+    ASSERT(m_renderGraph);
+    VkCommandBuffer commandBuffer = m_frameCommandBuffers[swapchainImageIndex];
+    executeRenderGraph(commandBuffer, appState, *m_renderGraph, swapchainImageIndex);
 
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
@@ -764,82 +764,130 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     return true;
 }
 
-void VulkanBackend::executeRenderGraph(VkCommandBuffer commandBuffer, const ApplicationState& appState, const RenderGraph& renderGraph, const ResourceManager& resourceManager)
+void VulkanBackend::executeRenderGraph(VkCommandBuffer commandBuffer, const ApplicationState& appState, const RenderGraph& renderGraph, uint32_t swapchainImageIndex)
 {
-    CommandList cmdList {};
+    VkCommandBufferBeginInfo commandBufferBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    commandBufferBeginInfo.flags = 0u;
+    commandBufferBeginInfo.pInheritanceInfo = nullptr;
 
-    renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
-        //executeRenderGraphNode(commandBuffer, node, resourceManager);
-
-        //node.execute(appState, cmdList);
-    });
-}
-
-void VulkanBackend::executeRenderGraphNode(VkCommandBuffer commandBuffer, const RenderGraphNode& node, const ResourceManager& resourceManager)
-{
-    // TODO: The called has to create a command buffer for each node!
-
-    //CommandList cmdList {};
-    //node.execute(appState, )
-
-    // TODO: Re-implement!
-
-    /*
-    VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-
-    Extent2D extent = renderPass.target().extent();
-    renderPassBeginInfo.renderArea.extent = { extent.width(), extent.height() };
-    renderPassBeginInfo.renderArea.offset = { 0, 0 };
-
-    auto cmdIterator = renderPass.commands().begin();
-
-    std::vector<VkClearValue> clearValues {};
-    if (renderPass.commands().front()->type() == typeid(CmdClear)) {
-
-        // TODO: Respect clear command settings!
-        //auto clearCmd = dynamic_cast<CmdClear*>(renderPass.commands().front());
-        //clearValues.reserve(renderPass.target().attachmentCount() + (renderPass.target().hasDepthTarget() ? 1 : 0));
-
-        clearValues[0].color = { 1.0f, 0.0f, 1.0f, 1.0f };
-        clearValues[1].depthStencil = { 1.0f, 0 };
-
-        renderPassBeginInfo.clearValueCount = clearValues.size();
-        renderPassBeginInfo.pClearValues = clearValues.data();
-
-        // Skip the first command now, because its intent has been captured
-        std::advance(cmdIterator, 1);
+    if (vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo) != VK_SUCCESS) {
+        LogError("VulkanBackend::executeRenderGraph(): error beginning command buffer command!\n");
     }
 
-    // TODO: The render pass, framebuffer, pipeline, and pipeline layout should be created at render pass construction.
-    //  At this stage we should just perform a basic lookup to get those resources from the VulkanBackend
+    renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
+        CommandList cmdList {};
+        node.execute(appState, cmdList);
 
-    // TODO: The descriptor set (and maybe the pipeline layout?!) can be tied to per frame updates, so we need to do some stuff here. Unclear..
+        bool insideRenderPass = false;
 
-    //VulkanBackend::RenderPassInfo info = renderPassInfo(renderPass);
-    //renderPassBeginInfo.renderPass = info.renderPass;
-    // TODO: Hmm, but the render pass is created before we establish render targets, i.e. framebuffers. Or can we let our layering take care of that somehow?
-    renderPassBeginInfo.framebuffer = nullptr; //framebuffer(renderPass.target());
+        while (cmdList.hasNext()) {
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    //vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipeline);
-    //vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, info.pipelineLayout, 0, 1, &THE_DESCRIPTOR_SET_FOR_FRAME, 0, nullptr); // TODO!
+            const auto& command = cmdList.next();
 
-    for (; cmdIterator != renderPass.commands().end(); std::advance(cmdIterator, 1)) {
-        const FrontendCommand* cmd = *cmdIterator;
-        auto& type = cmd->type();
+            if (command.is<CmdSetRenderState>()) {
+                printf("EXEC CmdSetRenderState\n");
 
-        if (type == typeid(CmdDrawIndexed)) {
-            executeDrawIndexed(commandBuffer, resourceManager, *dynamic_cast<const CmdDrawIndexed*>(cmd));
+                if (cmdList.hasNext() && cmdList.peekNext().is<CmdClear>()) {
+                    executeSetRenderState(commandBuffer, command.as<CmdSetRenderState>(), &cmdList.next().as<CmdClear>(), swapchainImageIndex);
+                } else {
+                    executeSetRenderState(commandBuffer, command.as<CmdSetRenderState>(), nullptr, swapchainImageIndex);
+                }
+
+                insideRenderPass = true;
+            }
+
+            else if (command.is<CmdUpdateBuffer>()) {
+                printf("EXEC CmdUpdateBuffer\n");
+                auto& cmd = command.as<CmdUpdateBuffer>();
+                auto* bytes = static_cast<std::byte*>(cmd.source);
+                updateBuffer(cmd.buffer, bytes, cmd.size);
+            }
+
+            else if (command.is<CmdClear>()) {
+                printf("EXEC CmdClear\n");
+                // For now, just assume it's always after a CmdSetRenderState
+                ASSERT_NOT_REACHED();
+
+            }
+
+            else if (command.is<CmdDrawIndexed>()) {
+                printf("EXEC CmdDrawIndexed\n");
+                ASSERT(insideRenderPass);
+                executeDrawIndexed(commandBuffer, command.as<CmdDrawIndexed>());
+            }
+
+            else {
+                LogError("VulkanBackend::executeRenderGraph(): unhandled command!\n");
+                ASSERT_NOT_REACHED();
+            }
+        }
+
+        if (insideRenderPass) {
+            vkCmdEndRenderPass(commandBuffer);
+            insideRenderPass = false;
+        }
+    });
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        LogError("VulkanBackend::executeRenderGraph(): error ending command buffer command!\n");
+    }
+}
+
+void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const CmdSetRenderState& cmd, const CmdClear* clearCmd, uint32_t swapchainImageIndex)
+{
+    const RenderTarget& renderTarget = cmd.renderState.renderTarget();
+
+    // TODO: Now in hindsight it looks like maybe we should have separate renderTarget & pipelineState commands maybe?
+    std::vector<VkClearValue> clearValues {};
+
+    if (clearCmd) {
+        VkClearColorValue clearColorValue = { clearCmd->clearColor.r, clearCmd->clearColor.g, clearCmd->clearColor.b, clearCmd->clearColor.a };
+        VkClearDepthStencilValue clearDepthStencilValue = { clearCmd->clearDepth, clearCmd->clearStencil };
+
+        if (renderTarget.isWindowTarget()) {
+            clearValues.resize(2);
+            clearValues[0].color = clearColorValue;
+            clearValues[1].depthStencil = clearDepthStencilValue;
         } else {
-            ASSERT_NOT_REACHED();
+            for (auto& [type, _] : renderTarget.sortedAttachments()) {
+                VkClearValue value = {};
+                if (type == RenderTarget::AttachmentType::Depth) {
+                    value.depthStencil = clearDepthStencilValue;
+                } else {
+                    value.color = clearColorValue;
+                }
+                clearValues.push_back(value);
+            }
         }
     }
 
-    vkCmdEndRenderPass(commandBuffer);
-    */
+    VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+
+    RenderTargetInfo* targetInfo {};
+    if (renderTarget.isWindowTarget()) {
+        targetInfo = &m_windowRenderTargetInfos[swapchainImageIndex];
+    } else {
+        targetInfo = &renderTargetInfo(renderTarget);
+    }
+    renderPassBeginInfo.renderPass = targetInfo->compatibleRenderPass;
+    renderPassBeginInfo.framebuffer = targetInfo->framebuffer;
+
+    auto& targetExtent = renderTarget.isWindowTarget() ? m_swapchainExtent : renderTarget.extent();
+    renderPassBeginInfo.renderArea.offset = { 0, 0 };
+    renderPassBeginInfo.renderArea.extent = { targetExtent.width(), targetExtent.height() };
+
+    renderPassBeginInfo.clearValueCount = clearValues.size();
+    renderPassBeginInfo.pClearValues = clearValues.data();
+
+    // TODO: Handle subpasses properly!
+    vkCmdBeginRenderPass(commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    RenderStateInfo& stateInfo = renderStateInfo(cmd.renderState);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipelineLayout, 0, 1, &stateInfo.descriptorSet, 0, nullptr);
 }
 
-void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const ResourceManager& resourceManager, const CmdDrawIndexed& command)
+void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const CmdDrawIndexed& command)
 {
     VkBuffer vertexBuffer = buffer(command.vertexBuffer);
     VkBuffer indexBuffer = buffer(command.indexBuffer);
@@ -914,18 +962,26 @@ void VulkanBackend::updateBuffer(const BufferUpdate& update)
         LogErrorAndExit("Trying to update an already-deleted or not-yet-created buffer\n");
     }
 
-    BufferInfo& bufferInfo = m_bufferInfos[update.buffer().id()];
-
     const std::byte* data = update.data().data();
     size_t size = update.data().size();
+    updateBuffer(update.buffer(), data, size);
+}
 
-    switch (update.buffer().memoryHint()) {
+void VulkanBackend::updateBuffer(const Buffer& buffer, const std::byte* data, size_t size)
+{
+    if (buffer.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to update an already-deleted or not-yet-created buffer\n");
+    }
+
+    BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
+
+    switch (buffer.memoryHint()) {
     case Buffer::MemoryHint::GpuOptimal:
         setBufferDataUsingStagingBuffer(bufferInfo.buffer, data, size);
         break;
     case Buffer::MemoryHint::TransferOptimal:
         if (!bufferInfo.memory.has_value()) {
-            LogErrorAndExit("Trying to update transfer optimal buffer that doesn't own it's memory, which currently isn't upported!\n");
+            LogErrorAndExit("Trying to update transfer optimal buffer that doesn't own it's memory, which currently isn't unsupported!\n");
         }
         setBufferMemoryDirectly(bufferInfo.memory.value(), data, size);
         break;
@@ -1331,6 +1387,12 @@ void VulkanBackend::destroyWindowRenderTargets()
 
     VkRenderPass sharedRenderPass = m_windowRenderTargetInfos.front().compatibleRenderPass;
     vkDestroyRenderPass(m_device, sharedRenderPass, nullptr);
+}
+
+VulkanBackend::RenderTargetInfo& VulkanBackend::renderTargetInfo(const RenderTarget& renderTarget)
+{
+    RenderTargetInfo& renderTargetInfo = m_renderTargetInfos[renderTarget.id()];
+    return renderTargetInfo;
 }
 
 void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swapchainImageIndex)
@@ -1764,6 +1826,12 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
     vkDestroyPipelineLayout(m_device, renderStateInfo.pipelineLayout, nullptr);
 
     renderState.unregisterBackend(backendBadge());
+}
+
+VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState& renderState)
+{
+    RenderStateInfo& renderStateInfo = m_renderStateInfos[renderState.id()];
+    return renderStateInfo;
 }
 
 void VulkanBackend::reconstructRenderGraph(RenderGraph& renderGraph, const ApplicationState& appState)

@@ -10,9 +10,18 @@ struct FrontendCommand {
     FrontendCommand() = default;
     virtual ~FrontendCommand() = default;
 
-    [[nodiscard]] const std::type_info& type() const
+    template<typename T>
+    bool is() const
     {
-        return typeid(*this);
+        return typeid(*this) == typeid(T);
+    }
+
+    template<typename T>
+    const T& as() const
+    {
+        ASSERT(is<T>());
+        auto* casted = dynamic_cast<const T*>(this);
+        return *casted;
     }
 };
 
@@ -39,7 +48,7 @@ struct CmdDrawIndexed : public FrontendCommand {
 
 struct CmdSetRenderState : public FrontendCommand {
 
-    CmdSetRenderState(RenderState& renderState)
+    explicit CmdSetRenderState(RenderState& renderState)
         : renderState(renderState)
     {
     }
@@ -49,21 +58,27 @@ struct CmdSetRenderState : public FrontendCommand {
 
 struct CmdUpdateBuffer : public FrontendCommand {
 
-    CmdUpdateBuffer(Buffer& buffer, void* source, size_t size, size_t offset = 0u)
+    CmdUpdateBuffer(Buffer& buffer, void* source, size_t size)
         : buffer(buffer)
         , source(source)
         , size(size)
-        , offset(offset)
     {
     }
 
     Buffer& buffer;
     void* source;
     size_t size;
-    size_t offset;
 };
 
 struct ClearColor {
+    ClearColor(float r, float g, float b, float a = 1.0f)
+        : r(r)
+        , g(g)
+        , b(b)
+        , a(a)
+    {
+    }
+
     float r { 0.0f };
     float g { 0.0f };
     float b { 0.0f };

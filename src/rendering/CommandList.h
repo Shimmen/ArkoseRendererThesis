@@ -15,11 +15,26 @@ public:
         m_vector.push_back(std::unique_ptr<T>(new T(std::forward<Args>(args)...)));
     }
 
-    const std::vector<std::unique_ptr<FrontendCommand>>& vector(Badge<Backend>) const
+    bool hasNext() const
     {
-        return m_vector;
+        return m_iterator < m_vector.size();
+    }
+
+    const FrontendCommand& peekNext() const
+    {
+        ASSERT(hasNext());
+        const FrontendCommand& command = *m_vector[m_iterator];
+        return command;
+    }
+
+    const FrontendCommand& next()
+    {
+        const FrontendCommand& command = *m_vector[m_iterator];
+        m_iterator += 1;
+        return command;
     }
 
 private:
     std::vector<std::unique_ptr<FrontendCommand>> m_vector {};
+    size_t m_iterator { 0 };
 };
