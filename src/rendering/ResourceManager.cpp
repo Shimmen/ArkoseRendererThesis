@@ -85,12 +85,12 @@ Texture2D& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool
 RenderState& ResourceManager::createRenderState(
     const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
     const Shader& shader, const ShaderBindingSet& shaderBindingSet,
-    const Viewport& viewport, const BlendState& blendState)
+    const Viewport& viewport, const BlendState& blendState, const RasterState& rasterState)
 {
     if (m_renderStates.size() >= m_renderStates.capacity()) {
         LogErrorAndExit("Reached max capacity of render states, update the capacity!\n");
     }
-    RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState };
+    RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState };
     m_renderStates.push_back(renderState);
     return m_renderStates.back();
 }

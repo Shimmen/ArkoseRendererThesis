@@ -1541,11 +1541,35 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
     VkPipelineRasterizationStateCreateInfo rasterizer = { VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
     rasterizer.depthClampEnable = VK_FALSE;
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.lineWidth = 1.0f;
+
+    switch (renderState.rasterState().polygonMode) {
+    case PolygonMode::Filled:
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        break;
+    case PolygonMode::Lines:
+        rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+        break;
+    case PolygonMode::Points:
+        rasterizer.polygonMode = VK_POLYGON_MODE_POINT;
+        break;
+    }
+
+    if (renderState.rasterState().backfaceCullingEnabled) {
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    } else {
+        rasterizer.cullMode = VK_CULL_MODE_NONE;
+    }
+
+    switch (renderState.rasterState().frontFace) {
+    case TriangleWindingOrder::Clockwise:
+        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        break;
+    case TriangleWindingOrder::CounterClockwise:
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        break;
+    }
 
     VkPipelineMultisampleStateCreateInfo multisampling = { VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
     multisampling.sampleShadingEnable = VK_FALSE;

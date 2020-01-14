@@ -27,7 +27,7 @@ public:
     [[nodiscard]] Buffer& createBuffer(std::vector<T>&& inData, Buffer::Usage usage, Buffer::MemoryHint);
     [[nodiscard]] Buffer& createBuffer(const std::byte* data, size_t size, Buffer::Usage, Buffer::MemoryHint);
 
-    [[nodiscard]] RenderState& createRenderState(const RenderTarget&, const VertexLayout&, const Shader&, const ShaderBindingSet&, const Viewport&, const BlendState&);
+    [[nodiscard]] RenderState& createRenderState(const RenderTarget&, const VertexLayout&, const Shader&, const ShaderBindingSet&, const Viewport&, const BlendState&, const RasterState&);
 
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture2D&);

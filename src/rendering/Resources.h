@@ -177,6 +177,23 @@ struct BlendState {
     bool enabled { false };
 };
 
+enum class TriangleWindingOrder {
+    Clockwise,
+    CounterClockwise
+};
+
+enum class PolygonMode {
+    Filled,
+    Lines,
+    Points
+};
+
+struct RasterState {
+    bool backfaceCullingEnabled { true };
+    TriangleWindingOrder frontFace { TriangleWindingOrder::CounterClockwise };
+    PolygonMode polygonMode { PolygonMode::Filled };
+};
+
 struct Viewport {
     float x { 0.0f };
     float y { 0.0f };
@@ -216,13 +233,14 @@ public:
     RenderState(Badge<ResourceManager>,
         const RenderTarget& renderTarget, VertexLayout vertexLayout,
         Shader shader, ShaderBindingSet shaderBindingSet,
-        Viewport viewport, BlendState blendState)
+        Viewport viewport, BlendState blendState, RasterState rasterState)
         : m_renderTarget(renderTarget)
         , m_vertexLayout(vertexLayout)
         , m_shader(shader)
         , m_shaderBindingSet(shaderBindingSet)
         , m_viewport(viewport)
         , m_blendState(blendState)
+        , m_rasterState(rasterState)
     {
         ASSERT(shader.type() == ShaderType::Raster);
     }
@@ -235,6 +253,7 @@ public:
 
     const Viewport& fixedViewport() const { return m_viewport; }
     const BlendState& blendState() const { return m_blendState; }
+    const RasterState& rasterState() const { return m_rasterState; }
 
 private:
     const RenderTarget& m_renderTarget;
@@ -245,4 +264,5 @@ private:
 
     Viewport m_viewport;
     BlendState m_blendState;
+    RasterState m_rasterState;
 };

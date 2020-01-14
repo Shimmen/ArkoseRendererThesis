@@ -53,6 +53,8 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
         ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, &testTexture };
         ShaderBindingSet shaderBindingSet { uniformBufferBinding, textureSamplerBinding };
 
+        // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
+
         Viewport viewport;
         viewport.width = appState.windowExtent().width();
         viewport.height = appState.windowExtent().height();
@@ -60,8 +62,13 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
         BlendState blendState;
         blendState.enabled = false;
 
+        RasterState rasterState;
+        rasterState.polygonMode = PolygonMode::Filled;
+        rasterState.backfaceCullingEnabled = false;
+        //rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
+
         RenderTarget& windowTarget = resourceManager.getWindowRenderTarget();
-        RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState);
+        RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
         return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             auto& cameraState = frameAllocator.allocate<CameraState>();
