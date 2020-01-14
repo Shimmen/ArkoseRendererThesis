@@ -191,11 +191,11 @@ enum class ShaderBindingType {
 
 struct ShaderBinding {
 
-    ShaderBinding(uint32_t index, ShaderFileType, const Buffer*);
-    ShaderBinding(uint32_t index, ShaderFileType, const Texture2D*);
+    ShaderBinding(uint32_t index, ShaderStage, const Buffer*);
+    ShaderBinding(uint32_t index, ShaderStage, const Texture2D*);
 
     uint32_t bindingIndex;
-    ShaderFileType shaderFileType; // TODO: Later we want flags here I guess, so we can have multiple stuff.
+    ShaderStage shaderStage; // TODO: Later we want flags here I guess, so we can have multiple of them..
 
     ShaderBindingType type;
     const Buffer* buffer;

@@ -3,21 +3,21 @@
 #include <string>
 #include <vector>
 
-enum class ShaderFileType {
+enum class ShaderStage {
     Vertex,
     Fragment,
     Compute,
 };
 
 struct ShaderFile {
-    ShaderFile(std::string name, ShaderFileType type);
+    ShaderFile(std::string name, ShaderStage);
 
     [[nodiscard]] const std::string& name() const;
-    [[nodiscard]] ShaderFileType type() const;
+    [[nodiscard]] ShaderStage stage() const;
 
 private:
     std::string m_name;
-    ShaderFileType m_type;
+    ShaderStage m_stage;
 };
 
 enum class ShaderType {

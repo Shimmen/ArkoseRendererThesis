@@ -1416,14 +1416,14 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
             stageCreateInfo.pName = "main";
 
             VkShaderStageFlagBits stageFlags;
-            switch (file.type()) {
-            case ShaderFileType::Vertex:
+            switch (file.stage()) {
+            case ShaderStage::Vertex:
                 stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
                 break;
-            case ShaderFileType::Fragment:
+            case ShaderStage::Fragment:
                 stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
                 break;
-            case ShaderFileType::Compute:
+            case ShaderStage::Compute:
                 ASSERT_NOT_REACHED();
                 break;
             }
@@ -1459,14 +1459,14 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
             // NOTE: Should be 1 unless we have an array, which we currently don't support.
             binding.descriptorCount = 1;
 
-            switch (bindingInfo.shaderFileType) {
-            case ShaderFileType::Vertex:
+            switch (bindingInfo.shaderStage) {
+            case ShaderStage::Vertex:
                 binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
                 break;
-            case ShaderFileType::Fragment:
+            case ShaderStage::Fragment:
                 binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
                 break;
-            case ShaderFileType::Compute:
+            case ShaderStage::Compute:
                 ASSERT_NOT_REACHED();
                 break;
             }

@@ -155,18 +155,18 @@ Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memo
 {
 }
 
-ShaderBinding::ShaderBinding(uint32_t index, ShaderFileType shaderFileType, const Buffer* buffer)
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Buffer* buffer)
     : bindingIndex(index)
-    , shaderFileType(shaderFileType)
+    , shaderStage(shaderStage)
     , type(ShaderBindingType::UniformBuffer) // TODO: Technically this could be some other type of buffer here (e.g. shader storage buffer)
     , buffer(buffer)
     , texture(nullptr)
 {
 }
 
-ShaderBinding::ShaderBinding(uint32_t index, ShaderFileType shaderFileType, const Texture2D* texture)
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Texture2D* texture)
     : bindingIndex(index)
-    , shaderFileType(shaderFileType)
+    , shaderStage(shaderStage)
     , type(ShaderBindingType::TextureSampler)
     , buffer(nullptr)
     , texture(texture)

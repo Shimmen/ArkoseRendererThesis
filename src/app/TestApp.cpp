@@ -49,8 +49,8 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
                 { 2, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
         };
 
-        ShaderBinding uniformBufferBinding = { 0, ShaderFileType::Vertex, &cameraUniformBuffer };
-        ShaderBinding textureSamplerBinding = { 1, ShaderFileType::Fragment, &testTexture };
+        ShaderBinding uniformBufferBinding = { 0, ShaderStage::Vertex, &cameraUniformBuffer };
+        ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, &testTexture };
         ShaderBindingSet shaderBindingSet { uniformBufferBinding, textureSamplerBinding };
 
         Viewport viewport;

@@ -3,9 +3,9 @@
 #include "rendering/ShaderManager.h"
 #include <utility/logging.h>
 
-ShaderFile::ShaderFile(std::string name, ShaderFileType type)
+ShaderFile::ShaderFile(std::string name, ShaderStage stage)
     : m_name(std::move(name))
-    , m_type(type)
+    , m_stage(stage)
 {
     auto& manager = ShaderManager::instance();
     switch (manager.loadAndCompileImmediately(m_name)) {
@@ -27,21 +27,21 @@ const std::string& ShaderFile::name() const
     return m_name;
 }
 
-ShaderFileType ShaderFile::type() const
+ShaderStage ShaderFile::stage() const
 {
-    return m_type;
+    return m_stage;
 }
 
 Shader Shader::createBasic(std::string name, std::string vertexName, std::string fragmentName)
 {
-    ShaderFile vertexFile { std::move(vertexName), ShaderFileType::Vertex };
-    ShaderFile fragmentFile { std::move(fragmentName), ShaderFileType::Fragment };
+    ShaderFile vertexFile { std::move(vertexName), ShaderStage::Vertex };
+    ShaderFile fragmentFile { std::move(fragmentName), ShaderStage::Fragment };
     return Shader(std::move(name), { vertexFile, fragmentFile }, ShaderType::Raster);
 }
 
 Shader Shader::createCompute(std::string name, std::string computeName)
 {
-    ShaderFile computeFile { std::move(computeName), ShaderFileType::Compute };
+    ShaderFile computeFile { std::move(computeName), ShaderStage::Compute };
     return Shader(std::move(name), { computeFile }, ShaderType::Compute);
 }
 

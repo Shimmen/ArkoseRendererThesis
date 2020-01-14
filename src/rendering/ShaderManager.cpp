@@ -98,21 +98,6 @@ std::optional<std::string> ShaderManager::shaderError(const std::string& name) c
     return data.lastCompileError;
 }
 
-std::optional<uint32_t> ShaderManager::shaderVersion(const std::string& name) const
-{
-    auto path = resolvePath(name);
-
-    std::lock_guard<std::mutex> dataLock(m_shaderDataMutex);
-    auto result = m_loadedShaders.find(path);
-
-    if (result == m_loadedShaders.end()) {
-        return {};
-    }
-
-    const ShaderData& data = result->second;
-    return data.currentBinaryVersion;
-}
-
 ShaderManager::ShaderStatus ShaderManager::loadAndCompileImmediately(const std::string& name)
 {
     auto path = resolvePath(name);
