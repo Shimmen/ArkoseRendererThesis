@@ -25,8 +25,8 @@ void Resource::registerBackend(Badge<Backend>, uint64_t id) const
     m_id = id;
 }
 
-Texture2D::Texture2D(Badge<ResourceManager>, int width, int height, Format format, MinFilter minFilter, MagFilter magFilter)
-    : m_extent(width, height)
+Texture2D::Texture2D(Badge<ResourceManager>, Extent2D extent, Format format, MinFilter minFilter, MagFilter magFilter)
+    : m_extent(extent)
     , m_format(format)
     , m_minFilter(minFilter)
     , m_magFilter(magFilter)
@@ -39,16 +39,10 @@ bool Texture2D::hasMipmaps() const
     return false;
 }
 
-RenderTarget::RenderTarget(Badge<ResourceManager>)
-    : m_attachments()
-    , m_isWindowTarget(true)
-{
-}
-
 RenderTarget::RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture)
     : m_attachments {}
 {
-    Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = colorTexture };
+    Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
     m_attachments.push_back(colorAttachment);
 }
 
@@ -69,12 +63,12 @@ RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachm
         return;
     }
 
-    Extent2D firstExtent = m_attachments.front().texture.extent();
+    Extent2D firstExtent = m_attachments.front().texture->extent();
 
     for (auto& attachment : m_attachments) {
-        if (attachment.texture.extent() != firstExtent) {
+        if (attachment.texture->extent() != firstExtent) {
             LogErrorAndExit("RenderTarget error: tried to create with attachments of different sizes: (%ix%i) vs (%ix%i)\n",
-                attachment.texture.extent().width(), attachment.texture.extent().height(),
+                attachment.texture->extent().width(), attachment.texture->extent().height(),
                 firstExtent.width(), firstExtent.height());
         }
     }
@@ -107,15 +101,11 @@ RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachm
 
 const Extent2D& RenderTarget::extent() const
 {
-    ASSERT(!isWindowTarget());
-
-    return m_attachments.front().texture.extent();
+    return m_attachments.front().texture->extent();
 }
 
 size_t RenderTarget::colorAttachmentCount() const
 {
-    ASSERT(!isWindowTarget());
-
     size_t total = totalAttachmentCount();
     if (hasDepthAttachment()) {
         return total - 1;
@@ -126,26 +116,17 @@ size_t RenderTarget::colorAttachmentCount() const
 
 size_t RenderTarget::totalAttachmentCount() const
 {
-    ASSERT(!isWindowTarget());
-
     return m_attachments.size();
 }
 
 bool RenderTarget::hasDepthAttachment() const
 {
-    ASSERT(!isWindowTarget());
-
     if (m_attachments.empty()) {
         return false;
     }
 
     const Attachment& last = m_attachments.back();
     return last.type == AttachmentType::Depth;
-}
-
-bool RenderTarget::isWindowTarget() const
-{
-    return m_isWindowTarget;
 }
 
 Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memoryHint)

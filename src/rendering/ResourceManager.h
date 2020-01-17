@@ -9,18 +9,15 @@
 
 class ResourceManager {
 public:
-    explicit ResourceManager();
+    explicit ResourceManager(const RenderTarget* windowRenderTarget);
 
     void setCurrentPass(std::string);
 
-    // TODO: Handle the fact that IDs are updated in the background and since we are taking copies of Resources everywhere this system is
-    //  currently kind of broken! We need to use references or something like that, without making it too cumbersome for the Apps to manage.
-
-    [[nodiscard]] RenderTarget& getWindowRenderTarget();
+    [[nodiscard]] const RenderTarget& getWindowRenderTarget();
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
     [[nodiscard]] Texture2D& loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps);
-    [[nodiscard]] Texture2D& createTexture2D(int width, int height, Texture2D::Format);
+    [[nodiscard]] Texture2D& createTexture2D(Extent2D, Texture2D::Format);
 
     [[nodiscard]] Buffer& createBuffer(size_t size, Buffer::Usage, Buffer::MemoryHint);
     template<typename T>
@@ -44,11 +41,15 @@ public:
     const std::vector<BufferUpdate>& bufferUpdates() const;
     const std::vector<TextureUpdateFromFile>& textureUpdates() const;
 
+    Badge<ResourceManager> exchangeBadges(Badge<Backend>) const;
+
 protected:
     std::string makeQualifiedName(const std::string& pass, const std::string& name);
 
 private:
     std::optional<std::string> m_current_pass_name;
+
+    const RenderTarget* m_windowRenderTarget;
 
     std::unordered_map<std::string, const Buffer*> m_name_buffer_map;
     std::unordered_map<std::string, const Texture2D*> m_name_texture_map;

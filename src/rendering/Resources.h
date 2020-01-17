@@ -23,6 +23,13 @@ struct Extent2D {
         , m_height(height)
     {
     }
+    Extent2D(int width, int height)
+            : m_width(width)
+            , m_height(height)
+    {
+        ASSERT(width >= 0);
+        ASSERT(height >= 0);
+    }
     Extent2D(const Extent2D& other)
         : Extent2D(other.m_width, other.m_height)
     {
@@ -60,6 +67,7 @@ private:
 struct Texture2D : public Resource {
 
     enum class Format {
+        Unknown,
         RGBA8,
         Depth32F
     };
@@ -76,7 +84,7 @@ struct Texture2D : public Resource {
 
     Texture2D() = default;
     Texture2D(const Texture2D&) = default;
-    Texture2D(Badge<ResourceManager>, int width, int height, Format, MinFilter, MagFilter);
+    Texture2D(Badge<ResourceManager>, Extent2D, Format, MinFilter, MagFilter);
 
     [[nodiscard]] const Extent2D& extent() const { return m_extent; }
     [[nodiscard]] Format format() const { return m_format; }
@@ -104,12 +112,11 @@ struct RenderTarget : public Resource {
 
     struct Attachment {
         AttachmentType type;
-        Texture2D texture;
+        Texture2D* texture;
     };
 
     RenderTarget() = default;
     RenderTarget(const RenderTarget&) = default;
-    explicit RenderTarget(Badge<ResourceManager>);
     explicit RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture);
     explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments);
 
@@ -117,13 +124,11 @@ struct RenderTarget : public Resource {
     [[nodiscard]] size_t colorAttachmentCount() const;
     [[nodiscard]] size_t totalAttachmentCount() const;
     [[nodiscard]] bool hasDepthAttachment() const;
-    [[nodiscard]] bool isWindowTarget() const;
 
     [[nodiscard]] const std::vector<Attachment>& sortedAttachments() const { return m_attachments; }
 
 private:
     std::vector<Attachment> m_attachments {};
-    bool m_isWindowTarget { false };
 };
 
 struct Buffer : public Resource {

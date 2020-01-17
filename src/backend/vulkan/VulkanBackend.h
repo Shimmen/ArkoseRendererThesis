@@ -33,6 +33,7 @@ private:
 
     void executeRenderGraph(const ApplicationState&, const RenderGraph&, uint32_t swapchainImageIndex);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*, uint32_t swapchainImageIndex);
+    void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
     void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
     void reconstructRenderGraph(RenderGraph&, const ApplicationState&);
@@ -47,11 +48,12 @@ private:
     void updateBuffer(const Buffer& buffer, const std::byte*, size_t);
     VkBuffer buffer(const Buffer&);
 
+    struct TextureInfo;
     void newTexture(const Texture2D&);
     void deleteTexture(const Texture2D&);
     void updateTexture(const TextureUpdateFromFile&);
     //void updateTexture(const TextureUpdateFromData&);
-    VkImage image(const Texture2D&);
+    TextureInfo& textureInfo(const Texture2D&);
 
     struct RenderTargetInfo;
     void newRenderTarget(const RenderTarget&);
@@ -73,6 +75,9 @@ private:
     void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
     void destroySwapchain();
     [[nodiscard]] Extent2D recreateSwapchain();
+
+    void createWindowRenderTargetFrontend();
+    void updateWindowRenderTargetFrontend();
 
     ///////////////////////////////////////////////////////////////////////////
     /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.
@@ -130,7 +135,6 @@ private:
     /// Window and swapchain related members
 
     GLFWwindow* m_window;
-    bool m_unhandledWindowResize { false };
 
     VkSurfaceKHR m_surface {};
     VkSwapchainKHR m_swapchain {};
@@ -147,6 +151,9 @@ private:
     VkImage m_depthImage {};
     VkImageView m_depthImageView {};
     VkDeviceMemory m_depthImageMemory {};
+
+    std::vector<VkFramebuffer > m_swapchainFramebuffers {};
+    VkRenderPass m_swapchainRenderPass {};
 
     //
 
@@ -212,6 +219,9 @@ private:
     std::vector<BufferInfo> m_bufferInfos {};
     std::vector<TextureInfo> m_textureInfos {};
     std::vector<RenderTargetInfo> m_renderTargetInfos {};
-    std::vector<RenderTargetInfo> m_windowRenderTargetInfos {};
     std::vector<RenderStateInfo> m_renderStateInfos {};
+
+    Texture2D m_swapchainDepthTexture {};
+    std::vector<Texture2D> m_swapchainColorTextures {};
+    std::vector<RenderTarget> m_swapchainRenderTargets {};
 };

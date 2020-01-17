@@ -32,5 +32,5 @@ protected:
     NodeConstructorFunction m_constructor_function {};
 
     //! Submits the rendering commands that the node should perform.
-    CommandSubmissionCallback m_command_submission_callback {};
+    std::vector<CommandSubmissionCallback> m_command_submission_callbacks {};
 };

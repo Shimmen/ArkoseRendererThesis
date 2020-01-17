@@ -5,7 +5,8 @@
 #include "utility/util.h"
 #include <stb_image.h>
 
-ResourceManager::ResourceManager()
+ResourceManager::ResourceManager(const RenderTarget* windowRenderTarget)
+    : m_windowRenderTarget(windowRenderTarget)
 {
     m_buffers.reserve(maxNumBuffers);
     m_textures.reserve(maxNumTextures);
@@ -18,11 +19,14 @@ void ResourceManager::setCurrentPass(std::string pass)
     m_current_pass_name = std::move(pass);
 }
 
-RenderTarget& ResourceManager::getWindowRenderTarget()
+const RenderTarget& ResourceManager::getWindowRenderTarget()
 {
-    // NOTE: We don't want to add this to the list of render targets, since it's implied that it will always exist!
-    static RenderTarget sharedWindowRenderTarget { Badge<ResourceManager>() };
-    return sharedWindowRenderTarget;
+    ASSERT(m_windowRenderTarget);
+    return *m_windowRenderTarget;
+    // TODO: I don't love how this works.. but it's really nice if as much code as possible doesn't have to treat the window render target as special
+    // NOTE: We don't want to add this to the list of render targets, since it's implied that it will always exist (so it doesn't need to be created/removed)
+    //static RenderTarget sharedWindowRenderTarget { Badge<ResourceManager>() };
+    //return sharedWindowRenderTarget;
 }
 
 RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)
@@ -35,12 +39,12 @@ RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTa
     return m_renderTargets.back();
 }
 
-Texture2D& ResourceManager::createTexture2D(int width, int height, Texture2D::Format format)
+Texture2D& ResourceManager::createTexture2D(Extent2D extent, Texture2D::Format format)
 {
     if (m_textures.size() >= m_textures.capacity()) {
         LogErrorAndExit("Reached max capacity of textures, update the capacity!\n");
     }
-    Texture2D texture { {}, width, height, format, Texture2D::MinFilter::Linear, Texture2D::MagFilter::Linear };
+    Texture2D texture { {}, extent, format, Texture2D::MinFilter::Linear, Texture2D::MagFilter::Linear };
     m_textures.push_back(texture);
     return m_textures.back();
 }
@@ -76,7 +80,7 @@ Texture2D& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool
     ASSERT(componentCount == 3 || componentCount == 4);
     auto format = Texture2D::Format::RGBA8;
 
-    Texture2D& texture = createTexture2D(width, height, format);
+    Texture2D& texture = createTexture2D({ width, height }, format);
     m_immediate_texture_updates.emplace_back(texture, imagePath, generateMipmaps);
 
     return texture;
@@ -170,6 +174,11 @@ const std::vector<BufferUpdate>& ResourceManager::bufferUpdates() const
 const std::vector<TextureUpdateFromFile>& ResourceManager::textureUpdates() const
 {
     return m_immediate_texture_updates;
+}
+
+Badge<ResourceManager> ResourceManager::exchangeBadges(Badge<Backend>) const
+{
+    return {};
 }
 
 std::string ResourceManager::makeQualifiedName(const std::string& pass, const std::string& name)

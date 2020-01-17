@@ -3,7 +3,7 @@
 #include "backend/Backend.h"
 
 StaticResourceManager::StaticResourceManager()
-    : m_resourceManager()
+    : m_resourceManager(nullptr)
 {
     m_resourceManager.setCurrentPass("static");
 }

@@ -70,6 +70,19 @@ struct CmdUpdateBuffer : public FrontendCommand {
     size_t size;
 };
 
+struct CmdCopyTexture : public FrontendCommand {
+
+    CmdCopyTexture(Texture2D& srcTexture, Texture2D& dstTexture)
+        : srcTexture(srcTexture)
+        , dstTexture(dstTexture)
+    {
+        ASSERT(srcTexture.extent() == dstTexture.extent());
+    }
+
+    Texture2D& srcTexture;
+    Texture2D& dstTexture;
+};
+
 struct ClearColor {
     ClearColor(float r, float g, float b, float a = 1.0f)
         : r(r)

@@ -1,6 +1,7 @@
 #include "TestApp.h"
 
 #include "camera_state.h"
+#include <utility/Input.h>
 
 void TestApp::setup(StaticResourceManager& staticResources)
 {
@@ -67,13 +68,27 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
         rasterState.backfaceCullingEnabled = false;
         //rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
 
-        RenderTarget& windowTarget = resourceManager.getWindowRenderTarget();
+        //Texture2D& colorTexture = resourceManager.createTexture2D(appState.windowExtent(), Texture2D::Format::RGBA8);
+        //Texture2D& depthTexture = resourceManager.createTexture2D(appState.windowExtent(), Texture2D::Format::Depth32F);
+        //RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
+        //    { RenderTarget::AttachmentType::Depth, &depthTexture } });
+
+        const RenderTarget& windowTarget = resourceManager.getWindowRenderTarget();
         RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
         return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             auto& cameraState = frameAllocator.allocate<CameraState>();
             cameraState.world_from_local = mathkit::axisAngle({ 0, 1, 0 }, appState.elapsedTime() * 3.1415f / 2.0f);
-            cameraState.view_from_world = mathkit::lookAt({ 0, 1, 2 }, { 0, 0, 0 });
+            if (Input::instance().isKeyDown(GLFW_KEY_UP)) {
+                cameraState.world_from_local = mathkit::translate(0, 1, 0) * cameraState.world_from_local;
+            }
+            if (Input::instance().isKeyDown(GLFW_KEY_LEFT)) {
+                cameraState.world_from_local = mathkit::translate(-0.5f, 0, 0) * cameraState.world_from_local;
+            }
+            if (Input::instance().isKeyDown(GLFW_KEY_RIGHT)) {
+                cameraState.world_from_local = mathkit::translate(+0.5f, 0, 0) * cameraState.world_from_local;
+            }
+            cameraState.view_from_world = mathkit::lookAt({ 0, 1, 3 }, { 0, 0.5f, 0 });
             float aspectRatio = float(appState.windowExtent().width()) / float(appState.windowExtent().height());
             cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), aspectRatio, 0.1f);
             cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;

@@ -14,13 +14,14 @@
 #include <unordered_map>
 #include <unordered_set>
 
+static bool s_unhandledWindowResize = false;
+
 VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     : m_window(window)
     , m_app(app)
 {
     glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int, int) {
-        auto self = static_cast<VulkanBackend*>(glfwGetWindowUserPointer(window));
-        self->m_unhandledWindowResize = true;
+        s_unhandledWindowResize = true;
     }));
 
     // TODO: Make the creation & deletion of this conditional! We might not always wont this (for performance)
@@ -54,6 +55,8 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     }
 
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
+    createWindowRenderTargetFrontend();
+    updateWindowRenderTargetFrontend();
 
     m_staticResourceManager = std::make_unique<StaticResourceManager>();
     m_app.setup(*m_staticResourceManager);
@@ -632,9 +635,77 @@ Extent2D VulkanBackend::recreateSwapchain()
     destroySwapchain();
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
 
-    m_unhandledWindowResize = false;
+    createWindowRenderTargetFrontend();
+    updateWindowRenderTargetFrontend();
+
+    s_unhandledWindowResize = false;
 
     return m_swapchainExtent;
+}
+
+void VulkanBackend::createWindowRenderTargetFrontend()
+{
+    ASSERT(m_numSwapchainImages > 0);
+
+    // TODO: This is clearly stupid..
+    ResourceManager& badgeGiver = m_staticResourceManager->internal(backendBadge());
+
+    m_swapchainDepthTexture = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Depth32F, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
+    TextureInfo depthInfo {}; // NOTE: The details of this will be filled in & updated when the swapchain is (re)created, for now it's just a placeholder
+    depthInfo.format = m_depthImageFormat;
+    depthInfo.image = m_depthImage;
+    depthInfo.view = m_depthImageView;
+    depthInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    m_swapchainDepthTexture.registerBackend(backendBadge(), m_textureInfos.size());
+    m_textureInfos.push_back(depthInfo);
+
+    m_swapchainColorTextures.resize(m_numSwapchainImages);
+    m_swapchainRenderTargets.resize(m_numSwapchainImages);
+
+    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
+
+        m_swapchainColorTextures[i] = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Unknown, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
+        TextureInfo colorInfo {}; // NOTE: The details of this will be filled in & updated when the swapchain is (re)created, for now it's just a placeholder
+        colorInfo.format = m_swapchainImageFormat;
+        colorInfo.image = m_swapchainImages[i];
+        colorInfo.view = m_swapchainImageViews[i];
+        colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        m_swapchainColorTextures[i].registerBackend(backendBadge(), m_textureInfos.size());
+        m_textureInfos.push_back(colorInfo);
+
+        RenderTargetInfo targetInfo {}; // NOTE: The details of this will be filled in & updated when the swapchain is (re)created, for now it's just a placeholder
+        m_swapchainRenderTargets[i] = RenderTarget(badgeGiver.exchangeBadges(backendBadge()), { { RenderTarget::AttachmentType::Color0, &m_swapchainColorTextures[i] }, { RenderTarget::AttachmentType::Depth, &m_swapchainDepthTexture } });
+        m_swapchainRenderTargets[i].registerBackend(backendBadge(), m_renderTargetInfos.size());
+        m_renderTargetInfos.push_back(targetInfo);
+    }
+}
+
+void VulkanBackend::updateWindowRenderTargetFrontend()
+{
+    TextureInfo depthInfo {};
+    depthInfo.image = m_depthImage;
+    depthInfo.view = m_depthImageView;
+    depthInfo.format = m_depthImageFormat;
+    depthInfo.memory = m_depthImageMemory;
+    depthInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    textureInfo(m_swapchainDepthTexture) = depthInfo;
+
+    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
+        TextureInfo colorInfo {};
+        colorInfo.image = m_swapchainImages[i];
+        colorInfo.view = m_swapchainImageViews[i];
+        colorInfo.format = m_swapchainImageFormat;
+        colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorInfo.memory = nullptr;
+        textureInfo(m_swapchainColorTextures[i]) = colorInfo;
+    }
+
+    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
+        RenderTargetInfo targetInfo {};
+        targetInfo.compatibleRenderPass = m_swapchainRenderPass;
+        targetInfo.framebuffer = m_swapchainFramebuffers[i];
+        renderTargetInfo(m_swapchainRenderTargets[i]) = targetInfo;
+    }
 }
 
 void VulkanBackend::createStaticResources()
@@ -714,7 +785,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
 
         VkResult presentResult = vkQueuePresentKHR(m_presentQueue, &presentInfo);
 
-        if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || m_unhandledWindowResize) {
+        if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || s_unhandledWindowResize) {
             Extent2D newWindowExtent = recreateSwapchain();
             appState = appState.updateWindowExtent(newWindowExtent);
             reconstructRenderGraph(*m_renderGraph, appState);
@@ -778,6 +849,10 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
                 executeDrawIndexed(commandBuffer, command.as<CmdDrawIndexed>());
             }
 
+            else if (command.is<CmdCopyTexture>()) {
+                executeCopyTexture(commandBuffer, command.as<CmdCopyTexture>());
+            }
+
             else {
                 LogError("VulkanBackend::executeRenderGraph(): unhandled command!\n");
                 ASSERT_NOT_REACHED();
@@ -797,7 +872,8 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
 
 void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const CmdSetRenderState& cmd, const CmdClear* clearCmd, uint32_t swapchainImageIndex)
 {
-    const RenderTarget& renderTarget = cmd.renderState.renderTarget();
+    //const RenderTarget& renderTarget = cmd.renderState.renderTarget();
+    const RenderTarget& renderTarget = m_swapchainRenderTargets[swapchainImageIndex];
 
     // TODO: Now in hindsight it looks like maybe we should have separate renderTarget & pipelineState commands maybe?
     std::vector<VkClearValue> clearValues {};
@@ -806,35 +882,25 @@ void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const C
         VkClearColorValue clearColorValue = { { clearCmd->clearColor.r, clearCmd->clearColor.g, clearCmd->clearColor.b, clearCmd->clearColor.a } };
         VkClearDepthStencilValue clearDepthStencilValue = { clearCmd->clearDepth, clearCmd->clearStencil };
 
-        if (renderTarget.isWindowTarget()) {
-            clearValues.resize(2);
-            clearValues[0].color = clearColorValue;
-            clearValues[1].depthStencil = clearDepthStencilValue;
-        } else {
-            for (auto& [type, _] : renderTarget.sortedAttachments()) {
-                VkClearValue value = {};
-                if (type == RenderTarget::AttachmentType::Depth) {
-                    value.depthStencil = clearDepthStencilValue;
-                } else {
-                    value.color = clearColorValue;
-                }
-                clearValues.push_back(value);
+        for (auto& [type, _] : renderTarget.sortedAttachments()) {
+            VkClearValue value = {};
+            if (type == RenderTarget::AttachmentType::Depth) {
+                value.depthStencil = clearDepthStencilValue;
+            } else {
+                value.color = clearColorValue;
             }
+            clearValues.push_back(value);
         }
     }
 
     VkRenderPassBeginInfo renderPassBeginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 
-    RenderTargetInfo* targetInfo {};
-    if (renderTarget.isWindowTarget()) {
-        targetInfo = &m_windowRenderTargetInfos[swapchainImageIndex];
-    } else {
-        targetInfo = &renderTargetInfo(renderTarget);
-    }
-    renderPassBeginInfo.renderPass = targetInfo->compatibleRenderPass;
-    renderPassBeginInfo.framebuffer = targetInfo->framebuffer;
+    const RenderTargetInfo& targetInfo = renderTargetInfo(renderTarget);
 
-    auto& targetExtent = renderTarget.isWindowTarget() ? m_swapchainExtent : renderTarget.extent();
+    renderPassBeginInfo.renderPass = targetInfo.compatibleRenderPass;
+    renderPassBeginInfo.framebuffer = targetInfo.framebuffer;
+
+    auto& targetExtent = renderTarget.extent();
     renderPassBeginInfo.renderArea.offset = { 0, 0 };
     renderPassBeginInfo.renderArea.extent = { targetExtent.width(), targetExtent.height() };
 
@@ -847,6 +913,41 @@ void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const C
     RenderStateInfo& stateInfo = renderStateInfo(cmd.renderState);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipelineLayout, 0, 1, &stateInfo.descriptorSet, 0, nullptr);
+}
+
+void VulkanBackend::executeCopyTexture(VkCommandBuffer commandBuffer, const CmdCopyTexture& command)
+{
+    const TextureInfo& srcInfo = textureInfo(command.srcTexture);
+    const TextureInfo& dstInfo = textureInfo(command.dstTexture);
+
+    // TODO: We probably want to support more options here or in other versions of this
+
+    VkImageCopy copyRegion = {};
+
+    ASSERT(command.srcTexture.extent() == command.dstTexture.extent());
+    copyRegion.extent = { command.srcTexture.extent().width(), command.srcTexture.extent().height() };
+    copyRegion.srcOffset = { 0, 0, 0 };
+    copyRegion.dstOffset = { 0, 0, 0 };
+
+    ASSERT(!command.srcTexture.hasMipmaps() && !command.dstTexture.hasMipmaps());
+    ASSERT(command.srcTexture.format() == Texture2D::Format::RGBA8 && command.dstTexture.format() == Texture2D::Format::RGBA8);
+
+    VkImageSubresourceLayers srcSubresource = {};
+    srcSubresource.baseArrayLayer = 0;
+    srcSubresource.layerCount = 0;
+    srcSubresource.mipLevel = 0;
+    srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    VkImageSubresourceLayers dstSubresource = {};
+    dstSubresource.baseArrayLayer = 0;
+    dstSubresource.layerCount = 0;
+    dstSubresource.mipLevel = 0;
+    dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    copyRegion.srcSubresource = srcSubresource;
+    copyRegion.srcSubresource = dstSubresource;
+
+    vkCmdCopyImage(commandBuffer, srcInfo.image, srcInfo.currentLayout, dstInfo.image, dstInfo.currentLayout, 1, &copyRegion);
 }
 
 void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const CmdDrawIndexed& command)
@@ -968,6 +1069,9 @@ void VulkanBackend::newTexture(const Texture2D& texture)
     case Texture2D::Format::Depth32F:
         format = VK_FORMAT_D32_SFLOAT;
         isDepthFormat = true;
+        break;
+    case Texture2D::Format::Unknown:
+        ASSERT_NOT_REACHED();
         break;
     }
 
@@ -1133,10 +1237,10 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     textureInfo.currentLayout = finalLayout;
 }
 
-VkImage VulkanBackend::image(const Texture2D& texture)
+VulkanBackend::TextureInfo& VulkanBackend::textureInfo(const Texture2D& texture)
 {
-    TextureInfo& imageInfo = m_textureInfos[texture.id()];
-    return imageInfo.image;
+    TextureInfo& textureInfo = m_textureInfos[texture.id()];
+    return textureInfo;
 }
 
 void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
@@ -1152,11 +1256,11 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
         // This is important for the VkAttachmentReference attachment index later in this loop.
         ASSERT(!depthAttachmentRef.has_value());
 
-        TextureInfo& textureInfo = m_textureInfos[texture.id()];
+        const TextureInfo& texInfo = textureInfo(*texture);
 
         // TODO: Handle multisampling, clearing, storing, and stencil stuff!
         VkAttachmentDescription attachment = {};
-        attachment.format = textureInfo.format;
+        attachment.format = texInfo.format;
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
         attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1170,12 +1274,12 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
             finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         }
 
-        attachment.initialLayout = textureInfo.currentLayout;
+        attachment.initialLayout = texInfo.currentLayout;
         attachment.finalLayout = finalLayout;
 
         uint32_t attachmentIndex = allAttachments.size();
         allAttachments.push_back(attachment);
-        allAttachmentImageViews.push_back(textureInfo.view);
+        allAttachmentImageViews.push_back(texInfo.view);
 
         if (type == RenderTarget::AttachmentType::Depth) {
             VkAttachmentReference attachmentRef = {};
@@ -1312,8 +1416,9 @@ void VulkanBackend::setupWindowRenderTargets()
     if (vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to create window render pass\n");
     }
+    m_swapchainRenderPass = renderPass;
 
-    m_windowRenderTargetInfos.resize(m_numSwapchainImages);
+    m_swapchainFramebuffers.resize(m_numSwapchainImages);
     for (size_t it = 0; it < m_numSwapchainImages; ++it) {
 
         std::array<VkImageView, 2> attachmentImageViews = {
@@ -1334,19 +1439,28 @@ void VulkanBackend::setupWindowRenderTargets()
             LogErrorAndExit("Error trying to create window framebuffer\n");
         }
 
-        m_windowRenderTargetInfos[it].compatibleRenderPass = renderPass;
-        m_windowRenderTargetInfos[it].framebuffer = framebuffer;
+        m_swapchainFramebuffers[it] = framebuffer;
     }
 }
 
 void VulkanBackend::destroyWindowRenderTargets()
 {
+    for (RenderTarget& renderTarget : m_swapchainRenderTargets) {
+        RenderTargetInfo& info = renderTargetInfo(renderTarget);
+        vkDestroyFramebuffer(m_device, info.framebuffer, nullptr);
+    }
+
+    RenderTargetInfo& info = renderTargetInfo(m_swapchainRenderTargets[0]);
+    vkDestroyRenderPass(m_device, info.compatibleRenderPass, nullptr);
+
+    /*
     for (RenderTargetInfo& renderTargetInfo : m_windowRenderTargetInfos) {
         vkDestroyFramebuffer(m_device, renderTargetInfo.framebuffer, nullptr);
     }
 
     VkRenderPass sharedRenderPass = m_windowRenderTargetInfos.front().compatibleRenderPass;
     vkDestroyRenderPass(m_device, sharedRenderPass, nullptr);
+     */
 }
 
 VulkanBackend::RenderTargetInfo& VulkanBackend::renderTargetInfo(const RenderTarget& renderTarget)
@@ -1621,13 +1735,9 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
 
     // render pass stuff
     const RenderTarget& renderTarget = renderState.renderTarget();
-    const RenderTargetInfo* renderTargetInfo {};
-    if (renderTarget.isWindowTarget()) {
-        renderTargetInfo = &m_windowRenderTargetInfos[swapchainImageIndex];
-    } else {
-        renderTargetInfo = &m_renderTargetInfos[renderTarget.id()];
-    }
-    pipelineCreateInfo.renderPass = renderTargetInfo->compatibleRenderPass;
+    const RenderTargetInfo& targetInfo = renderTargetInfo(renderTarget);
+
+    pipelineCreateInfo.renderPass = targetInfo.compatibleRenderPass;
     pipelineCreateInfo.subpass = 0; // TODO: How should this be handled?
 
     // extra stuff (optional for this)
@@ -1753,14 +1863,14 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
             case ShaderBindingType::TextureSampler: {
 
                 ASSERT(bindingInfo.texture);
-                const TextureInfo& textureInfo = m_textureInfos[bindingInfo.texture->id()];
+                const TextureInfo& texInfo = textureInfo(*bindingInfo.texture);
 
                 VkDescriptorImageInfo descImageInfo {};
-                descImageInfo.sampler = textureInfo.sampler;
-                descImageInfo.imageView = textureInfo.view;
+                descImageInfo.sampler = texInfo.sampler;
+                descImageInfo.imageView = texInfo.view;
 
-                ASSERT(textureInfo.currentLayout == VK_IMAGE_LAYOUT_GENERAL || textureInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                descImageInfo.imageLayout = textureInfo.currentLayout;
+                ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_GENERAL || texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                descImageInfo.imageLayout = texInfo.currentLayout;
 
                 descImageInfos.push_back(descImageInfo);
                 write.pImageInfo = &descImageInfos.back();
@@ -1821,8 +1931,11 @@ void VulkanBackend::reconstructRenderGraph(RenderGraph& renderGraph, const Appli
     m_frameResourceManagers.resize(m_numSwapchainImages);
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
 
-        auto resourceManager = std::make_unique<ResourceManager>();
-        renderGraph.constructAll(*resourceManager, appState);
+        ApplicationState appStateCorrect { appState.windowExtent(), 0.0, 0.0, swapchainImageIndex };
+
+        const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[swapchainImageIndex];
+        auto resourceManager = std::make_unique<ResourceManager>(&windowRenderTargetForFrame);
+        renderGraph.constructAll(*resourceManager, appStateCorrect);
 
         // Delete old resources
         if (m_frameResourceManagers[swapchainImageIndex]) {
