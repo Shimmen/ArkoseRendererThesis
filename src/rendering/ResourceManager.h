@@ -13,7 +13,7 @@ public:
 
     void setCurrentPass(std::string);
 
-    [[nodiscard]] const RenderTarget& getWindowRenderTarget();
+    [[nodiscard]] const RenderTarget& windowRenderTarget();
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
     [[nodiscard]] Texture2D& loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps);

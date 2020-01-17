@@ -36,7 +36,7 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
 {
     auto graph = std::make_unique<RenderGraph>();
 
-    graph->addNode("example-triangle", [&](ResourceManager& resourceManager, const ApplicationState& appState) {
+    graph->addNode("example-triangle", [&](ResourceManager& resourceManager) {
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
 
@@ -57,8 +57,7 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
 
         Viewport viewport;
-        viewport.width = appState.windowExtent().width();
-        viewport.height = appState.windowExtent().height();
+        viewport.extent = resourceManager.windowRenderTarget().extent();
 
         BlendState blendState;
         blendState.enabled = false;
@@ -73,7 +72,7 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
         //RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
         //    { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        const RenderTarget& windowTarget = resourceManager.getWindowRenderTarget();
+        const RenderTarget& windowTarget = resourceManager.windowRenderTarget();
         RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
         return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {

@@ -56,7 +56,6 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
     createWindowRenderTargetFrontend();
-    updateWindowRenderTargetFrontend();
 
     m_staticResourceManager = std::make_unique<StaticResourceManager>();
     m_app.setup(*m_staticResourceManager);
@@ -634,9 +633,7 @@ Extent2D VulkanBackend::recreateSwapchain()
 
     destroySwapchain();
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
-
     createWindowRenderTargetFrontend();
-    updateWindowRenderTargetFrontend();
 
     s_unhandledWindowResize = false;
 
@@ -650,60 +647,39 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     // TODO: This is clearly stupid..
     ResourceManager& badgeGiver = m_staticResourceManager->internal(backendBadge());
 
-    m_swapchainDepthTexture = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Depth32F, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
-    TextureInfo depthInfo {}; // NOTE: The details of this will be filled in & updated when the swapchain is (re)created, for now it's just a placeholder
+    TextureInfo depthInfo {};
     depthInfo.format = m_depthImageFormat;
     depthInfo.image = m_depthImage;
     depthInfo.view = m_depthImageView;
+    depthInfo.memory = m_depthImageMemory;
     depthInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    m_swapchainDepthTexture = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Depth32F, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
     m_swapchainDepthTexture.registerBackend(backendBadge(), m_textureInfos.size());
-    m_textureInfos.push_back(depthInfo);
+    m_textureInfos.push_back(depthInfo); // TODO: Use free lists!
+    textureInfo(m_swapchainDepthTexture) = depthInfo;
 
     m_swapchainColorTextures.resize(m_numSwapchainImages);
     m_swapchainRenderTargets.resize(m_numSwapchainImages);
 
     for (size_t i = 0; i < m_numSwapchainImages; ++i) {
 
-        m_swapchainColorTextures[i] = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Unknown, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
-        TextureInfo colorInfo {}; // NOTE: The details of this will be filled in & updated when the swapchain is (re)created, for now it's just a placeholder
-        colorInfo.format = m_swapchainImageFormat;
-        colorInfo.image = m_swapchainImages[i];
-        colorInfo.view = m_swapchainImageViews[i];
-        colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        m_swapchainColorTextures[i].registerBackend(backendBadge(), m_textureInfos.size());
-        m_textureInfos.push_back(colorInfo);
-
-        RenderTargetInfo targetInfo {}; // NOTE: The details of this will be filled in & updated when the swapchain is (re)created, for now it's just a placeholder
-        m_swapchainRenderTargets[i] = RenderTarget(badgeGiver.exchangeBadges(backendBadge()), { { RenderTarget::AttachmentType::Color0, &m_swapchainColorTextures[i] }, { RenderTarget::AttachmentType::Depth, &m_swapchainDepthTexture } });
-        m_swapchainRenderTargets[i].registerBackend(backendBadge(), m_renderTargetInfos.size());
-        m_renderTargetInfos.push_back(targetInfo);
-    }
-}
-
-void VulkanBackend::updateWindowRenderTargetFrontend()
-{
-    TextureInfo depthInfo {};
-    depthInfo.image = m_depthImage;
-    depthInfo.view = m_depthImageView;
-    depthInfo.format = m_depthImageFormat;
-    depthInfo.memory = m_depthImageMemory;
-    depthInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    textureInfo(m_swapchainDepthTexture) = depthInfo;
-
-    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
         TextureInfo colorInfo {};
+        colorInfo.format = m_swapchainImageFormat;
         colorInfo.image = m_swapchainImages[i];
         colorInfo.view = m_swapchainImageViews[i];
-        colorInfo.format = m_swapchainImageFormat;
-        colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         colorInfo.memory = nullptr;
+        colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        m_swapchainColorTextures[i] = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Unknown, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
+        m_swapchainColorTextures[i].registerBackend(backendBadge(), m_textureInfos.size());
+        m_textureInfos.push_back(colorInfo); // TODO: Use free lists!
         textureInfo(m_swapchainColorTextures[i]) = colorInfo;
-    }
 
-    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
         RenderTargetInfo targetInfo {};
         targetInfo.compatibleRenderPass = m_swapchainRenderPass;
         targetInfo.framebuffer = m_swapchainFramebuffers[i];
+        m_swapchainRenderTargets[i] = RenderTarget(badgeGiver.exchangeBadges(backendBadge()), { { RenderTarget::AttachmentType::Color0, &m_swapchainColorTextures[i] }, { RenderTarget::AttachmentType::Depth, &m_swapchainDepthTexture } });
+        m_swapchainRenderTargets[i].registerBackend(backendBadge(), m_renderTargetInfos.size());
+        m_renderTargetInfos.push_back(targetInfo); // TODO: Use free lists!
         renderTargetInfo(m_swapchainRenderTargets[i]) = targetInfo;
     }
 }
@@ -1635,16 +1611,16 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
     VkViewport viewport = {};
     viewport.x = viewportInfo.x;
     viewport.y = viewportInfo.y;
-    viewport.width = viewportInfo.width;
-    viewport.height = viewportInfo.height;
+    viewport.width = viewportInfo.extent.width();
+    viewport.height = viewportInfo.extent.height();
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     // TODO: Should we always use the viewport settings if no scissor is specified?
     VkRect2D scissor = {};
     scissor.offset = { 0, 0 };
-    scissor.extent.width = uint32_t(viewportInfo.width);
-    scissor.extent.height = uint32_t(viewportInfo.height);
+    scissor.extent.width = uint32_t(viewportInfo.extent.width());
+    scissor.extent.height = uint32_t(viewportInfo.extent.height());
 
     VkPipelineViewportStateCreateInfo viewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
     viewportState.viewportCount = 1;

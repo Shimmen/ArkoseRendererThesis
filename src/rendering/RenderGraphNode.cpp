@@ -16,7 +16,7 @@ void RenderGraphNode::construct(ResourceManager& resourceManager, const Applicat
 
     //auto exec_func = m_constructor_function(resourceManager, appState);
     ASSERT(appState.frameIndex() == m_command_submission_callbacks.size());
-    m_command_submission_callbacks.push_back(m_constructor_function(resourceManager, appState));
+    m_command_submission_callbacks.push_back(m_constructor_function(resourceManager));
 }
 
 void RenderGraphNode::execute(const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) const

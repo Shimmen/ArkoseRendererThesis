@@ -19,14 +19,10 @@ void ResourceManager::setCurrentPass(std::string pass)
     m_current_pass_name = std::move(pass);
 }
 
-const RenderTarget& ResourceManager::getWindowRenderTarget()
+const RenderTarget& ResourceManager::windowRenderTarget()
 {
     ASSERT(m_windowRenderTarget);
     return *m_windowRenderTarget;
-    // TODO: I don't love how this works.. but it's really nice if as much code as possible doesn't have to treat the window render target as special
-    // NOTE: We don't want to add this to the list of render targets, since it's implied that it will always exist (so it doesn't need to be created/removed)
-    //static RenderTarget sharedWindowRenderTarget { Badge<ResourceManager>() };
-    //return sharedWindowRenderTarget;
 }
 
 RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)

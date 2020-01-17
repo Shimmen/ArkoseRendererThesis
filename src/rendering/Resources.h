@@ -202,8 +202,7 @@ struct RasterState {
 struct Viewport {
     float x { 0.0f };
     float y { 0.0f };
-    float width;
-    float height;
+    Extent2D extent;
 };
 
 enum class ShaderBindingType {

@@ -77,7 +77,6 @@ private:
     [[nodiscard]] Extent2D recreateSwapchain();
 
     void createWindowRenderTargetFrontend();
-    void updateWindowRenderTargetFrontend();
 
     ///////////////////////////////////////////////////////////////////////////
     /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.

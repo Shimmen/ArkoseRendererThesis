@@ -14,7 +14,7 @@
 class RenderGraphNode : public Resource {
 public:
     using CommandSubmissionCallback = std::function<void(const ApplicationState&, CommandList&, FrameAllocator&)>;
-    using NodeConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&, const ApplicationState&)>;
+    using NodeConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&)>;
 
     explicit RenderGraphNode(NodeConstructorFunction);
     ~RenderGraphNode() = default;
