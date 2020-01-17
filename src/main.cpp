@@ -2,6 +2,7 @@
 #include "backend/vulkan/VulkanBackend.h"
 #include "rendering/App.h"
 #include "rendering/ShaderManager.h"
+#include "utility/Input.h"
 #include "utility/logging.h"
 
 #define GLFW_INCLUDE_NONE
@@ -64,7 +65,6 @@ std::unique_ptr<Backend> createBackend(BackendType backendType, GLFWwindow* wind
         break;
     }
 
-    glfwSetWindowUserPointer(window, backend.get());
     return backend;
 }
 
@@ -76,6 +76,7 @@ int main()
 
     BackendType backendType = BackendType::Vulkan;
     GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
+    Input::registerWindow(window);
 
     {
         auto app = std::make_unique<TestApp>();
@@ -88,6 +89,7 @@ int main()
         double lastTime = 0.0;
         while (!glfwWindowShouldClose(window)) {
 
+            Input::preEventPoll();
             glfwPollEvents();
 
             double elapsedTime = glfwGetTime();

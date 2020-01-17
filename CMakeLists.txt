@@ -15,6 +15,7 @@ add_executable(ArkoseRenderer
         src/rendering/RenderGraphNode.cpp
         src/rendering/RenderGraph.cpp
         src/utility/FrameAllocator.cpp
+        src/utility/Input.cpp
         src/utility/fileio.cpp
         src/utility/Random.cpp)
 
