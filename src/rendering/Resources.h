@@ -125,7 +125,9 @@ struct RenderTarget : public Resource {
     [[nodiscard]] size_t totalAttachmentCount() const;
     [[nodiscard]] bool hasDepthAttachment() const;
 
-    [[nodiscard]] const std::vector<Attachment>& sortedAttachments() const { return m_attachments; }
+    [[nodiscard]] const Texture2D* attachment(AttachmentType) const;
+
+    [[nodiscard]] const std::vector<Attachment>& sortedAttachments() const;
 
 private:
     std::vector<Attachment> m_attachments {};

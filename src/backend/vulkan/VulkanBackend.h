@@ -32,7 +32,7 @@ private:
     /// Command translation & resource management
 
     void executeRenderGraph(const ApplicationState&, const RenderGraph&, uint32_t swapchainImageIndex);
-    void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*, uint32_t swapchainImageIndex);
+    void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
     void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
@@ -93,7 +93,7 @@ private:
     VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
 
-    bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout) const;
+    bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height) const;
 
     ///////////////////////////////////////////////////////////////////////////

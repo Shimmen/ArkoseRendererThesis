@@ -54,8 +54,10 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
 
+        const RenderTarget& windowTarget = resourceManager.windowRenderTarget();
+
         Viewport viewport;
-        viewport.extent = resourceManager.windowRenderTarget().extent();
+        viewport.extent = windowTarget.extent();
 
         BlendState blendState;
         blendState.enabled = false;
@@ -65,13 +67,13 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
         rasterState.backfaceCullingEnabled = false;
         //rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
 
-        //Texture2D& colorTexture = resourceManager.createTexture2D(appState.windowExtent(), Texture2D::Format::RGBA8);
-        //Texture2D& depthTexture = resourceManager.createTexture2D(appState.windowExtent(), Texture2D::Format::Depth32F);
-        //RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
-        //    { RenderTarget::AttachmentType::Depth, &depthTexture } });
+        Texture2D& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture2D::Format::RGBA8);
+        Texture2D& depthTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture2D::Format::Depth32F);
+        RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
+            { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        const RenderTarget& windowTarget = resourceManager.windowRenderTarget();
         RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
+        //RenderState& renderState = resourceManager.createRenderState(renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
         return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             auto& cameraState = frameAllocator.allocate<CameraState>();
@@ -99,6 +101,9 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
                 *m_indexBuffer,
                 m_indexCount,
                 DrawMode::Triangles);
+
+            //const Texture2D& windowColorTexture = *windowTarget.attachment(RenderTarget::AttachmentType::Color0);
+            //commandList.add<CmdCopyTexture>(colorTexture, windowColorTexture);
         };
     });
 }

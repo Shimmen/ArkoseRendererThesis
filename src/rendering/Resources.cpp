@@ -129,6 +129,21 @@ bool RenderTarget::hasDepthAttachment() const
     return last.type == AttachmentType::Depth;
 }
 
+const Texture2D* RenderTarget::attachment(AttachmentType requestedType) const
+{
+    for (const auto& [type, texture] : m_attachments) {
+        if (type == requestedType) {
+            return texture;
+        }
+    }
+    return nullptr;
+}
+
+const std::vector<RenderTarget::Attachment>& RenderTarget::sortedAttachments() const
+{
+    return m_attachments;
+}
+
 Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memoryHint)
     : m_size(size)
     , m_usage(usage)

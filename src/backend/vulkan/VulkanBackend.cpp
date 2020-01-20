@@ -745,6 +745,11 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         LogError("VulkanBackend::executeFrame(): error acquiring next swapchain image.\n");
     }
 
+    // We shouldn't use the data from the swapchain image, so we set current layout accordingly (not sure about depth, but sure..)
+    const Texture2D& currentColorTexture = m_swapchainColorTextures[swapchainImageIndex];
+    textureInfo(currentColorTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    textureInfo(m_swapchainDepthTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
     ASSERT(m_renderGraph);
     executeRenderGraph(appState, *m_renderGraph, swapchainImageIndex);
 
@@ -790,21 +795,37 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
         LogError("VulkanBackend::executeRenderGraph(): error beginning command buffer command!\n");
     }
 
+    bool didWriteToSwapchain = false;
+    auto& swapchainRenderTarget = m_swapchainRenderTargets[swapchainImageIndex];
+    auto checkIfSwapchainWrite = [&](const RenderTarget& renderTarget) {
+        if (renderTarget.id() == swapchainRenderTarget.id()) {
+            didWriteToSwapchain = true;
+        }
+    };
+
     renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
         CommandList cmdList {};
         node.executeForFrame(appState, cmdList, frameAllocator, swapchainImageIndex);
 
         bool insideRenderPass = false;
+        auto endCurrentRenderPassIfAny = [&]() { // TODO: Maybe we want this to be more explicit for the app? Or maybe we just warn that it does happen?
+            if (insideRenderPass) {
+                vkCmdEndRenderPass(commandBuffer);
+                insideRenderPass = false;
+            }
+        };
 
         while (cmdList.hasNext()) {
 
             const auto& command = cmdList.next();
 
             if (command.is<CmdSetRenderState>()) {
+                auto& cmd = command.as<CmdSetRenderState>();
+                checkIfSwapchainWrite(cmd.renderState.renderTarget());
                 if (cmdList.hasNext() && cmdList.peekNext().is<CmdClear>()) {
-                    executeSetRenderState(commandBuffer, command.as<CmdSetRenderState>(), &cmdList.next().as<CmdClear>(), swapchainImageIndex);
+                    executeSetRenderState(commandBuffer, cmd, &cmdList.next().as<CmdClear>());
                 } else {
-                    executeSetRenderState(commandBuffer, command.as<CmdSetRenderState>(), nullptr, swapchainImageIndex);
+                    executeSetRenderState(commandBuffer, cmd, nullptr);
                 }
 
                 insideRenderPass = true;
@@ -828,6 +849,7 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
             }
 
             else if (command.is<CmdCopyTexture>()) {
+                endCurrentRenderPassIfAny();
                 executeCopyTexture(commandBuffer, command.as<CmdCopyTexture>());
             }
 
@@ -837,21 +859,23 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
             }
         }
 
-        if (insideRenderPass) {
-            vkCmdEndRenderPass(commandBuffer);
-            insideRenderPass = false;
-        }
+        endCurrentRenderPassIfAny();
     });
+
+    if (!didWriteToSwapchain) {
+        LogInfo("Manual layout transition!\n");
+        transitionImageLayout(m_swapchainImages[swapchainImageIndex], m_swapchainImageFormat,
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, &commandBuffer);
+    }
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         LogError("VulkanBackend::executeRenderGraph(): error ending command buffer command!\n");
     }
 }
 
-void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const CmdSetRenderState& cmd, const CmdClear* clearCmd, uint32_t swapchainImageIndex)
+void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const CmdSetRenderState& cmd, const CmdClear* clearCmd)
 {
-    //const RenderTarget& renderTarget = cmd.renderState.renderTarget();
-    const RenderTarget& renderTarget = m_swapchainRenderTargets[swapchainImageIndex];
+    const RenderTarget& renderTarget = cmd.renderState.renderTarget();
 
     // TODO: Now in hindsight it looks like maybe we should have separate renderTarget & pipelineState commands maybe?
     std::vector<VkClearValue> clearValues {};
@@ -895,8 +919,61 @@ void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const C
 
 void VulkanBackend::executeCopyTexture(VkCommandBuffer commandBuffer, const CmdCopyTexture& command)
 {
+    ASSERT_NOT_REACHED();
+    /*
     const TextureInfo& srcInfo = textureInfo(command.srcTexture);
     const TextureInfo& dstInfo = textureInfo(command.dstTexture);
+
+    VkImageMemoryBarrier imageBarriers[2];
+    {
+        VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+        barrier.image = srcInfo.image;
+        barrier.oldLayout = srcInfo.currentLayout;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+        barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // TODO: Don't assume color texture!
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        imageBarriers[0] = barrier;
+    }
+    {
+        VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+        barrier.image = dstInfo.image;
+        barrier.oldLayout = dstInfo.currentLayout;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // TODO: Don't assume color texture!
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        imageBarriers[1] = barrier;
+    }
+
+    VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; // TODO: Extreme..? yes
+    VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
+        0, nullptr,
+        0, nullptr,
+        2, imageBarriers);
 
     // TODO: We probably want to support more options here or in other versions of this
 
@@ -908,24 +985,27 @@ void VulkanBackend::executeCopyTexture(VkCommandBuffer commandBuffer, const CmdC
     copyRegion.dstOffset = { 0, 0, 0 };
 
     ASSERT(!command.srcTexture.hasMipmaps() && !command.dstTexture.hasMipmaps());
-    ASSERT(command.srcTexture.format() == Texture2D::Format::RGBA8 && command.dstTexture.format() == Texture2D::Format::RGBA8);
+
+    bool compatibleFormats = true; // TODO: Actually check!
+    ASSERT(compatibleFormats);
 
     VkImageSubresourceLayers srcSubresource = {};
     srcSubresource.baseArrayLayer = 0;
-    srcSubresource.layerCount = 0;
+    srcSubresource.layerCount = 1;
     srcSubresource.mipLevel = 0;
     srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
     VkImageSubresourceLayers dstSubresource = {};
     dstSubresource.baseArrayLayer = 0;
-    dstSubresource.layerCount = 0;
+    dstSubresource.layerCount = 1;
     dstSubresource.mipLevel = 0;
     dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
     copyRegion.srcSubresource = srcSubresource;
-    copyRegion.srcSubresource = dstSubresource;
+    copyRegion.dstSubresource = dstSubresource;
 
     vkCmdCopyImage(commandBuffer, srcInfo.image, srcInfo.currentLayout, dstInfo.image, dstInfo.currentLayout, 1, &copyRegion);
+    */
 }
 
 void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const CmdDrawIndexed& command)
@@ -2186,7 +2266,7 @@ VkImageView VulkanBackend::createImageView2D(VkImage image, VkFormat format, VkI
     return imageView;
 }
 
-bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) const
+bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* currentCommandBuffer) const
 {
     VkImageMemoryBarrier imageBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     imageBarrier.oldLayout = oldLayout;
@@ -2220,6 +2300,16 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
+    } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+
+        // Wait for all color attachment writes ...
+        sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        // ... before allowing any reading or writing
+        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
     } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
 
         LogWarning("VulkanBackend::transitionImageLayout(): transitioning to new layout VK_IMAGE_LAYOUT_GENERAL, which isn't great.\n");
@@ -2234,16 +2324,22 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
         LogErrorAndExit("VulkanBackend::transitionImageLayout(): old & new layout combination unsupported by application, exiting.\n");
     }
 
-    bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
-        vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
+    if (currentCommandBuffer) {
+        vkCmdPipelineBarrier(*currentCommandBuffer, sourceStage, destinationStage, 0,
             0, nullptr,
             0, nullptr,
             1, &imageBarrier);
-    });
-
-    if (!success) {
-        LogError("VulkanBackend::transitionImageLayout(): error transitioning layout, refer to issueSingleTimeCommand errors for more information.\n");
-        return false;
+    } else {
+        bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+            vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
+                0, nullptr,
+                0, nullptr,
+                1, &imageBarrier);
+        });
+        if (!success) {
+            LogError("VulkanBackend::transitionImageLayout(): error transitioning layout, refer to issueSingleTimeCommand errors for more information.\n");
+            return false;
+        }
     }
 
     return true;
