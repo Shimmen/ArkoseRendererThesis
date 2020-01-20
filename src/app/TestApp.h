@@ -5,7 +5,7 @@
 class TestApp : public App {
 public:
     void setup(StaticResourceManager&) override;
-    std::unique_ptr<RenderGraph> mainRenderGraph() override;
+    void makeRenderGraph(RenderGraph&) override;
 
 private:
     struct Vertex {

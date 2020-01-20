@@ -2,11 +2,16 @@
 
 #include <utility/logging.h>
 
-void RenderGraph::constructAll(ResourceManager& resourceManager, const ApplicationState& appState)
+RenderGraph::RenderGraph(size_t frameMultiplicity)
+    : m_frameMultiplicity(frameMultiplicity)
+{
+}
+
+void RenderGraph::constructAllForFrame(ResourceManager& resourceManager, uint32_t frame)
 {
     for (const auto& [name, node] : m_nodes) {
         resourceManager.setCurrentPass(name);
-        node->construct(resourceManager, appState);
+        node->constructForFrame(resourceManager, frame);
     }
 }
 
@@ -23,6 +28,7 @@ void RenderGraph::addNode(const std::string& name, std::unique_ptr<RenderGraphNo
         LogErrorAndExit("GpuPipeline::addNode: called for node with name '%s' but it already exist in this graph!\n", name.c_str());
     }
 
+    node->setFrameMultiplicity(m_frameMultiplicity);
     m_nodes[name] = std::move(node);
 }
 

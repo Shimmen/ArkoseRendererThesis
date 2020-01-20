@@ -32,11 +32,9 @@ void TestApp::setup(StaticResourceManager& staticResources)
     m_indexBuffer = &staticResources.createBuffer(Buffer::Usage::Index, std::move(indices));
 }
 
-std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
+void TestApp::makeRenderGraph(RenderGraph& graph)
 {
-    auto graph = std::make_unique<RenderGraph>();
-
-    graph->addNode("example-triangle", [&](ResourceManager& resourceManager) {
+    graph.addNode("example-triangle", [&](ResourceManager& resourceManager) {
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
 
@@ -103,6 +101,4 @@ std::unique_ptr<RenderGraph> TestApp::mainRenderGraph()
                 DrawMode::Triangles);
         };
     });
-
-    return graph;
 }

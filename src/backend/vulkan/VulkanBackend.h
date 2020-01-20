@@ -36,7 +36,7 @@ private:
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
     void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
-    void reconstructRenderGraph(RenderGraph&, const ApplicationState&);
+    void reconstructRenderGraphResources(RenderGraph& renderGraph);
     void destroyRenderGraph(RenderGraph&);
 
     void createStaticResources();

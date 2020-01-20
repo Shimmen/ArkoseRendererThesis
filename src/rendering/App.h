@@ -11,5 +11,5 @@ public:
     virtual ~App() {}
 
     virtual void setup(StaticResourceManager&) = 0;
-    virtual std::unique_ptr<RenderGraph> mainRenderGraph() = 0;
+    virtual void makeRenderGraph(RenderGraph&) = 0;
 };

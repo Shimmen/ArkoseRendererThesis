@@ -5,25 +5,25 @@ RenderGraphNode::RenderGraphNode(NodeConstructorFunction function)
     : m_constructor_function(std::move(function))
     , m_command_submission_callbacks()
 {
-    m_command_submission_callbacks.reserve(3);
 }
 
-void RenderGraphNode::construct(ResourceManager& resourceManager, const ApplicationState& appState)
+void RenderGraphNode::setFrameMultiplicity(size_t frameMultiplicity)
 {
-    if (m_command_submission_callbacks.size() == 3) {
-        m_command_submission_callbacks.clear();
-    }
-
-    //auto exec_func = m_constructor_function(resourceManager, appState);
-    ASSERT(appState.frameIndex() == m_command_submission_callbacks.size());
-    m_command_submission_callbacks.push_back(m_constructor_function(resourceManager));
+    m_command_submission_callbacks.clear();
+    m_command_submission_callbacks.resize(frameMultiplicity);
+    m_frameMultiplicity = frameMultiplicity;
 }
 
-void RenderGraphNode::execute(const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) const
+void RenderGraphNode::constructForFrame(ResourceManager& resourceManager, uint32_t frame)
 {
-    uint32_t imageIndex = appState.frameIndex() % 3;
-    ASSERT(imageIndex < m_command_submission_callbacks.size());
-    m_command_submission_callbacks[imageIndex](appState, commandList, frameAllocator);
+    ASSERT(m_frameMultiplicity > 0);
+    ASSERT(frame >= 0 && frame < m_frameMultiplicity);
+    m_command_submission_callbacks[frame] = m_constructor_function(resourceManager);
+}
 
-    //m_command_submission_callback(appState, commandList, frameAllocator);
+void RenderGraphNode::executeForFrame(const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator, uint32_t frame) const
+{
+    ASSERT(m_frameMultiplicity > 0);
+    ASSERT(frame >= 0 && frame < m_frameMultiplicity);
+    m_command_submission_callbacks[frame](appState, commandList, frameAllocator);
 }

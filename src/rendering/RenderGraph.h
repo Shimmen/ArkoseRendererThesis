@@ -10,13 +10,13 @@
 
 class RenderGraph {
 public:
-    RenderGraph() = default;
+    explicit RenderGraph(size_t frameMultiplicity);
     ~RenderGraph() = default;
 
     NON_COPYABLE(RenderGraph);
     RenderGraph(RenderGraph&&) noexcept = default;
 
-    void constructAll(ResourceManager&, const ApplicationState&);
+    void constructAllForFrame(ResourceManager&, uint32_t frame);
 
     void addNode(const std::string& name, const RenderGraphNode::NodeConstructorFunction&);
     void addNode(const std::string& name, std::unique_ptr<RenderGraphNode>);
@@ -25,4 +25,7 @@ public:
 
 private:
     std::unordered_map<std::string, std::unique_ptr<RenderGraphNode>> m_nodes;
+
+    //! The number of swapchain images / frames that this node needs to "manage"
+    uint32_t m_frameMultiplicity;
 };

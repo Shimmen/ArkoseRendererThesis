@@ -61,9 +61,11 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     m_app.setup(*m_staticResourceManager);
     createStaticResources();
 
-    m_renderGraph = m_app.mainRenderGraph();
+    m_renderGraph = std::make_unique<RenderGraph>(m_numSwapchainImages);
+    m_app.makeRenderGraph(*m_renderGraph);
+
     ApplicationState appState { m_swapchainExtent, 0.0, 0.0, 0 };
-    reconstructRenderGraph(*m_renderGraph, appState);
+    reconstructRenderGraphResources(*m_renderGraph);
 
     for (size_t i = 0; i < m_numSwapchainImages; ++i) {
         auto allocator = std::make_unique<FrameAllocator>(frameAllocatorSize);
@@ -731,7 +733,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         // Since we couldn't acquire an image to draw to, recreate the swapchain and report that it didn't work
         Extent2D newWindowExtent = recreateSwapchain();
         appState = appState.updateWindowExtent(newWindowExtent);
-        reconstructRenderGraph(*m_renderGraph, appState);
+        reconstructRenderGraphResources(*m_renderGraph);
         return false;
     }
     if (acquireResult == VK_SUBOPTIMAL_KHR) {
@@ -764,7 +766,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || s_unhandledWindowResize) {
             Extent2D newWindowExtent = recreateSwapchain();
             appState = appState.updateWindowExtent(newWindowExtent);
-            reconstructRenderGraph(*m_renderGraph, appState);
+            reconstructRenderGraphResources(*m_renderGraph);
         } else if (presentResult != VK_SUCCESS) {
             LogError("VulkanBackend::executeFrame(): could not present swapchain (frame %u).\n", m_currentFrameIndex);
         }
@@ -790,7 +792,7 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
 
     renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
         CommandList cmdList {};
-        node.execute(appState, cmdList, frameAllocator);
+        node.executeForFrame(appState, cmdList, frameAllocator, swapchainImageIndex);
 
         bool insideRenderPass = false;
 
@@ -1900,18 +1902,16 @@ VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState
     return renderStateInfo;
 }
 
-void VulkanBackend::reconstructRenderGraph(RenderGraph& renderGraph, const ApplicationState& appState)
+void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
 {
     // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
 
     m_frameResourceManagers.resize(m_numSwapchainImages);
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
 
-        ApplicationState appStateCorrect { appState.windowExtent(), 0.0, 0.0, swapchainImageIndex };
-
         const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[swapchainImageIndex];
         auto resourceManager = std::make_unique<ResourceManager>(&windowRenderTargetForFrame);
-        renderGraph.constructAll(*resourceManager, appStateCorrect);
+        renderGraph.constructAllForFrame(*resourceManager, swapchainImageIndex);
 
         // Delete old resources
         if (m_frameResourceManagers[swapchainImageIndex]) {
