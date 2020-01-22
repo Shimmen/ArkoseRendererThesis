@@ -5,6 +5,7 @@
 #include "rendering/App.h"
 #include "rendering/StaticResourceManager.h"
 #include "utility/FrameAllocator.h"
+#include "utility/PersistentIndexedList.h"
 #include <array>
 
 #include <vulkan/vulkan.h>
@@ -151,7 +152,7 @@ private:
     VkImageView m_depthImageView {};
     VkDeviceMemory m_depthImageMemory {};
 
-    std::vector<VkFramebuffer > m_swapchainFramebuffers {};
+    std::vector<VkFramebuffer> m_swapchainFramebuffers {};
     VkRenderPass m_swapchainRenderPass {};
 
     //
@@ -215,10 +216,10 @@ private:
         VkPipeline pipeline {};
     };
 
-    std::vector<BufferInfo> m_bufferInfos {};
-    std::vector<TextureInfo> m_textureInfos {};
-    std::vector<RenderTargetInfo> m_renderTargetInfos {};
-    std::vector<RenderStateInfo> m_renderStateInfos {};
+    PersistentIndexedList<BufferInfo> m_bufferInfos {};
+    PersistentIndexedList<TextureInfo> m_textureInfos {};
+    PersistentIndexedList<RenderTargetInfo> m_renderTargetInfos {};
+    PersistentIndexedList<RenderStateInfo> m_renderStateInfos {};
 
     Texture2D m_swapchainDepthTexture {};
     std::vector<Texture2D> m_swapchainColorTextures {};

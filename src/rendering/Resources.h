@@ -55,6 +55,7 @@ private:
 struct Resource {
 public:
     [[nodiscard]] uint64_t id() const;
+    [[nodiscard]] bool hasBackend() const;
     void unregisterBackend(Badge<Backend>) const;
     void registerBackend(Badge<Backend>, uint64_t id) const;
 

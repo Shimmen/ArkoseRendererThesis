@@ -656,10 +656,13 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     depthInfo.view = m_depthImageView;
     depthInfo.memory = m_depthImageMemory;
     depthInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    if (m_swapchainDepthTexture.hasBackend()) {
+        m_textureInfos.remove(m_swapchainDepthTexture.id());
+    }
     m_swapchainDepthTexture = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Depth32F, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
-    m_swapchainDepthTexture.registerBackend(backendBadge(), m_textureInfos.size());
-    m_textureInfos.push_back(depthInfo); // TODO: Use free lists!
-    textureInfo(m_swapchainDepthTexture) = depthInfo;
+    size_t depthIndex = m_textureInfos.add(depthInfo);
+    m_swapchainDepthTexture.registerBackend(backendBadge(), depthIndex);
 
     m_swapchainColorTextures.resize(m_numSwapchainImages);
     m_swapchainRenderTargets.resize(m_numSwapchainImages);
@@ -672,18 +675,24 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         colorInfo.view = m_swapchainImageViews[i];
         colorInfo.memory = nullptr;
         colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        if (m_swapchainColorTextures[i].hasBackend()) {
+            m_textureInfos.remove(m_swapchainColorTextures[i].id());
+        }
         m_swapchainColorTextures[i] = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Unknown, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
-        m_swapchainColorTextures[i].registerBackend(backendBadge(), m_textureInfos.size());
-        m_textureInfos.push_back(colorInfo); // TODO: Use free lists!
-        textureInfo(m_swapchainColorTextures[i]) = colorInfo;
+        size_t colorIndex = m_textureInfos.add(colorInfo);
+        m_swapchainColorTextures[i].registerBackend(backendBadge(), colorIndex);
 
         RenderTargetInfo targetInfo {};
         targetInfo.compatibleRenderPass = m_swapchainRenderPass;
         targetInfo.framebuffer = m_swapchainFramebuffers[i];
+
+        if (m_swapchainRenderTargets[i].hasBackend()) {
+            m_renderTargetInfos.remove(m_swapchainRenderTargets[i].id());
+        }
         m_swapchainRenderTargets[i] = RenderTarget(badgeGiver.exchangeBadges(backendBadge()), { { RenderTarget::AttachmentType::Color0, &m_swapchainColorTextures[i] }, { RenderTarget::AttachmentType::Depth, &m_swapchainDepthTexture } });
-        m_swapchainRenderTargets[i].registerBackend(backendBadge(), m_renderTargetInfos.size());
-        m_renderTargetInfos.push_back(targetInfo); // TODO: Use free lists!
-        renderTargetInfo(m_swapchainRenderTargets[i]) = targetInfo;
+        size_t targetIndex = m_renderTargetInfos.add(targetInfo);
+        m_swapchainRenderTargets[i].registerBackend(backendBadge(), targetIndex);
     }
 }
 
@@ -1056,9 +1065,7 @@ void VulkanBackend::newBuffer(const Buffer& buffer)
     bufferInfo.buffer = vkBuffer;
     bufferInfo.memory = deviceMemory;
 
-    // TODO: Use free lists!
-    size_t index = m_bufferInfos.size();
-    m_bufferInfos.push_back(bufferInfo);
+    size_t index = m_bufferInfos.add(bufferInfo);
     buffer.registerBackend(backendBadge(), index);
 }
 
@@ -1068,13 +1075,13 @@ void VulkanBackend::deleteBuffer(const Buffer& buffer)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created buffer\n");
     }
 
-    // TODO: When we have a free list, also maybe remove from the m_bufferInfos vector? But then we should also keep track of generations etc.
     BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
     vkDestroyBuffer(m_device, bufferInfo.buffer, nullptr);
     if (bufferInfo.memory.has_value()) {
         vkFreeMemory(m_device, bufferInfo.memory.value(), nullptr);
     }
 
+    m_bufferInfos.remove(buffer.id());
     buffer.unregisterBackend(backendBadge());
 }
 
@@ -1211,9 +1218,7 @@ void VulkanBackend::newTexture(const Texture2D& texture)
     textureInfo.sampler = sampler;
     textureInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    // TODO: Use free lists!
-    size_t index = m_textureInfos.size();
-    m_textureInfos.push_back(textureInfo);
+    size_t index = m_textureInfos.add(textureInfo);
     texture.registerBackend(backendBadge(), index);
 }
 
@@ -1223,9 +1228,7 @@ void VulkanBackend::deleteTexture(const Texture2D& texture)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created texture\n");
     }
 
-    // TODO: When we have a free list, also maybe remove from the m_bufferInfos vector? But then we should also keep track of generations etc.
     TextureInfo& textureInfo = m_textureInfos[texture.id()];
-
     vkDestroySampler(m_device, textureInfo.sampler, nullptr);
     vkDestroyImageView(m_device, textureInfo.view, nullptr);
     vkDestroyImage(m_device, textureInfo.image, nullptr);
@@ -1233,6 +1236,7 @@ void VulkanBackend::deleteTexture(const Texture2D& texture)
         vkFreeMemory(m_device, textureInfo.memory.value(), nullptr);
     }
 
+    m_textureInfos.remove(texture.id());
     texture.unregisterBackend(backendBadge());
 }
 
@@ -1392,9 +1396,7 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     renderTargetInfo.compatibleRenderPass = renderPass;
     renderTargetInfo.framebuffer = framebuffer;
 
-    // TODO: Use free lists!
-    size_t index = m_renderTargetInfos.size();
-    m_renderTargetInfos.push_back(renderTargetInfo);
+    size_t index = m_renderTargetInfos.add(renderTargetInfo);
     renderTarget.registerBackend(backendBadge(), index);
 }
 
@@ -1404,11 +1406,11 @@ void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render target\n");
     }
 
-    // TODO: When we have a free list, also maybe remove from the m_renderTargetInfos vector? But then we should also keep track of generations etc.
     RenderTargetInfo& renderTargetInfo = m_renderTargetInfos[renderTarget.id()];
     vkDestroyFramebuffer(m_device, renderTargetInfo.framebuffer, nullptr);
     vkDestroyRenderPass(m_device, renderTargetInfo.compatibleRenderPass, nullptr);
 
+    m_renderTargetInfos.remove(renderTarget.id());
     renderTarget.unregisterBackend(backendBadge());
 }
 
@@ -1511,15 +1513,6 @@ void VulkanBackend::destroyWindowRenderTargets()
 
     RenderTargetInfo& info = renderTargetInfo(m_swapchainRenderTargets[0]);
     vkDestroyRenderPass(m_device, info.compatibleRenderPass, nullptr);
-
-    /*
-    for (RenderTargetInfo& renderTargetInfo : m_windowRenderTargetInfos) {
-        vkDestroyFramebuffer(m_device, renderTargetInfo.framebuffer, nullptr);
-    }
-
-    VkRenderPass sharedRenderPass = m_windowRenderTargetInfos.front().compatibleRenderPass;
-    vkDestroyRenderPass(m_device, sharedRenderPass, nullptr);
-     */
 }
 
 VulkanBackend::RenderTargetInfo& VulkanBackend::renderTargetInfo(const RenderTarget& renderTarget)
@@ -1954,9 +1947,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
     renderStateInfo.pipelineLayout = pipelineLayout;
     renderStateInfo.pipeline = graphicsPipeline;
 
-    // TODO: Use free lists!
-    size_t index = m_renderStateInfos.size();
-    m_renderStateInfos.push_back(renderStateInfo);
+    size_t index = m_renderStateInfos.add(renderStateInfo);
     renderState.registerBackend(backendBadge(), index);
 }
 
@@ -1966,14 +1957,13 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render state\n");
     }
 
-    // TODO: When we have a free list, also maybe remove from the m_renderStateInfos vector? But then we should also keep track of generations etc.
     RenderStateInfo& renderStateInfo = m_renderStateInfos[renderState.id()];
-
     vkDestroyDescriptorPool(m_device, renderStateInfo.descriptorPool, nullptr);
     vkDestroyDescriptorSetLayout(m_device, renderStateInfo.descriptorSetLayout, nullptr);
     vkDestroyPipeline(m_device, renderStateInfo.pipeline, nullptr);
     vkDestroyPipelineLayout(m_device, renderStateInfo.pipelineLayout, nullptr);
 
+    m_renderStateInfos.remove(renderState.id());
     renderState.unregisterBackend(backendBadge());
 }
 

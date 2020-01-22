@@ -11,6 +11,11 @@ uint64_t Resource::id() const
     return m_id;
 }
 
+bool Resource::hasBackend() const
+{
+    return m_id != Resource::NullId;
+}
+
 void Resource::unregisterBackend(Badge<Backend>) const
 {
     m_id = Resource::NullId;
