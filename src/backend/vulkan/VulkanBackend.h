@@ -7,6 +7,7 @@
 #include "utility/FrameAllocator.h"
 #include "utility/PersistentIndexedList.h"
 #include <array>
+#include <vk_mem_alloc.h>
 
 #include <vulkan/vulkan.h>
 
@@ -130,6 +131,8 @@ private:
 
     VkDevice m_device {};
     VulkanQueueInfo m_queueInfo {};
+
+    VmaAllocator m_memoryAllocator {};
 
     ///////////////////////////////////////////////////////////////////////////
     /// Window and swapchain related members

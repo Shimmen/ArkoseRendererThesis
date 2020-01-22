@@ -37,6 +37,14 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     m_device = createDevice(m_physicalDevice, m_surface);
     createSemaphoresAndFences(m_device);
 
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.physicalDevice = m_physicalDevice;
+    allocatorInfo.device = m_device;
+    allocatorInfo.flags = 0u;
+    if (vmaCreateAllocator(&allocatorInfo, &m_memoryAllocator) != VK_SUCCESS) {
+        LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create memory allocator, exiting.\n");
+    }
+
     vkGetDeviceQueue(m_device, m_queueInfo.presentQueueFamilyIndex, 0, &m_presentQueue);
     vkGetDeviceQueue(m_device, m_queueInfo.graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
 
@@ -93,6 +101,8 @@ VulkanBackend::~VulkanBackend()
         vkDestroySemaphore(m_device, m_renderFinishedSemaphores[it], nullptr);
         vkDestroyFence(m_device, m_inFlightFrameFences[it], nullptr);
     }
+
+    vmaDestroyAllocator(m_memoryAllocator);
 
     vkDestroyDevice(m_device, nullptr);
     vkDestroySurfaceKHR(m_instance, m_surface, nullptr);

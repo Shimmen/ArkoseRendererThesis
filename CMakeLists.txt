@@ -51,6 +51,9 @@ find_package(Vulkan REQUIRED)
 target_include_directories(ArkoseRenderer PRIVATE Vulkan::Vulkan)
 target_link_libraries(ArkoseRenderer Vulkan::Vulkan)
 
+add_subdirectory(deps/vulkan_memory_allocator)
+target_link_libraries(ArkoseRenderer vulkan_memory_allocator)
+
 if (WIN32)
     target_compile_definitions(ArkoseRenderer PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 endif ()
