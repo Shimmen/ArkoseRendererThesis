@@ -8,10 +8,6 @@
 ResourceManager::ResourceManager(const RenderTarget* windowRenderTarget)
     : m_windowRenderTarget(windowRenderTarget)
 {
-    m_buffers.reserve(maxNumBuffers);
-    m_textures.reserve(maxNumTextures);
-    m_renderTargets.reserve(maxNumRenderTargets);
-    m_renderStates.reserve(maxNumRenderStates);
 }
 
 void ResourceManager::setCurrentPass(std::string pass)
@@ -27,9 +23,6 @@ const RenderTarget& ResourceManager::windowRenderTarget()
 
 RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)
 {
-    if (m_renderTargets.size() >= m_renderTargets.capacity()) {
-        LogErrorAndExit("Reached max capacity of render targets, update the capacity!\n");
-    }
     RenderTarget renderTarget { {}, attachments };
     m_renderTargets.push_back(renderTarget);
     return m_renderTargets.back();
@@ -37,9 +30,6 @@ RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTa
 
 Texture2D& ResourceManager::createTexture2D(Extent2D extent, Texture2D::Format format)
 {
-    if (m_textures.size() >= m_textures.capacity()) {
-        LogErrorAndExit("Reached max capacity of textures, update the capacity!\n");
-    }
     Texture2D texture { {}, extent, format, Texture2D::MinFilter::Linear, Texture2D::MagFilter::Linear };
     m_textures.push_back(texture);
     return m_textures.back();
@@ -48,9 +38,6 @@ Texture2D& ResourceManager::createTexture2D(Extent2D extent, Texture2D::Format f
 Buffer& ResourceManager::createBuffer(size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
     ASSERT(size > 0);
-    if (m_buffers.size() >= m_buffers.capacity()) {
-        LogErrorAndExit("Reached max capacity of buffers, update the capacity!\n");
-    }
     Buffer buffer = { {}, size, usage, memoryHint };
     m_buffers.push_back(buffer);
     return m_buffers.back();
@@ -87,9 +74,6 @@ RenderState& ResourceManager::createRenderState(
     const Shader& shader, const ShaderBindingSet& shaderBindingSet,
     const Viewport& viewport, const BlendState& blendState, const RasterState& rasterState)
 {
-    if (m_renderStates.size() >= m_renderStates.capacity()) {
-        LogErrorAndExit("Reached max capacity of render states, update the capacity!\n");
-    }
     RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState };
     m_renderStates.push_back(renderState);
     return m_renderStates.back();
@@ -144,22 +128,22 @@ void ResourceManager::setBufferDataImmediately(Buffer& buffer, const std::byte* 
 
 const std::vector<Buffer>& ResourceManager::buffers() const
 {
-    return m_buffers;
+    return m_buffers.vector();
 }
 
 const std::vector<Texture2D>& ResourceManager::textures() const
 {
-    return m_textures;
+    return m_textures.vector();
 }
 
 const std::vector<RenderTarget>& ResourceManager::renderTargets() const
 {
-    return m_renderTargets;
+    return m_renderTargets.vector();
 }
 
 const std::vector<RenderState>& ResourceManager::renderStates() const
 {
-    return m_renderStates;
+    return m_renderStates.vector();
 }
 
 const std::vector<BufferUpdate>& ResourceManager::bufferUpdates() const

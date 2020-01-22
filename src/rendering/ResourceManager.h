@@ -3,9 +3,9 @@
 #include "ApplicationState.h"
 #include "ResourceChange.h"
 #include "Resources.h"
+#include "utility/CapList.h"
 #include "utility/util.h"
 #include <unordered_map>
-#include <array>
 
 class ResourceManager {
 public:
@@ -58,18 +58,17 @@ private:
     std::vector<BufferUpdate> m_immediate_buffer_updates;
     std::vector<TextureUpdateFromFile> m_immediate_texture_updates;
 
-    // TODO: Maybe we want some better way of handling these capped vectors? Custom class?
     static constexpr int maxNumBuffers { 10 };
-    std::vector<Buffer> m_buffers;
+    CapList<Buffer> m_buffers { maxNumBuffers };
 
     static constexpr int maxNumTextures { 10 };
-    std::vector<Texture2D> m_textures;
+    CapList<Texture2D> m_textures { maxNumTextures };
 
     static constexpr int maxNumRenderTargets { 4 };
-    std::vector<RenderTarget> m_renderTargets;
+    CapList<RenderTarget> m_renderTargets { maxNumRenderTargets };
 
     static constexpr int maxNumRenderStates { 10 };
-    std::vector<RenderState> m_renderStates;
+    CapList<RenderState> m_renderStates { maxNumRenderStates };
 };
 
 template<typename T>
