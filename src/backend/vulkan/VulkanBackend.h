@@ -189,10 +189,7 @@ private:
 
     struct BufferInfo {
         VkBuffer buffer {};
-        // FIXME: At some later point in time, we should have a common device memory
-        //  e.g. one for all vertex buffers, and here we keep a reference to that one
-        //  and some offset and size. But for now every buffer has its own memory.
-        std::optional<VkDeviceMemory> memory {};
+        VmaAllocation allocation {};
     };
 
     struct TextureInfo {

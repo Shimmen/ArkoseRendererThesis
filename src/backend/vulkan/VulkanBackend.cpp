@@ -1056,24 +1056,33 @@ void VulkanBackend::newBuffer(const Buffer& buffer)
         break;
     }
 
-    VkMemoryPropertyFlags memoryPropertyFlags = 0u;
+    VmaAllocationCreateInfo allocCreateInfo = {};
     switch (buffer.memoryHint()) {
     case Buffer::MemoryHint::GpuOptimal:
-        memoryPropertyFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        usageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        usageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; // TODO: We shouldn't always have this! Maybe a GpuOnly hint for without this?
         break;
     case Buffer::MemoryHint::TransferOptimal:
-        memoryPropertyFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-        memoryPropertyFlags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; // (ensures host visible!)
+        allocCreateInfo.requiredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
         break;
     }
 
-    VkDeviceMemory deviceMemory;
-    VkBuffer vkBuffer = createBuffer(buffer.size(), usageFlags, memoryPropertyFlags, deviceMemory);
+    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferCreateInfo.size = buffer.size();
+    bufferCreateInfo.usage = usageFlags;
+
+    VkBuffer vkBuffer;
+    VmaAllocation allocation;
+    VmaAllocationInfo allocationInfo;
+    if (vmaCreateBuffer(m_memoryAllocator, &bufferCreateInfo, &allocCreateInfo, &vkBuffer, &allocation, &allocationInfo) != VK_SUCCESS) {
+        LogError("VulkanBackend::newBuffer(): could not create buffer of size %u.\n", buffer.size());
+    }
 
     BufferInfo bufferInfo {};
     bufferInfo.buffer = vkBuffer;
-    bufferInfo.memory = deviceMemory;
+    bufferInfo.allocation = allocation;
 
     size_t index = m_bufferInfos.add(bufferInfo);
     buffer.registerBackend(backendBadge(), index);
@@ -1086,10 +1095,7 @@ void VulkanBackend::deleteBuffer(const Buffer& buffer)
     }
 
     BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
-    vkDestroyBuffer(m_device, bufferInfo.buffer, nullptr);
-    if (bufferInfo.memory.has_value()) {
-        vkFreeMemory(m_device, bufferInfo.memory.value(), nullptr);
-    }
+    vmaDestroyBuffer(m_memoryAllocator, bufferInfo.buffer, bufferInfo.allocation);
 
     m_bufferInfos.remove(buffer.id());
     buffer.unregisterBackend(backendBadge());
@@ -1119,10 +1125,13 @@ void VulkanBackend::updateBuffer(const Buffer& buffer, const std::byte* data, si
         setBufferDataUsingStagingBuffer(bufferInfo.buffer, data, size);
         break;
     case Buffer::MemoryHint::TransferOptimal:
-        if (!bufferInfo.memory.has_value()) {
-            LogErrorAndExit("Trying to update transfer optimal buffer that doesn't own it's memory, which currently isn't unsupported!\n");
+        // TODO: Offload to helper function!
+        void* mappedMemory;
+        if (vmaMapMemory(m_memoryAllocator, bufferInfo.allocation, &mappedMemory) != VK_SUCCESS) {
+            LogError("VulkanBackend::updateBuffer(): could not map the memory for loading data.\n");
         }
-        setBufferMemoryDirectly(bufferInfo.memory.value(), data, size);
+        std::memcpy(mappedMemory, data, size);
+        vmaUnmapMemory(m_memoryAllocator, bufferInfo.allocation);
         break;
     }
 }
@@ -2108,6 +2117,8 @@ bool VulkanBackend::issueSingleTimeCommand(const std::function<void(VkCommandBuf
 
 VkBuffer VulkanBackend::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkDeviceMemory& memory)
 {
+    // TODO: Deprecated, but currently used by texture stuff, so remove soon!
+
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     bufferCreateInfo.size = size;
@@ -2162,6 +2173,8 @@ bool VulkanBackend::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSi
 
 bool VulkanBackend::setBufferMemoryDirectly(VkDeviceMemory memory, const void* data, VkDeviceSize size, VkDeviceSize offset)
 {
+    // TODO: Deprecated, but currently used by texture stuff, so remove soon! Or just change it to be compliant with VMA
+
     void* sharedMemory;
     if (vkMapMemory(m_device, memory, offset, size, 0u, &sharedMemory) != VK_SUCCESS) {
         LogError("VulkanBackend::setBufferMemoryDirectly(): could not map the memory for loading data.\n");
@@ -2175,18 +2188,30 @@ bool VulkanBackend::setBufferMemoryDirectly(VkDeviceMemory memory, const void* d
 
 bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void* data, VkDeviceSize size, VkDeviceSize offset)
 {
-    VkDeviceMemory stagingMemory;
-    VkBuffer stagingBuffer = createBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
+    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufferCreateInfo.size = size;
+
+    VmaAllocationCreateInfo allocCreateInfo = {};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+    if (vmaCreateBuffer(m_memoryAllocator, &bufferCreateInfo, &allocCreateInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
+        LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could not create staging buffer.\n");
+    }
 
     AT_SCOPE_EXIT([&] {
-        vkDestroyBuffer(m_device, stagingBuffer, nullptr);
-        vkFreeMemory(m_device, stagingMemory, nullptr);
+        vmaDestroyBuffer(m_memoryAllocator, stagingBuffer, stagingAllocation);
     });
 
-    if (!setBufferMemoryDirectly(stagingMemory, data, size)) {
-        LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could not set staging data.\n");
-        return false;
+    void* mappedMemory;
+    if (vmaMapMemory(m_memoryAllocator, stagingAllocation, &mappedMemory) != VK_SUCCESS) {
+        LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could not map staging buffer.\n");
     }
+    std::memcpy(mappedMemory, data, size);
+    vmaUnmapMemory(m_memoryAllocator, stagingAllocation);
 
     if (!copyBuffer(stagingBuffer, buffer, size)) {
         LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could not copy from staging buffer to buffer.\n");
