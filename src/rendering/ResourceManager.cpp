@@ -59,9 +59,18 @@ Texture& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool g
     int width, height, componentCount;
     stbi_info(imagePath.c_str(), &width, &height, &componentCount);
 
-    // TODO!
-    ASSERT(componentCount == 3 || componentCount == 4);
-    auto format = Texture::Format::RGBA8;
+    Texture::Format format;
+    switch (componentCount) {
+    case 1:
+    case 2:
+        LogErrorAndExit("Currently no support for other than RGB and RGBA texture loading!\n");
+    case 3:
+        format = (srgb) ? Texture::Format::sRGB8 : Texture::Format::RGB8;
+        break;
+    case 4:
+        format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGBA8;
+        break;
+    }
 
     // TODO: Maybe we want to allow more stuff..?
     auto usage = Texture::Usage::Sampled;

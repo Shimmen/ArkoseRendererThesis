@@ -69,7 +69,10 @@ struct Texture : public Resource {
 
     enum class Format {
         Unknown,
+        RGB8,
         RGBA8,
+        sRGB8,
+        sRGBA8,
         Depth32F
     };
 

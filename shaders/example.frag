@@ -13,5 +13,6 @@ void main()
     //vec3 color = vColor;
     vec3 color = texture(uSampler, vTexCoord).rgb;
 
+    color = pow(color, vec3(1.0 / 2.2));
     oColor = vec4(color, 1.0);
 }

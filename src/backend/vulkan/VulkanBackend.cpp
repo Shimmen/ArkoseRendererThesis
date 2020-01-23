@@ -1149,10 +1149,18 @@ VulkanBackend::BufferInfo& VulkanBackend::bufferInfo(const Buffer& buffer)
 void VulkanBackend::newTexture(const Texture& texture)
 {
     VkFormat format;
-
     switch (texture.format()) {
+    case Texture::Format::RGB8:
+        format = VK_FORMAT_R8G8B8_UNORM;
+        break;
+    case Texture::Format::sRGB8:
+        format = VK_FORMAT_R8G8B8_SRGB;
+        break;
     case Texture::Format::RGBA8:
         format = VK_FORMAT_R8G8B8A8_UNORM;
+        break;
+    case Texture::Format::sRGBA8:
+        format = VK_FORMAT_R8G8B8A8_SRGB;
         break;
     case Texture::Format::Depth32F:
         format = VK_FORMAT_D32_SFLOAT;
@@ -1290,8 +1298,8 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     // TODO: Well, if the texture isn't a float texture
     ASSERT(!stbi_is_hdr(update.path().c_str()));
 
-    int width, height, numChannels; // FIXME: Check the number of channels instead of forcing RGBA
-    stbi_uc* pixels = stbi_load(update.path().c_str(), &width, &height, &numChannels, STBI_rgb_alpha);
+    int width, height, numChannels;
+    stbi_uc* pixels = stbi_load(update.path().c_str(), &width, &height, &numChannels, 0);
     if (!pixels) {
         LogError("VulkanBackend::updateTexture(): stb_image could not read the contents of '%s'.\n", update.path().c_str());
         return;

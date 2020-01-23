@@ -8,7 +8,7 @@ void TestApp::setup(StaticResourceManager& staticResources)
     // Here we can do stuff like CPU work and GPU stuff that is fully or mostly static,
     // e.g. load textures, load meshes, set vertex buffers.
 
-    m_testTexture = &staticResources.loadTexture2D("assets/test-pattern.png", true, false);
+    m_testTexture = &staticResources.loadTexture2D("assets/test-pattern.png", true, true);
 
     std::vector<Vertex> vertices = {
         { vec3(-0.5, -0.5, 0), vec3(1, 0, 0), vec2(1, 0) },
