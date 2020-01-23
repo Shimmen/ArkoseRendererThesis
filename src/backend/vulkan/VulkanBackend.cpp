@@ -1028,8 +1028,8 @@ void VulkanBackend::executeCopyTexture(VkCommandBuffer commandBuffer, const CmdC
 
 void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const CmdDrawIndexed& command)
 {
-    VkBuffer vertexBuffer = buffer(command.vertexBuffer);
-    VkBuffer indexBuffer = buffer(command.indexBuffer);
+    VkBuffer vertexBuffer = bufferInfo(command.vertexBuffer).buffer;
+    VkBuffer indexBuffer = bufferInfo(command.indexBuffer).buffer;
 
     VkBuffer vertexBuffers[] = { vertexBuffer };
     VkDeviceSize offsets[] = { 0 };
@@ -1095,8 +1095,8 @@ void VulkanBackend::deleteBuffer(const Buffer& buffer)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created buffer\n");
     }
 
-    BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
-    vmaDestroyBuffer(m_memoryAllocator, bufferInfo.buffer, bufferInfo.allocation);
+    const BufferInfo& bufInfo = bufferInfo(buffer);
+    vmaDestroyBuffer(m_memoryAllocator, bufInfo.buffer, bufInfo.allocation);
 
     m_bufferInfos.remove(buffer.id());
     buffer.unregisterBackend(backendBadge());
@@ -1119,16 +1119,16 @@ void VulkanBackend::updateBuffer(const Buffer& buffer, const std::byte* data, si
         LogErrorAndExit("Trying to update an already-deleted or not-yet-created buffer\n");
     }
 
-    BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
+    BufferInfo& bufInfo = bufferInfo(buffer);
 
     switch (buffer.memoryHint()) {
     case Buffer::MemoryHint::GpuOptimal:
-        if (!setBufferDataUsingStagingBuffer(bufferInfo.buffer, data, size)) {
+        if (!setBufferDataUsingStagingBuffer(bufInfo.buffer, data, size)) {
             LogError("VulkanBackend::updateBuffer(): could not update the buffer memory through staging buffer.\n");
         }
         break;
     case Buffer::MemoryHint::TransferOptimal:
-        if (!setBufferMemoryUsingMapping(bufferInfo.allocation, data, size)) {
+        if (!setBufferMemoryUsingMapping(bufInfo.allocation, data, size)) {
             LogError("VulkanBackend::updateBuffer(): could not update the buffer memory through mapping.\n");
         }
         break;
@@ -1138,10 +1138,10 @@ void VulkanBackend::updateBuffer(const Buffer& buffer, const std::byte* data, si
     }
 }
 
-VkBuffer VulkanBackend::buffer(const Buffer& buffer)
+VulkanBackend::BufferInfo& VulkanBackend::bufferInfo(const Buffer& buffer)
 {
     BufferInfo& bufferInfo = m_bufferInfos[buffer.id()];
-    return bufferInfo.buffer;
+    return bufferInfo;
 }
 
 void VulkanBackend::newTexture(const Texture& texture)
@@ -1260,10 +1260,10 @@ void VulkanBackend::deleteTexture(const Texture& texture)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created texture\n");
     }
 
-    TextureInfo& textureInfo = m_textureInfos[texture.id()];
-    vkDestroySampler(m_device, textureInfo.sampler, nullptr);
-    vkDestroyImageView(m_device, textureInfo.view, nullptr);
-    vmaDestroyImage(m_memoryAllocator, textureInfo.image, textureInfo.allocation);
+    TextureInfo& texInfo = textureInfo(texture);
+    vkDestroySampler(m_device, texInfo.sampler, nullptr);
+    vkDestroyImageView(m_device, texInfo.view, nullptr);
+    vmaDestroyImage(m_memoryAllocator, texInfo.image, texInfo.allocation);
 
     m_textureInfos.remove(texture.id());
     texture.unregisterBackend(backendBadge());
@@ -1320,26 +1320,26 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
         stbi_image_free(pixels);
     });
 
-    TextureInfo& textureInfo = m_textureInfos[update.texture().id()];
+    TextureInfo& texInfo = textureInfo(update.texture());
 
-    if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
+    if (!transitionImageLayout(texInfo.image, texInfo.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
         LogError("VulkanBackend::updateTexture(): could not transition the image to transfer layout.\n");
     }
-    if (!copyBufferToImage(stagingBuffer, textureInfo.image, width, height)) {
+    if (!copyBufferToImage(stagingBuffer, texInfo.image, width, height)) {
         LogError("VulkanBackend::updateTexture(): could not copy the staging buffer to the image.\n");
     }
 
     // TODO: We probably don't wanna use VK_IMAGE_LAYOUT_GENERAL here!
     VkImageLayout finalLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout)) {
+    if (!transitionImageLayout(texInfo.image, texInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout)) {
         LogError("VulkanBackend::updateTexture(): could not transition the image to the specified image layout.\n");
     }
-    //if (!transitionImageLayout(textureInfo.image, textureInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
+    //if (!transitionImageLayout(texInfo.image, texInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
     //    LogError("VulkanBackend::updateTexture(): could not transition the image to shader-read-only layout.\n");
     //}
 
-    textureInfo.currentLayout = finalLayout;
+    texInfo.currentLayout = finalLayout;
 }
 
 VulkanBackend::TextureInfo& VulkanBackend::textureInfo(const Texture& texture)
@@ -1448,9 +1448,9 @@ void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render target\n");
     }
 
-    RenderTargetInfo& renderTargetInfo = m_renderTargetInfos[renderTarget.id()];
-    vkDestroyFramebuffer(m_device, renderTargetInfo.framebuffer, nullptr);
-    vkDestroyRenderPass(m_device, renderTargetInfo.compatibleRenderPass, nullptr);
+    RenderTargetInfo& targetInfo = renderTargetInfo(renderTarget);
+    vkDestroyFramebuffer(m_device, targetInfo.framebuffer, nullptr);
+    vkDestroyRenderPass(m_device, targetInfo.compatibleRenderPass, nullptr);
 
     m_renderTargetInfos.remove(renderTarget.id());
     renderTarget.unregisterBackend(backendBadge());
@@ -1940,12 +1940,12 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
             case ShaderBindingType::UniformBuffer: {
 
                 ASSERT(bindingInfo.buffer);
-                const BufferInfo& bufferInfo = m_bufferInfos[bindingInfo.buffer->id()];
+                const BufferInfo& bufInfo = bufferInfo(*bindingInfo.buffer);
 
                 VkDescriptorBufferInfo descBufferInfo {};
                 descBufferInfo.offset = 0;
                 descBufferInfo.range = VK_WHOLE_SIZE;
-                descBufferInfo.buffer = bufferInfo.buffer;
+                descBufferInfo.buffer = bufInfo.buffer;
 
                 descBufferInfos.push_back(descBufferInfo);
                 write.pBufferInfo = &descBufferInfos.back();
@@ -1999,11 +1999,11 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render state\n");
     }
 
-    RenderStateInfo& renderStateInfo = m_renderStateInfos[renderState.id()];
-    vkDestroyDescriptorPool(m_device, renderStateInfo.descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(m_device, renderStateInfo.descriptorSetLayout, nullptr);
-    vkDestroyPipeline(m_device, renderStateInfo.pipeline, nullptr);
-    vkDestroyPipelineLayout(m_device, renderStateInfo.pipelineLayout, nullptr);
+    RenderStateInfo& stateInfo = renderStateInfo(renderState);
+    vkDestroyDescriptorPool(m_device, stateInfo.descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(m_device, stateInfo.descriptorSetLayout, nullptr);
+    vkDestroyPipeline(m_device, stateInfo.pipeline, nullptr);
+    vkDestroyPipelineLayout(m_device, stateInfo.pipelineLayout, nullptr);
 
     m_renderStateInfos.remove(renderState.id());
     renderState.unregisterBackend(backendBadge());

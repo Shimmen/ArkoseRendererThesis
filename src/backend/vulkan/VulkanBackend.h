@@ -48,26 +48,19 @@ private:
     void deleteBuffer(const Buffer&);
     void updateBuffer(const BufferUpdate&);
     void updateBuffer(const Buffer& buffer, const std::byte*, size_t);
-    VkBuffer buffer(const Buffer&);
 
-    struct TextureInfo;
     void newTexture(const Texture&);
     void deleteTexture(const Texture&);
     void updateTexture(const TextureUpdateFromFile&);
     //void updateTexture(const TextureUpdateFromData&);
-    TextureInfo& textureInfo(const Texture&);
 
-    struct RenderTargetInfo;
     void newRenderTarget(const RenderTarget&);
     void deleteRenderTarget(const RenderTarget&);
     void setupWindowRenderTargets();
     void destroyWindowRenderTargets();
-    RenderTargetInfo& renderTargetInfo(const RenderTarget&);
 
-    struct RenderStateInfo;
     void newRenderState(const RenderState&, uint32_t swapchainImageIndex);
     void deleteRenderState(const RenderState&);
-    RenderStateInfo& renderStateInfo(const RenderState&);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Swapchain management
@@ -214,6 +207,12 @@ private:
         VkPipelineLayout pipelineLayout {};
         VkPipeline pipeline {};
     };
+
+    // (helpers for accessing from *Infos vectors)
+    BufferInfo& bufferInfo(const Buffer&);
+    TextureInfo& textureInfo(const Texture&);
+    RenderTargetInfo& renderTargetInfo(const RenderTarget&);
+    RenderStateInfo& renderStateInfo(const RenderState&);
 
     PersistentIndexedList<BufferInfo> m_bufferInfos {};
     PersistentIndexedList<TextureInfo> m_textureInfos {};
