@@ -669,7 +669,8 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     if (m_swapchainDepthTexture.hasBackend()) {
         m_textureInfos.remove(m_swapchainDepthTexture.id());
     }
-    m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
+    m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F,
+        Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
     size_t depthIndex = m_textureInfos.add(depthInfo);
     m_swapchainDepthTexture.registerBackend(backendBadge(), depthIndex);
 
@@ -687,7 +688,8 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         if (m_swapchainColorTextures[i].hasBackend()) {
             m_textureInfos.remove(m_swapchainColorTextures[i].id());
         }
-        m_swapchainColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
+        m_swapchainColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown,
+            Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
         size_t colorIndex = m_textureInfos.add(colorInfo);
         m_swapchainColorTextures[i].registerBackend(backendBadge(), colorIndex);
 
@@ -1147,7 +1149,6 @@ VulkanBackend::BufferInfo& VulkanBackend::bufferInfo(const Buffer& buffer)
 void VulkanBackend::newTexture(const Texture& texture)
 {
     VkFormat format;
-    bool isDepthFormat = false;
 
     switch (texture.format()) {
     case Texture::Format::RGBA8:
@@ -1155,20 +1156,26 @@ void VulkanBackend::newTexture(const Texture& texture)
         break;
     case Texture::Format::Depth32F:
         format = VK_FORMAT_D32_SFLOAT;
-        isDepthFormat = true;
         break;
     case Texture::Format::Unknown:
         LogErrorAndExit("Trying to create new texture with format Unknown, which is not allowed!\n");
     }
 
-    // TODO: For now, since we don't have the information available, we always assume that all images might be sampled or used as attachments!
-    //  In the future we probably want to provide this info or give hints etc. but for now this will have to do..
+    const VkImageUsageFlags attachmentFlags = texture.hasDepthFormat() ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    const VkImageUsageFlags sampledFlags = VK_IMAGE_USAGE_SAMPLED_BIT;
+
     VkImageUsageFlags usageFlags = 0u;
-    usageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-    if (isDepthFormat) {
-        usageFlags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    } else {
-        usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    switch (texture.usage()) {
+    case Texture::Usage::Attachment:
+        usageFlags = attachmentFlags;
+        break;
+    case Texture::Usage::Sampled:
+        usageFlags = sampledFlags;
+        break;
+    case Texture::Usage::All:
+        // TODO: Something more that needs to be here?
+        usageFlags = attachmentFlags | sampledFlags;
+        break;
     }
 
     // TODO: For now always keep images in device local memory.
@@ -1194,7 +1201,7 @@ void VulkanBackend::newTexture(const Texture& texture)
 
     // TODO: Handle things like mipmaps here!
     VkImageAspectFlags aspectFlags = 0u;
-    if (isDepthFormat) {
+    if (texture.hasDepthFormat()) {
         aspectFlags |= VK_IMAGE_ASPECT_DEPTH_BIT;
     } else {
         aspectFlags |= VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1322,22 +1329,33 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
 
     TextureInfo& texInfo = textureInfo(update.texture());
 
-    if (!transitionImageLayout(texInfo.image, texInfo.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
+    // NOTE: Since we are updating the texture we don't care what was in the image before. For these cases undefined
+    //  works fine, since it will simply discard/ignore whatever data is in it before.
+    VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    if (!transitionImageLayout(texInfo.image, texInfo.format, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
         LogError("VulkanBackend::updateTexture(): could not transition the image to transfer layout.\n");
     }
     if (!copyBufferToImage(stagingBuffer, texInfo.image, width, height)) {
         LogError("VulkanBackend::updateTexture(): could not copy the staging buffer to the image.\n");
     }
 
-    // TODO: We probably don't wanna use VK_IMAGE_LAYOUT_GENERAL here!
-    VkImageLayout finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkImageLayout finalLayout;
+    switch (update.texture().usage()) {
+    case Texture::Usage::Attachment:
+        finalLayout = update.texture().hasDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        break;
+    case Texture::Usage::Sampled:
+        finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        break;
+    case Texture::Usage::All:
+        finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        break;
+    }
 
     if (!transitionImageLayout(texInfo.image, texInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout)) {
-        LogError("VulkanBackend::updateTexture(): could not transition the image to the specified image layout.\n");
+        LogError("VulkanBackend::updateTexture(): could not transition the image to the final image layout.\n");
     }
-    //if (!transitionImageLayout(texInfo.image, texInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)) {
-    //    LogError("VulkanBackend::updateTexture(): could not transition the image to shader-read-only layout.\n");
-    //}
 
     texInfo.currentLayout = finalLayout;
 }
@@ -2315,16 +2333,6 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
 
         // ... before allowing any reading or writing
         destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
-
-        LogWarning("VulkanBackend::transitionImageLayout(): transitioning to new layout VK_IMAGE_LAYOUT_GENERAL, which isn't great.\n");
-
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-        destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
 
     } else {

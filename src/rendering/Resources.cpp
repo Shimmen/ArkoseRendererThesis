@@ -30,9 +30,10 @@ void Resource::registerBackend(Badge<Backend>, uint64_t id) const
     m_id = id;
 }
 
-Texture::Texture(Badge<ResourceManager>, Extent2D extent, Format format, MinFilter minFilter, MagFilter magFilter)
+Texture::Texture(Badge<ResourceManager>, Extent2D extent, Format format, Usage usage, MinFilter minFilter, MagFilter magFilter)
     : m_extent(extent)
     , m_format(format)
+    , m_usage(usage)
     , m_minFilter(minFilter)
     , m_magFilter(magFilter)
 {

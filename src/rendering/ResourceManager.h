@@ -17,7 +17,7 @@ public:
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
     [[nodiscard]] Texture& loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps);
-    [[nodiscard]] Texture& createTexture2D(Extent2D, Texture::Format);
+    [[nodiscard]] Texture& createTexture2D(Extent2D, Texture::Format, Texture::Usage);
 
     [[nodiscard]] Buffer& createBuffer(size_t size, Buffer::Usage, Buffer::MemoryHint);
     template<typename T>

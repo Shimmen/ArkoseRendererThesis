@@ -28,9 +28,9 @@ RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTa
     return m_renderTargets.back();
 }
 
-Texture& ResourceManager::createTexture2D(Extent2D extent, Texture::Format format)
+Texture& ResourceManager::createTexture2D(Extent2D extent, Texture::Format format, Texture::Usage usage)
 {
-    Texture texture { {}, extent, format, Texture::MinFilter::Linear, Texture::MagFilter::Linear };
+    Texture texture { {}, extent, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear };
     m_textures.push_back(texture);
     return m_textures.back();
 }
@@ -63,7 +63,10 @@ Texture& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool g
     ASSERT(componentCount == 3 || componentCount == 4);
     auto format = Texture::Format::RGBA8;
 
-    Texture& texture = createTexture2D({ width, height }, format);
+    // TODO: Maybe we want to allow more stuff..?
+    auto usage = Texture::Usage::Sampled;
+
+    Texture& texture = createTexture2D({ width, height }, format, usage);
     m_immediate_texture_updates.emplace_back(texture, imagePath, generateMipmaps);
 
     return texture;

@@ -14,6 +14,7 @@ private:
         vec2 texCoord;
     };
 
+    Texture* m_testTexture {};
     Buffer* m_vertexBuffer {};
     Buffer* m_indexBuffer {};
     size_t m_indexCount {};

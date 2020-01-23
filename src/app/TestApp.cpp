@@ -8,6 +8,8 @@ void TestApp::setup(StaticResourceManager& staticResources)
     // Here we can do stuff like CPU work and GPU stuff that is fully or mostly static,
     // e.g. load textures, load meshes, set vertex buffers.
 
+    m_testTexture = &staticResources.loadTexture2D("assets/test-pattern.png", true, false);
+
     std::vector<Vertex> vertices = {
         { vec3(-0.5, -0.5, 0), vec3(1, 0, 0), vec2(1, 0) },
         { vec3(0.5, -0.5, 0), vec3(0, 1, 0), vec2(0, 0) },
@@ -39,7 +41,6 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
         Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
 
         Buffer& cameraUniformBuffer = resourceManager.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        Texture& testTexture = resourceManager.loadTexture2D("assets/test-pattern.png", true, false);
 
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),
@@ -49,7 +50,7 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
         };
 
         ShaderBinding uniformBufferBinding = { 0, ShaderStage::Vertex, &cameraUniformBuffer };
-        ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, &testTexture };
+        ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, m_testTexture };
         ShaderBindingSet shaderBindingSet { uniformBufferBinding, textureSamplerBinding };
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
@@ -67,8 +68,8 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
         rasterState.backfaceCullingEnabled = false;
         //rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
 
-        Texture& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8);
-        Texture& depthTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F);
+        Texture& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        Texture& depthTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
         RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 

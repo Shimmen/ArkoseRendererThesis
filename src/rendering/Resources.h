@@ -24,8 +24,8 @@ struct Extent2D {
     {
     }
     Extent2D(int width, int height)
-            : m_width(width)
-            , m_height(height)
+        : m_width(width)
+        , m_height(height)
     {
         ASSERT(width >= 0);
         ASSERT(height >= 0);
@@ -73,6 +73,12 @@ struct Texture : public Resource {
         Depth32F
     };
 
+    enum class Usage {
+        Attachment,
+        Sampled,
+        All,
+    };
+
     enum class MinFilter {
         Linear,
         Nearest,
@@ -85,17 +91,24 @@ struct Texture : public Resource {
 
     Texture() = default;
     Texture(const Texture&) = default;
-    Texture(Badge<ResourceManager>, Extent2D, Format, MinFilter, MagFilter);
+    Texture(Badge<ResourceManager>, Extent2D, Format, Usage, MinFilter, MagFilter);
 
     [[nodiscard]] const Extent2D& extent() const { return m_extent; }
     [[nodiscard]] Format format() const { return m_format; }
+    [[nodiscard]] Usage usage() const { return m_usage; }
     [[nodiscard]] MinFilter minFilter() const { return m_minFilter; }
     [[nodiscard]] MagFilter magFilter() const { return m_magFilter; }
     [[nodiscard]] bool hasMipmaps() const;
 
+    [[nodiscard]] bool hasDepthFormat() const
+    {
+        return m_format == Format::Depth32F;
+    }
+
 private:
     Extent2D m_extent;
     Format m_format;
+    Usage m_usage;
     MinFilter m_minFilter;
     MagFilter m_magFilter;
     bool m_mipmaps;
