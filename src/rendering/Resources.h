@@ -65,7 +65,7 @@ private:
     mutable uint64_t m_id { NullId };
 };
 
-struct Texture2D : public Resource {
+struct Texture : public Resource {
 
     enum class Format {
         Unknown,
@@ -83,9 +83,9 @@ struct Texture2D : public Resource {
         Nearest,
     };
 
-    Texture2D() = default;
-    Texture2D(const Texture2D&) = default;
-    Texture2D(Badge<ResourceManager>, Extent2D, Format, MinFilter, MagFilter);
+    Texture() = default;
+    Texture(const Texture&) = default;
+    Texture(Badge<ResourceManager>, Extent2D, Format, MinFilter, MagFilter);
 
     [[nodiscard]] const Extent2D& extent() const { return m_extent; }
     [[nodiscard]] Format format() const { return m_format; }
@@ -113,12 +113,12 @@ struct RenderTarget : public Resource {
 
     struct Attachment {
         AttachmentType type;
-        Texture2D* texture;
+        Texture* texture;
     };
 
     RenderTarget() = default;
     RenderTarget(const RenderTarget&) = default;
-    explicit RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture);
+    explicit RenderTarget(Badge<ResourceManager>, Texture& colorTexture);
     explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments);
 
     [[nodiscard]] const Extent2D& extent() const;
@@ -126,7 +126,7 @@ struct RenderTarget : public Resource {
     [[nodiscard]] size_t totalAttachmentCount() const;
     [[nodiscard]] bool hasDepthAttachment() const;
 
-    [[nodiscard]] const Texture2D* attachment(AttachmentType) const;
+    [[nodiscard]] const Texture* attachment(AttachmentType) const;
 
     [[nodiscard]] const std::vector<Attachment>& sortedAttachments() const;
 
@@ -217,14 +217,14 @@ enum class ShaderBindingType {
 struct ShaderBinding {
 
     ShaderBinding(uint32_t index, ShaderStage, const Buffer*);
-    ShaderBinding(uint32_t index, ShaderStage, const Texture2D*);
+    ShaderBinding(uint32_t index, ShaderStage, const Texture*);
 
     uint32_t bindingIndex;
     ShaderStage shaderStage; // TODO: Later we want flags here I guess, so we can have multiple of them..
 
     ShaderBindingType type;
     const Buffer* buffer;
-    const Texture2D* texture;
+    const Texture* texture;
 };
 
 struct ShaderBindingSet {

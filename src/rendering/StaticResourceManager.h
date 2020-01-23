@@ -16,7 +16,7 @@ public:
     template<typename T>
     [[nodiscard]] Buffer& createBuffer(Buffer::Usage, std::vector<T>&&);
 
-    [[nodiscard]] Texture2D& loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps);
+    [[nodiscard]] Texture& loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps);
 
     ResourceManager& internal(Badge<Backend>) { return m_resourceManager; }
 

@@ -51,11 +51,11 @@ private:
     VkBuffer buffer(const Buffer&);
 
     struct TextureInfo;
-    void newTexture(const Texture2D&);
-    void deleteTexture(const Texture2D&);
+    void newTexture(const Texture&);
+    void deleteTexture(const Texture&);
     void updateTexture(const TextureUpdateFromFile&);
     //void updateTexture(const TextureUpdateFromData&);
-    TextureInfo& textureInfo(const Texture2D&);
+    TextureInfo& textureInfo(const Texture&);
 
     struct RenderTargetInfo;
     void newRenderTarget(const RenderTarget&);
@@ -220,7 +220,7 @@ private:
     PersistentIndexedList<RenderTargetInfo> m_renderTargetInfos {};
     PersistentIndexedList<RenderStateInfo> m_renderStateInfos {};
 
-    Texture2D m_swapchainDepthTexture {};
-    std::vector<Texture2D> m_swapchainColorTextures {};
+    Texture m_swapchainDepthTexture {};
+    std::vector<Texture> m_swapchainColorTextures {};
     std::vector<RenderTarget> m_swapchainRenderTargets {};
 };

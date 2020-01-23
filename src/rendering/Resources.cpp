@@ -30,7 +30,7 @@ void Resource::registerBackend(Badge<Backend>, uint64_t id) const
     m_id = id;
 }
 
-Texture2D::Texture2D(Badge<ResourceManager>, Extent2D extent, Format format, MinFilter minFilter, MagFilter magFilter)
+Texture::Texture(Badge<ResourceManager>, Extent2D extent, Format format, MinFilter minFilter, MagFilter magFilter)
     : m_extent(extent)
     , m_format(format)
     , m_minFilter(minFilter)
@@ -38,13 +38,13 @@ Texture2D::Texture2D(Badge<ResourceManager>, Extent2D extent, Format format, Min
 {
 }
 
-bool Texture2D::hasMipmaps() const
+bool Texture::hasMipmaps() const
 {
     // TODO: Use min filter to figure out the answer!
     return false;
 }
 
-RenderTarget::RenderTarget(Badge<ResourceManager>, Texture2D& colorTexture)
+RenderTarget::RenderTarget(Badge<ResourceManager>, Texture& colorTexture)
     : m_attachments {}
 {
     Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
@@ -134,7 +134,7 @@ bool RenderTarget::hasDepthAttachment() const
     return last.type == AttachmentType::Depth;
 }
 
-const Texture2D* RenderTarget::attachment(AttachmentType requestedType) const
+const Texture* RenderTarget::attachment(AttachmentType requestedType) const
 {
     for (const auto& [type, texture] : m_attachments) {
         if (type == requestedType) {
@@ -165,7 +165,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Buff
 {
 }
 
-ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Texture2D* texture)
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Texture* texture)
     : bindingIndex(index)
     , shaderStage(shaderStage)
     , type(ShaderBindingType::TextureSampler)

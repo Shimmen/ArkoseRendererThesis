@@ -20,23 +20,23 @@ private:
 
 class TextureUpdate {
 public:
-    explicit TextureUpdate(Texture2D& texture, bool generateMipmaps)
+    explicit TextureUpdate(Texture& texture, bool generateMipmaps)
         : m_texture(texture)
         , m_generateMipmaps(generateMipmaps)
     {
     }
 
-    const Texture2D& texture() const { return m_texture; }
+    const Texture& texture() const { return m_texture; }
     bool generateMipmaps() const { return m_generateMipmaps; }
 
 private:
-    Texture2D& m_texture;
+    Texture& m_texture;
     bool m_generateMipmaps;
 };
 
 class TextureUpdateFromFile : public TextureUpdate {
 public:
-    TextureUpdateFromFile(Texture2D& texture, std::string path, bool generateMipmaps)
+    TextureUpdateFromFile(Texture& texture, std::string path, bool generateMipmaps)
         : TextureUpdate(texture, generateMipmaps)
         , m_path(std::move(path))
     {

@@ -669,7 +669,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     if (m_swapchainDepthTexture.hasBackend()) {
         m_textureInfos.remove(m_swapchainDepthTexture.id());
     }
-    m_swapchainDepthTexture = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Depth32F, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
+    m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
     size_t depthIndex = m_textureInfos.add(depthInfo);
     m_swapchainDepthTexture.registerBackend(backendBadge(), depthIndex);
 
@@ -687,7 +687,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         if (m_swapchainColorTextures[i].hasBackend()) {
             m_textureInfos.remove(m_swapchainColorTextures[i].id());
         }
-        m_swapchainColorTextures[i] = Texture2D(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture2D::Format::Unknown, Texture2D::MinFilter::Nearest, Texture2D::MagFilter::Nearest);
+        m_swapchainColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
         size_t colorIndex = m_textureInfos.add(colorInfo);
         m_swapchainColorTextures[i].registerBackend(backendBadge(), colorIndex);
 
@@ -764,7 +764,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     }
 
     // We shouldn't use the data from the swapchain image, so we set current layout accordingly (not sure about depth, but sure..)
-    const Texture2D& currentColorTexture = m_swapchainColorTextures[swapchainImageIndex];
+    const Texture& currentColorTexture = m_swapchainColorTextures[swapchainImageIndex];
     textureInfo(currentColorTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     textureInfo(m_swapchainDepthTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -1144,20 +1144,20 @@ VkBuffer VulkanBackend::buffer(const Buffer& buffer)
     return bufferInfo.buffer;
 }
 
-void VulkanBackend::newTexture(const Texture2D& texture)
+void VulkanBackend::newTexture(const Texture& texture)
 {
     VkFormat format;
     bool isDepthFormat = false;
 
     switch (texture.format()) {
-    case Texture2D::Format::RGBA8:
+    case Texture::Format::RGBA8:
         format = VK_FORMAT_R8G8B8A8_UNORM;
         break;
-    case Texture2D::Format::Depth32F:
+    case Texture::Format::Depth32F:
         format = VK_FORMAT_D32_SFLOAT;
         isDepthFormat = true;
         break;
-    case Texture2D::Format::Unknown:
+    case Texture::Format::Unknown:
         LogErrorAndExit("Trying to create new texture with format Unknown, which is not allowed!\n");
     }
 
@@ -1203,20 +1203,20 @@ void VulkanBackend::newTexture(const Texture2D& texture)
 
     VkFilter minFilter;
     switch (texture.minFilter()) {
-    case Texture2D::MinFilter::Linear:
+    case Texture::MinFilter::Linear:
         minFilter = VK_FILTER_LINEAR;
         break;
-    case Texture2D::MinFilter::Nearest:
+    case Texture::MinFilter::Nearest:
         minFilter = VK_FILTER_NEAREST;
         break;
     }
 
     VkFilter magFilter;
     switch (texture.magFilter()) {
-    case Texture2D::MagFilter::Linear:
+    case Texture::MagFilter::Linear:
         magFilter = VK_FILTER_LINEAR;
         break;
-    case Texture2D::MagFilter::Nearest:
+    case Texture::MagFilter::Nearest:
         magFilter = VK_FILTER_NEAREST;
         break;
     }
@@ -1254,7 +1254,7 @@ void VulkanBackend::newTexture(const Texture2D& texture)
     texture.registerBackend(backendBadge(), index);
 }
 
-void VulkanBackend::deleteTexture(const Texture2D& texture)
+void VulkanBackend::deleteTexture(const Texture& texture)
 {
     if (texture.id() == Resource::NullId) {
         LogErrorAndExit("Trying to delete an already-deleted or not-yet-created texture\n");
@@ -1342,7 +1342,7 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     textureInfo.currentLayout = finalLayout;
 }
 
-VulkanBackend::TextureInfo& VulkanBackend::textureInfo(const Texture2D& texture)
+VulkanBackend::TextureInfo& VulkanBackend::textureInfo(const Texture& texture)
 {
     TextureInfo& textureInfo = m_textureInfos[texture.id()];
     return textureInfo;

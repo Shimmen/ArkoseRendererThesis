@@ -28,9 +28,9 @@ RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTa
     return m_renderTargets.back();
 }
 
-Texture2D& ResourceManager::createTexture2D(Extent2D extent, Texture2D::Format format)
+Texture& ResourceManager::createTexture2D(Extent2D extent, Texture::Format format)
 {
-    Texture2D texture { {}, extent, format, Texture2D::MinFilter::Linear, Texture2D::MagFilter::Linear };
+    Texture texture { {}, extent, format, Texture::MinFilter::Linear, Texture::MagFilter::Linear };
     m_textures.push_back(texture);
     return m_textures.back();
 }
@@ -50,7 +50,7 @@ Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer
     return buffer;
 }
 
-Texture2D& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps)
+Texture& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps)
 {
     if (!fileio::isFileReadable(imagePath)) {
         LogErrorAndExit("Could not read image at path '%s'.\n", imagePath.c_str());
@@ -61,9 +61,9 @@ Texture2D& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool
 
     // TODO!
     ASSERT(componentCount == 3 || componentCount == 4);
-    auto format = Texture2D::Format::RGBA8;
+    auto format = Texture::Format::RGBA8;
 
-    Texture2D& texture = createTexture2D({ width, height }, format);
+    Texture& texture = createTexture2D({ width, height }, format);
     m_immediate_texture_updates.emplace_back(texture, imagePath, generateMipmaps);
 
     return texture;
@@ -88,7 +88,7 @@ void ResourceManager::publish(const std::string& name, const Buffer& buffer)
     m_name_buffer_map[fullName] = &buffer;
 }
 
-void ResourceManager::publish(const std::string& name, const Texture2D& texture)
+void ResourceManager::publish(const std::string& name, const Texture& texture)
 {
     ASSERT(m_current_pass_name.has_value());
     std::string fullName = makeQualifiedName(m_current_pass_name.value(), name);
@@ -106,7 +106,7 @@ void ResourceManager::publish(const std::string& name, const RenderTarget& rende
     m_name_render_target_map[fullName] = &renderTarget;
 }
 
-const Texture2D* ResourceManager::getTexture2D(const std::string& renderPass, const std::string& name)
+const Texture* ResourceManager::getTexture2D(const std::string& renderPass, const std::string& name)
 {
     std::string fullName = makeQualifiedName(renderPass, name);
     auto entry = m_name_texture_map.find(fullName);
@@ -115,7 +115,7 @@ const Texture2D* ResourceManager::getTexture2D(const std::string& renderPass, co
         return nullptr;
     }
 
-    const Texture2D* texture = entry->second;
+    const Texture* texture = entry->second;
     return texture;
 }
 
@@ -131,7 +131,7 @@ const std::vector<Buffer>& ResourceManager::buffers() const
     return m_buffers.vector();
 }
 
-const std::vector<Texture2D>& ResourceManager::textures() const
+const std::vector<Texture>& ResourceManager::textures() const
 {
     return m_textures.vector();
 }

@@ -39,7 +39,7 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
         Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
 
         Buffer& cameraUniformBuffer = resourceManager.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        Texture2D& testTexture = resourceManager.loadTexture2D("assets/test-pattern.png", true, false);
+        Texture& testTexture = resourceManager.loadTexture2D("assets/test-pattern.png", true, false);
 
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),
@@ -67,8 +67,8 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
         rasterState.backfaceCullingEnabled = false;
         //rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
 
-        Texture2D& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture2D::Format::RGBA8);
-        Texture2D& depthTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture2D::Format::Depth32F);
+        Texture& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8);
+        Texture& depthTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F);
         RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
@@ -102,7 +102,7 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
                 m_indexCount,
                 DrawMode::Triangles);
 
-            //const Texture2D& windowColorTexture = *windowTarget.attachment(RenderTarget::AttachmentType::Color0);
+            //const Texture& windowColorTexture = *windowTarget.attachment(RenderTarget::AttachmentType::Color0);
             //commandList.add<CmdCopyTexture>(colorTexture, windowColorTexture);
         };
     });
