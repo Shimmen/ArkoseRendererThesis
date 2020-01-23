@@ -65,6 +65,12 @@ RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachm
         LogErrorAndExit("RenderTarget error: tried to create with less than one attachments!\n");
     }
 
+    for (auto& [_, texture] : m_attachments) {
+        if (texture->usage() != Texture::Usage::Attachment && texture->usage() != Texture::Usage::All) {
+            LogErrorAndExit("RenderTarget error: tried to create with texture that can't be used as attachment\n");
+        }
+    }
+
     if (totalAttachmentCount() < 2) {
         return;
     }
@@ -173,6 +179,12 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Text
     , buffer(nullptr)
     , texture(texture)
 {
+    if (!texture) {
+        LogErrorAndExit("ShaderBinding error: null texture\n");
+    }
+    if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::All) {
+        LogErrorAndExit("ShaderBinding error: texture does not support sampling\n");
+    }
 }
 
 ShaderBindingSet::ShaderBindingSet(std::initializer_list<ShaderBinding> list)
