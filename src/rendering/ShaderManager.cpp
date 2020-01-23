@@ -190,7 +190,6 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
             data->content = fileData->content.c_str();
             data->content_length = fileData->content.size();
 
-            LogInfo("Getting include '%s' from '%s' with depth %d!\n", requested_source, requesting_source, include_depth);
             return data;
         }
 
