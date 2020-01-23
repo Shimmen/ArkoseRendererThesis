@@ -87,10 +87,9 @@ private:
 
     bool issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const;
 
-    VkBuffer createBuffer(VkDeviceSize size, VkBufferUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&);
     bool copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const;
-    bool setBufferMemoryDirectly(VkDeviceMemory, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
-    bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+    bool setBufferMemoryUsingMapping(VmaAllocation, const void* data, VkDeviceSize size);
+    bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size);
 
     VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
@@ -194,7 +193,7 @@ private:
 
     struct TextureInfo {
         VkImage image {};
-        std::optional<VkDeviceMemory> memory {};
+        VmaAllocation allocation {};
 
         VkFormat format {};
         VkImageView view {};

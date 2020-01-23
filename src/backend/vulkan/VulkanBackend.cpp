@@ -664,7 +664,6 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     depthInfo.format = m_depthImageFormat;
     depthInfo.image = m_depthImage;
     depthInfo.view = m_depthImageView;
-    depthInfo.memory = m_depthImageMemory;
     depthInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     if (m_swapchainDepthTexture.hasBackend()) {
@@ -683,7 +682,6 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         colorInfo.format = m_swapchainImageFormat;
         colorInfo.image = m_swapchainImages[i];
         colorInfo.view = m_swapchainImageViews[i];
-        colorInfo.memory = nullptr;
         colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         if (m_swapchainColorTextures[i].hasBackend()) {
@@ -1125,16 +1123,14 @@ void VulkanBackend::updateBuffer(const Buffer& buffer, const std::byte* data, si
 
     switch (buffer.memoryHint()) {
     case Buffer::MemoryHint::GpuOptimal:
-        setBufferDataUsingStagingBuffer(bufferInfo.buffer, data, size);
+        if (!setBufferDataUsingStagingBuffer(bufferInfo.buffer, data, size)) {
+            LogError("VulkanBackend::updateBuffer(): could not update the buffer memory through staging buffer.\n");
+        }
         break;
     case Buffer::MemoryHint::TransferOptimal:
-        // TODO: Offload to helper function!
-        void* mappedMemory;
-        if (vmaMapMemory(m_memoryAllocator, bufferInfo.allocation, &mappedMemory) != VK_SUCCESS) {
-            LogError("VulkanBackend::updateBuffer(): could not map the memory for loading data.\n");
+        if (!setBufferMemoryUsingMapping(bufferInfo.allocation, data, size)) {
+            LogError("VulkanBackend::updateBuffer(): could not update the buffer memory through mapping.\n");
         }
-        std::memcpy(mappedMemory, data, size);
-        vmaUnmapMemory(m_memoryAllocator, bufferInfo.allocation);
         break;
     case Buffer::MemoryHint::GpuOnly:
         LogError("VulkanBackend::updateBuffer(): can't update buffer with GpuOnly memory hint, ignoring\n");
@@ -1162,8 +1158,7 @@ void VulkanBackend::newTexture(const Texture2D& texture)
         isDepthFormat = true;
         break;
     case Texture2D::Format::Unknown:
-        ASSERT_NOT_REACHED();
-        break;
+        LogErrorAndExit("Trying to create new texture with format Unknown, which is not allowed!\n");
     }
 
     // TODO: For now, since we don't have the information available, we always assume that all images might be sampled or used as attachments!
@@ -1176,14 +1171,26 @@ void VulkanBackend::newTexture(const Texture2D& texture)
         usageFlags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
 
-    VkMemoryPropertyFlags memoryPropertyFlags = 0u;
-
     // TODO: For now always keep images in device local memory.
-    memoryPropertyFlags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    VmaAllocationCreateInfo allocCreateInfo = {};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     usageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    VkDeviceMemory deviceMemory;
-    VkImage image = createImage2D(texture.extent().width(), texture.extent().height(), format, usageFlags, memoryPropertyFlags, deviceMemory);
+    VkImageCreateInfo imageCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.extent = { .width = texture.extent().width(), .height = texture.extent().height(), .depth = 1 };
+    imageCreateInfo.mipLevels = 1; // FIXME!
+    imageCreateInfo.arrayLayers = 1;
+    imageCreateInfo.usage = usageFlags;
+    imageCreateInfo.format = format;
+    imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkImage image;
+    VmaAllocation allocation;
+    vmaCreateImage(m_memoryAllocator, &imageCreateInfo, &allocCreateInfo, &image, &allocation, nullptr);
 
     // TODO: Handle things like mipmaps here!
     VkImageAspectFlags aspectFlags = 0u;
@@ -1237,7 +1244,7 @@ void VulkanBackend::newTexture(const Texture2D& texture)
 
     TextureInfo textureInfo {};
     textureInfo.image = image;
-    textureInfo.memory = deviceMemory;
+    textureInfo.allocation = allocation;
     textureInfo.format = format;
     textureInfo.view = imageView;
     textureInfo.sampler = sampler;
@@ -1256,10 +1263,7 @@ void VulkanBackend::deleteTexture(const Texture2D& texture)
     TextureInfo& textureInfo = m_textureInfos[texture.id()];
     vkDestroySampler(m_device, textureInfo.sampler, nullptr);
     vkDestroyImageView(m_device, textureInfo.view, nullptr);
-    vkDestroyImage(m_device, textureInfo.image, nullptr);
-    if (textureInfo.memory.has_value()) {
-        vkFreeMemory(m_device, textureInfo.memory.value(), nullptr);
-    }
+    vmaDestroyImage(m_memoryAllocator, textureInfo.image, textureInfo.allocation);
 
     m_textureInfos.remove(texture.id());
     texture.unregisterBackend(backendBadge());
@@ -1283,23 +1287,36 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     stbi_uc* pixels = stbi_load(update.path().c_str(), &width, &height, &numChannels, STBI_rgb_alpha);
     if (!pixels) {
         LogError("VulkanBackend::updateTexture(): stb_image could not read the contents of '%s'.\n", update.path().c_str());
-        stbi_image_free(pixels);
         return;
     }
 
-    if (width != update.texture().extent().width() || height != update.texture().extent().height()) {
+    if (Extent2D(width, height) != update.texture().extent()) {
         LogErrorAndExit("VulkanBackend::updateTexture(): loaded texture does not match specified extent.\n");
     }
 
     VkDeviceSize pixelsSize = width * height * numChannels * sizeof(stbi_uc);
-    VkDeviceMemory stagingMemory;
-    VkBuffer stagingBuffer = createBuffer(pixelsSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingMemory);
-    if (!setBufferMemoryDirectly(stagingMemory, pixels, pixelsSize)) {
-        LogError("VulkanBackend::updateTexture(): could not set the staging buffer memory.\n");
+
+    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    bufferCreateInfo.size = pixelsSize;
+
+    VmaAllocationCreateInfo allocCreateInfo = {};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+
+    VkBuffer stagingBuffer;
+    VmaAllocation stagingAllocation;
+    if (vmaCreateBuffer(m_memoryAllocator, &bufferCreateInfo, &allocCreateInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
+        LogError("VulkanBackend::updateTexture(): could not create staging buffer.\n");
     }
+
+    if (!setBufferMemoryUsingMapping(stagingAllocation, pixels, pixelsSize)) {
+        LogError("VulkanBackend::updateTexture(): could set the buffer memory for the staging buffer.\n");
+        return;
+    }
+
     AT_SCOPE_EXIT([&]() {
-        vkDestroyBuffer(m_device, stagingBuffer, nullptr);
-        vkFreeMemory(m_device, stagingMemory, nullptr);
+        vmaDestroyBuffer(m_memoryAllocator, stagingBuffer, stagingAllocation);
         stbi_image_free(pixels);
     });
 
@@ -2121,43 +2138,6 @@ bool VulkanBackend::issueSingleTimeCommand(const std::function<void(VkCommandBuf
     return true;
 }
 
-VkBuffer VulkanBackend::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkDeviceMemory& memory)
-{
-    // TODO: Deprecated, but currently used by texture stuff, so remove soon!
-
-    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    bufferCreateInfo.size = size;
-    bufferCreateInfo.usage = usage;
-
-    VkBuffer buffer;
-    if (vkCreateBuffer(m_device, &bufferCreateInfo, nullptr, &buffer) != VK_SUCCESS) {
-        LogError("VulkanBackend::createBuffer(): could not create buffer of size %u.\n", size);
-        memory = {};
-        return {};
-    }
-
-    VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(m_device, buffer, &memoryRequirements);
-
-    VkMemoryAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    allocInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, memoryProperties);
-    allocInfo.allocationSize = memoryRequirements.size;
-
-    if (vkAllocateMemory(m_device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-        LogError("VulkanBackend::createBuffer(): could not allocate the required memory of size %u.\n", size);
-        memory = {};
-        return {};
-    }
-
-    if (vkBindBufferMemory(m_device, buffer, memory, 0) != VK_SUCCESS) {
-        LogError("VulkanBackend::createBuffer(): could not bind the allocated memory to the buffer.\n");
-        return {};
-    }
-
-    return buffer;
-}
-
 bool VulkanBackend::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const
 {
     VkBufferCopy bufferCopyRegion = {};
@@ -2177,22 +2157,19 @@ bool VulkanBackend::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSi
     return true;
 }
 
-bool VulkanBackend::setBufferMemoryDirectly(VkDeviceMemory memory, const void* data, VkDeviceSize size, VkDeviceSize offset)
+bool VulkanBackend::setBufferMemoryUsingMapping(VmaAllocation allocation, const void* data, VkDeviceSize size)
 {
-    // TODO: Deprecated, but currently used by texture stuff, so remove soon! Or just change it to be compliant with VMA
-
-    void* sharedMemory;
-    if (vkMapMemory(m_device, memory, offset, size, 0u, &sharedMemory) != VK_SUCCESS) {
-        LogError("VulkanBackend::setBufferMemoryDirectly(): could not map the memory for loading data.\n");
+    void* mappedMemory;
+    if (vmaMapMemory(m_memoryAllocator, allocation, &mappedMemory) != VK_SUCCESS) {
+        LogError("VulkanBackend::setBufferMemoryUsingMapping(): could not map staging buffer.\n");
         return false;
     }
-    std::memcpy(sharedMemory, data, size);
-    vkUnmapMemory(m_device, memory);
-
+    std::memcpy(mappedMemory, data, size);
+    vmaUnmapMemory(m_memoryAllocator, allocation);
     return true;
 }
 
-bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void* data, VkDeviceSize size, VkDeviceSize offset)
+bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void* data, VkDeviceSize size)
 {
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -2212,12 +2189,10 @@ bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void*
         vmaDestroyBuffer(m_memoryAllocator, stagingBuffer, stagingAllocation);
     });
 
-    void* mappedMemory;
-    if (vmaMapMemory(m_memoryAllocator, stagingAllocation, &mappedMemory) != VK_SUCCESS) {
-        LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could not map staging buffer.\n");
+    if (!setBufferMemoryUsingMapping(stagingAllocation, data, size)) {
+        LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could set staging buffer memory.\n");
+        return false;
     }
-    std::memcpy(mappedMemory, data, size);
-    vmaUnmapMemory(m_memoryAllocator, stagingAllocation);
 
     if (!copyBuffer(stagingBuffer, buffer, size)) {
         LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could not copy from staging buffer to buffer.\n");
