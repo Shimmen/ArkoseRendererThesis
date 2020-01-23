@@ -1058,9 +1058,12 @@ void VulkanBackend::newBuffer(const Buffer& buffer)
 
     VmaAllocationCreateInfo allocCreateInfo = {};
     switch (buffer.memoryHint()) {
+    case Buffer::MemoryHint::GpuOnly:
+        allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+        break;
     case Buffer::MemoryHint::GpuOptimal:
         allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-        usageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT; // TODO: We shouldn't always have this! Maybe a GpuOnly hint for without this?
+        usageFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         break;
     case Buffer::MemoryHint::TransferOptimal:
         allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; // (ensures host visible!)
@@ -1132,6 +1135,9 @@ void VulkanBackend::updateBuffer(const Buffer& buffer, const std::byte* data, si
         }
         std::memcpy(mappedMemory, data, size);
         vmaUnmapMemory(m_memoryAllocator, bufferInfo.allocation);
+        break;
+    case Buffer::MemoryHint::GpuOnly:
+        LogError("VulkanBackend::updateBuffer(): can't update buffer with GpuOnly memory hint, ignoring\n");
         break;
     }
 }

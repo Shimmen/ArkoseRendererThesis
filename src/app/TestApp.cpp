@@ -95,7 +95,7 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
 
             commandList.add<CmdUpdateBuffer>(cameraUniformBuffer, &cameraState, sizeof(CameraState));
             commandList.add<CmdSetRenderState>(renderState);
-            commandList.add<CmdClear>(ClearColor(1.0f, 0.0f, 1.0f), 1.0f);
+            commandList.add<CmdClear>(ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
             commandList.add<CmdDrawIndexed>(
                 *m_vertexBuffer,
                 *m_indexBuffer,

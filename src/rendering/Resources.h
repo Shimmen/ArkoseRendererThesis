@@ -148,6 +148,7 @@ struct Buffer : public Resource {
     enum class MemoryHint {
         TransferOptimal,
         GpuOptimal,
+        GpuOnly,
     };
 
     Buffer() = default;
