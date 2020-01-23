@@ -88,6 +88,9 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
             if (Input::instance().isKeyDown(GLFW_KEY_RIGHT)) {
                 cameraState.world_from_local = mathkit::translate(+0.5f, 0, 0) * cameraState.world_from_local;
             }
+            if (Input::instance().isKeyDown(GLFW_KEY_SPACE)) {
+                cameraState.world_from_local = mathkit::translate(0, 0, -30) * cameraState.world_from_local;
+            }
             cameraState.view_from_world = mathkit::lookAt({ 0, 1, 3 }, { 0, 0.5f, 0 });
             float aspectRatio = float(appState.windowExtent().width()) / float(appState.windowExtent().height());
             cameraState.projection_from_view = mathkit::infinitePerspective(mathkit::radians(45), aspectRatio, 0.1f);

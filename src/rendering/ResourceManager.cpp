@@ -30,7 +30,7 @@ RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTa
 
 Texture& ResourceManager::createTexture2D(Extent2D extent, Texture::Format format, Texture::Usage usage)
 {
-    Texture texture { {}, extent, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear };
+    Texture texture { {}, extent, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, Texture::Mipmap::None };
     m_textures.push_back(texture);
     return m_textures.back();
 }
@@ -50,7 +50,7 @@ Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer
     return buffer;
 }
 
-Texture& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps)
+Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps)
 {
     if (!fileio::isFileReadable(imagePath)) {
         LogErrorAndExit("Could not read image at path '%s'.\n", imagePath.c_str());
@@ -61,21 +61,24 @@ Texture& ResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool g
 
     Texture::Format format;
     switch (componentCount) {
-    case 1:
-    case 2:
-        LogErrorAndExit("Currently no support for other than RGB and RGBA texture loading!\n");
     case 3:
         format = (srgb) ? Texture::Format::sRGB8 : Texture::Format::RGB8;
         break;
     case 4:
         format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGBA8;
         break;
+    default:
+        LogErrorAndExit("Currently no support for other than (s)RGB and (s)RGBA texture loading!\n");
     }
 
     // TODO: Maybe we want to allow more stuff..?
     auto usage = Texture::Usage::Sampled;
 
-    Texture& texture = createTexture2D({ width, height }, format, usage);
+    auto mipmapMode = generateMipmaps ? Texture::Mipmap::Linear : Texture::Mipmap::None;
+
+    m_textures.push_back({ {}, { width, height }, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, mipmapMode });
+    Texture& texture = m_textures.back();
+
     m_immediate_texture_updates.emplace_back(texture, imagePath, generateMipmaps);
 
     return texture;
@@ -131,7 +134,7 @@ const Texture* ResourceManager::getTexture2D(const std::string& renderPass, cons
     return texture;
 }
 
-void ResourceManager::setBufferDataImmediately(Buffer& buffer, const std::byte* data, size_t size, size_t offset)
+void ResourceManager::setBufferDataImmediately(Buffer& buffer, const std::byte* data, size_t size)
 {
     // TODO: Don't make a copy here! I think it should be made explicit at the calling site.
     std::vector<std::byte> data_copy { data, data + size };

@@ -670,7 +670,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         m_textureInfos.remove(m_swapchainDepthTexture.id());
     }
     m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F,
-        Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
+        Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
     size_t depthIndex = m_textureInfos.add(depthInfo);
     m_swapchainDepthTexture.registerBackend(backendBadge(), depthIndex);
 
@@ -689,7 +689,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
             m_textureInfos.remove(m_swapchainColorTextures[i].id());
         }
         m_swapchainColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown,
-            Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest);
+            Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
         size_t colorIndex = m_textureInfos.add(colorInfo);
         m_swapchainColorTextures[i].registerBackend(backendBadge(), colorIndex);
 
@@ -1186,6 +1186,12 @@ void VulkanBackend::newTexture(const Texture& texture)
         break;
     }
 
+    // (if we later want to generate mipmaps we need the ability to use each mip as a src & dst in blitting)
+    if (texture.hasMipmaps()) {
+        usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        usageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
+
     // TODO: For now always keep images in device local memory.
     VmaAllocationCreateInfo allocCreateInfo = {};
     allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -1194,7 +1200,7 @@ void VulkanBackend::newTexture(const Texture& texture)
     VkImageCreateInfo imageCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
     imageCreateInfo.extent = { .width = texture.extent().width(), .height = texture.extent().height(), .depth = 1 };
-    imageCreateInfo.mipLevels = 1; // FIXME!
+    imageCreateInfo.mipLevels = texture.mipLevels();
     imageCreateInfo.arrayLayers = 1;
     imageCreateInfo.usage = usageFlags;
     imageCreateInfo.format = format;
@@ -1205,7 +1211,9 @@ void VulkanBackend::newTexture(const Texture& texture)
 
     VkImage image;
     VmaAllocation allocation;
-    vmaCreateImage(m_memoryAllocator, &imageCreateInfo, &allocCreateInfo, &image, &allocation, nullptr);
+    if (vmaCreateImage(m_memoryAllocator, &imageCreateInfo, &allocCreateInfo, &image, &allocation, nullptr) != VK_SUCCESS) {
+        LogError("VulkanBackend::newTexture(): could not create image.\n");
+    }
 
     // TODO: Handle things like mipmaps here!
     VkImageAspectFlags aspectFlags = 0u;
@@ -1214,7 +1222,27 @@ void VulkanBackend::newTexture(const Texture& texture)
     } else {
         aspectFlags |= VK_IMAGE_ASPECT_COLOR_BIT;
     }
-    VkImageView imageView = createImageView2D(image, format, aspectFlags);
+
+    VkImageViewCreateInfo viewCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewCreateInfo.subresourceRange.aspectMask = aspectFlags;
+    viewCreateInfo.image = image;
+    viewCreateInfo.format = format;
+    viewCreateInfo.components = {
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY
+    };
+    viewCreateInfo.subresourceRange.baseMipLevel = 0;
+    viewCreateInfo.subresourceRange.levelCount = texture.mipLevels();
+    viewCreateInfo.subresourceRange.baseArrayLayer = 0;
+    viewCreateInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    if (vkCreateImageView(m_device, &viewCreateInfo, nullptr, &imageView) != VK_SUCCESS) {
+        LogError("VulkanBackend::newTexture(): could not create image view.\n");
+    }
 
     VkFilter minFilter;
     switch (texture.minFilter()) {
@@ -1248,13 +1276,27 @@ void VulkanBackend::newTexture(const Texture& texture)
     samplerCreateInfo.maxAnisotropy = 16.0f;
     samplerCreateInfo.compareEnable = VK_FALSE;
     samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
     samplerCreateInfo.mipLodBias = 0.0f;
     samplerCreateInfo.minLod = 0.0f;
-    samplerCreateInfo.maxLod = 0.0f;
+    switch (texture.mipmap()) {
+    case Texture::Mipmap::None:
+        samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        samplerCreateInfo.maxLod = 0.0f;
+        break;
+    case Texture::Mipmap::Nearest:
+        samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        samplerCreateInfo.maxLod = texture.mipLevels();
+        break;
+    case Texture::Mipmap::Linear:
+        samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerCreateInfo.maxLod = texture.mipLevels();
+        break;
+    }
+
     VkSampler sampler;
     if (vkCreateSampler(m_device, &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
-        LogError("Could not create a sampler for the image.\n");
+        LogError("VulkanBackend::newTexture(): could not create sampler for the image.\n");
     }
 
     TextureInfo textureInfo {};
@@ -1344,6 +1386,8 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     if (!transitionImageLayout(texInfo.image, texInfo.format, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
         LogError("VulkanBackend::updateTexture(): could not transition the image to transfer layout.\n");
     }
+    texInfo.currentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
     if (!copyBufferToImage(stagingBuffer, texInfo.image, width, height)) {
         LogError("VulkanBackend::updateTexture(): could not copy the staging buffer to the image.\n");
     }
@@ -1361,11 +1405,138 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
         break;
     }
 
-    if (!transitionImageLayout(texInfo.image, texInfo.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, finalLayout)) {
-        LogError("VulkanBackend::updateTexture(): could not transition the image to the final image layout.\n");
+    if (update.generateMipmaps()) {
+        generateMipmaps(update.texture(), finalLayout);
+    } else {
+        if (!transitionImageLayout(texInfo.image, texInfo.format, texInfo.currentLayout, finalLayout)) {
+            LogError("VulkanBackend::updateTexture(): could not transition the image to the final image layout.\n");
+        }
     }
-
     texInfo.currentLayout = finalLayout;
+}
+
+void VulkanBackend::generateMipmaps(const Texture& texture, VkImageLayout finalLayout)
+{
+    ASSERT(texture.hasMipmaps());
+    TextureInfo& texInfo = textureInfo(texture);
+    VkImage image = texInfo.image;
+
+    VkImageAspectFlagBits aspectMask = texture.hasDepthFormat() ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+    //transitionImageLayout(image, texInfo.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+
+    VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    barrier.subresourceRange.aspectMask = aspectMask;
+    barrier.image = image;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.levelCount = 1;
+
+    uint32_t mipLevels = texture.mipLevels();
+    int32_t mipWidth = texture.extent().width();
+    int32_t mipHeight = texture.extent().height();
+
+    VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+    ASSERT(texInfo.currentLayout != VK_IMAGE_LAYOUT_UNDEFINED);
+
+    bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+        // Transition mips 1-n to transfer dst optimal
+        {
+            VkImageMemoryBarrier initialBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+            initialBarrier.image = image;
+            initialBarrier.subresourceRange.aspectMask = aspectMask;
+            initialBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            initialBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            initialBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            initialBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            initialBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            initialBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            initialBarrier.subresourceRange.baseArrayLayer = 0;
+            initialBarrier.subresourceRange.layerCount = 1;
+            initialBarrier.subresourceRange.baseMipLevel = 1;
+            initialBarrier.subresourceRange.levelCount = texture.mipLevels() - 1;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                0, nullptr,
+                0, nullptr,
+                1, &initialBarrier);
+        }
+
+        for (uint32_t i = 1; i < mipLevels; ++i) {
+
+            int32_t nextWidth = mipWidth > 1 ? mipWidth / 2 : 1;
+            int32_t nextHeight = mipHeight > 1 ? mipHeight / 2 : 1;
+
+            // TextureInfo's currentLayout keeps track of the whole image (or kind of mip0) but when we are messing
+            // with it here, it will have to be different for the different mip levels.
+            VkImageLayout currentLayout = (i == 1) ? texInfo.currentLayout : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+            barrier.subresourceRange.baseMipLevel = i - 1;
+            barrier.oldLayout = currentLayout;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+
+            VkImageBlit blit = {};
+            blit.srcOffsets[0] = { 0, 0, 0 };
+            blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+            blit.srcSubresource.aspectMask = aspectMask;
+            blit.srcSubresource.mipLevel = i - 1;
+            blit.srcSubresource.baseArrayLayer = 0;
+            blit.srcSubresource.layerCount = 1;
+            blit.dstOffsets[0] = { 0, 0, 0 };
+            blit.dstOffsets[1] = { nextWidth, nextHeight, 1 };
+            blit.dstSubresource.aspectMask = aspectMask;
+            blit.dstSubresource.mipLevel = i;
+            blit.dstSubresource.baseArrayLayer = 0;
+            blit.dstSubresource.layerCount = 1;
+
+            vkCmdBlitImage(commandBuffer,
+                image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1, &blit,
+                VK_FILTER_LINEAR);
+
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = finalLayout;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            vkCmdPipelineBarrier(commandBuffer,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage, 0,
+                0, nullptr,
+                0, nullptr,
+                1, &barrier);
+
+            mipWidth = nextWidth;
+            mipHeight = nextHeight;
+        }
+
+        barrier.subresourceRange.baseMipLevel = mipLevels - 1;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = finalLayout;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(commandBuffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage, 0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier);
+    });
+
+    if (!success) {
+        LogError("VulkanBackend::generateMipmaps(): error while generating mipmaps\n");
+    }
 }
 
 VulkanBackend::TextureInfo& VulkanBackend::textureInfo(const Texture& texture)

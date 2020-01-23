@@ -92,16 +92,25 @@ struct Texture : public Resource {
         Nearest,
     };
 
+    enum class Mipmap {
+        None,
+        Nearest,
+        Linear,
+    };
+
     Texture() = default;
     Texture(const Texture&) = default;
-    Texture(Badge<ResourceManager>, Extent2D, Format, Usage, MinFilter, MagFilter);
+    Texture(Badge<ResourceManager>, Extent2D, Format, Usage, MinFilter, MagFilter, Mipmap);
 
     [[nodiscard]] const Extent2D& extent() const { return m_extent; }
     [[nodiscard]] Format format() const { return m_format; }
     [[nodiscard]] Usage usage() const { return m_usage; }
     [[nodiscard]] MinFilter minFilter() const { return m_minFilter; }
     [[nodiscard]] MagFilter magFilter() const { return m_magFilter; }
+
+    [[nodiscard]] Mipmap mipmap() const { return m_mipmap; }
     [[nodiscard]] bool hasMipmaps() const;
+    [[nodiscard]] uint32_t mipLevels() const;
 
     [[nodiscard]] bool hasDepthFormat() const
     {
@@ -114,7 +123,7 @@ private:
     Usage m_usage;
     MinFilter m_minFilter;
     MagFilter m_magFilter;
-    bool m_mipmaps;
+    Mipmap m_mipmap;
 };
 
 struct RenderTarget : public Resource {

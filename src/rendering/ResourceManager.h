@@ -16,7 +16,7 @@ public:
     [[nodiscard]] const RenderTarget& windowRenderTarget();
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
-    [[nodiscard]] Texture& loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps);
+    [[nodiscard]] Texture& loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps);
     [[nodiscard]] Texture& createTexture2D(Extent2D, Texture::Format, Texture::Usage);
 
     [[nodiscard]] Buffer& createBuffer(size_t size, Buffer::Usage, Buffer::MemoryHint);
@@ -32,7 +32,7 @@ public:
 
     [[nodiscard]] const Texture* getTexture2D(const std::string& renderPass, const std::string& name);
 
-    void setBufferDataImmediately(Buffer&, const std::byte* data, size_t size, size_t offset = 0);
+    void setBufferDataImmediately(Buffer&, const std::byte* data, size_t size);
 
     const std::vector<Buffer>& buffers() const;
     const std::vector<Texture>& textures() const;

@@ -30,19 +30,30 @@ void Resource::registerBackend(Badge<Backend>, uint64_t id) const
     m_id = id;
 }
 
-Texture::Texture(Badge<ResourceManager>, Extent2D extent, Format format, Usage usage, MinFilter minFilter, MagFilter magFilter)
+Texture::Texture(Badge<ResourceManager>, Extent2D extent, Format format, Usage usage, MinFilter minFilter, MagFilter magFilter, Mipmap mipmap)
     : m_extent(extent)
     , m_format(format)
     , m_usage(usage)
     , m_minFilter(minFilter)
     , m_magFilter(magFilter)
+    , m_mipmap(mipmap)
 {
 }
 
 bool Texture::hasMipmaps() const
 {
-    // TODO: Use min filter to figure out the answer!
-    return false;
+    return m_mipmap != Mipmap::None;
+}
+
+uint32_t Texture::mipLevels() const
+{
+    if (hasMipmaps()) {
+        uint32_t size = std::max(extent().width(), extent().height());
+        uint32_t levels = std::floor(std::log2(size)) + 1;
+        return levels;
+    } else {
+        return 1;
+    }
 }
 
 RenderTarget::RenderTarget(Badge<ResourceManager>, Texture& colorTexture)

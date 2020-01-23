@@ -53,6 +53,7 @@ private:
     void deleteTexture(const Texture&);
     void updateTexture(const TextureUpdateFromFile&);
     //void updateTexture(const TextureUpdateFromData&);
+    void generateMipmaps(const Texture&, VkImageLayout finalLayout);
 
     void newRenderTarget(const RenderTarget&);
     void deleteRenderTarget(const RenderTarget&);
