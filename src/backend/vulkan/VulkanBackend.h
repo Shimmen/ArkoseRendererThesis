@@ -36,6 +36,7 @@ private:
     void executeRenderGraph(const ApplicationState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
+    void executeDrawArray(VkCommandBuffer, const CmdDrawArray&);
     void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
     void reconstructRenderGraphResources(RenderGraph& renderGraph);

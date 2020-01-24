@@ -2,8 +2,8 @@
 
 #include "Resources.h"
 #include "Shader.h"
+#include "utility/logging.h"
 #include <memory>
-#include <utility>
 
 struct FrontendCommand {
 
@@ -27,6 +27,27 @@ struct FrontendCommand {
 
 enum class DrawMode {
     Triangles
+};
+
+struct CmdDrawArray : public FrontendCommand {
+
+    CmdDrawArray(Buffer& vertexBuffer, size_t vertexCount, DrawMode mode)
+        : vertexBuffer(vertexBuffer)
+        , vertexCount(vertexCount)
+        , mode(mode)
+    {
+        switch (mode) {
+        case DrawMode::Triangles:
+            if (vertexCount < 3 || (vertexCount % 3) != 0) {
+                LogErrorAndExit("CmdDrawArray vertexCount must be at least 3, and a multiple of 3 for DrawMode::Triangles\n");
+            }
+            break;
+        }
+    }
+
+    Buffer& vertexBuffer;
+    size_t vertexCount;
+    DrawMode mode { DrawMode::Triangles };
 };
 
 struct CmdDrawIndexed : public FrontendCommand {

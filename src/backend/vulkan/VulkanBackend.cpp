@@ -1063,6 +1063,10 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
 
             }
 
+            else if (command.is<CmdDrawArray>()) {
+                executeDrawArray(commandBuffer, command.as<CmdDrawArray>());
+            }
+
             else if (command.is<CmdDrawIndexed>()) {
                 ASSERT(insideRenderPass);
                 executeDrawIndexed(commandBuffer, command.as<CmdDrawIndexed>());
@@ -1216,6 +1220,17 @@ void VulkanBackend::executeCopyTexture(VkCommandBuffer commandBuffer, const CmdC
 
     vkCmdCopyImage(commandBuffer, srcInfo.image, srcInfo.currentLayout, dstInfo.image, dstInfo.currentLayout, 1, &copyRegion);
     */
+}
+
+void VulkanBackend::executeDrawArray(VkCommandBuffer commandBuffer, const CmdDrawArray& command)
+{
+    VkBuffer vertexBuffer = bufferInfo(command.vertexBuffer).buffer;
+
+    VkBuffer vertexBuffers[] = { vertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdDraw(commandBuffer, command.vertexCount, 1, 0, 0);
 }
 
 void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const CmdDrawIndexed& command)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/App.h"
+#include "rendering/nodes/ForwardRendererNode.h"
 #include "utility/FpsCamera.h"
 
 class TestApp : public App {
@@ -16,10 +17,13 @@ private:
         vec2 texCoord;
     };
 
-    Texture* m_testTexture {};
-    Buffer* m_vertexBuffer {};
-    Buffer* m_indexBuffer {};
-    size_t m_indexCount {};
+    ForwardRendererNode::Object m_object {};
+    ForwardRendererNode::Scene m_scene {};
+
+    //Texture* m_testTexture {};
+    //Buffer* m_vertexBuffer {};
+    //Buffer* m_indexBuffer {};
+    //size_t m_indexCount {};
 
     FpsCamera m_camera {};
 };
