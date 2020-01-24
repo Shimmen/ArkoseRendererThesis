@@ -729,7 +729,7 @@ void VulkanBackend::setupDearImgui()
 
     //
 
-    ImGui_ImplGlfw_InitForVulkan(m_window, false);
+    ImGui_ImplGlfw_InitForVulkan(m_window, true);
 
     //
 

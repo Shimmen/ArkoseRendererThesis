@@ -1,5 +1,7 @@
 #include "FpsCamera.h"
 
+#include "GlobalState.h"
+
 void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float dt)
 {
     // Apply acceleration from input
@@ -21,7 +23,7 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
     if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT))
         acceleration.y -= 1;
 
-    if (mathkit::length2(acceleration) > 0.01f /* && !GuiSystem::isUsingKeyboard()*/) {
+    if (mathkit::length2(acceleration) > 0.01f && !GlobalState::get().guiIsUsingTheKeyboard()) {
         acceleration = normalize(acceleration) * (maxSpeed / timeToMaxSpeed) * dt;
         m_velocity += mathkit::rotateWithQuaternion(acceleration, m_orientation);
     } else {
@@ -46,7 +48,7 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
 
     // Calculate rotation velocity from input
 
-    if (input.isButtonDown(GLFW_MOUSE_BUTTON_2) /*&& !GuiSystem::isUsingMouse()*/) {
+    if (input.isButtonDown(GLFW_MOUSE_BUTTON_2) && !GlobalState::get().guiIsUsingTheMouse()) {
         // Screen size independent but also aspect ratio dependent!
         vec2 mouseDelta = input.mouseDelta() / float(screenExtent.width());
 
@@ -88,7 +90,7 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
 
     // Apply zoom
 
-    if (true /*!GuiSystem::isUsingMouse()*/) {
+    if (!GlobalState::get().guiIsUsingTheMouse()) {
         m_targetFieldOfView += -input.scrollDelta() * zoomSensitivity;
         m_targetFieldOfView = mathkit::clamp(m_targetFieldOfView, minFieldOfView, maxFieldOfView);
     }

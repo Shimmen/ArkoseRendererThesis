@@ -13,6 +13,9 @@ public:
     [[nodiscard]] Extent2D windowExtent() const;
     void updateWindowExtent(const Extent2D&);
 
+    [[nodiscard]] bool guiIsUsingTheMouse() const;
+    [[nodiscard]] bool guiIsUsingTheKeyboard() const;
+
 private:
     Extent2D m_windowExtent {};
 };
