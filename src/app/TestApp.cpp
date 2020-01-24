@@ -3,6 +3,7 @@
 #include "camera_state.h"
 #include "utility/GlobalState.h"
 #include "utility/Input.h"
+#include <imgui.h>
 
 void TestApp::setup(StaticResourceManager& staticResources)
 {
@@ -115,6 +116,8 @@ void TestApp::makeRenderGraph(RenderGraph& graph)
 
 void TestApp::update(float elapsedTime, float deltaTime)
 {
+    ImGui::ShowDemoWindow();
+
     const Input& input = Input::instance();
     m_camera.update(input, GlobalState::get().windowExtent(), deltaTime);
 }

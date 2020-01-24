@@ -33,7 +33,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
-    void executeRenderGraph(const ApplicationState&, const RenderGraph&, uint32_t swapchainImageIndex);
+    void executeRenderGraph(const ApplicationState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
     void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
@@ -64,6 +64,11 @@ private:
     void deleteRenderState(const RenderState&);
 
     ///////////////////////////////////////////////////////////////////////////
+    /// Drawing
+
+    void drawFrame(const ApplicationState&, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex);
+
+    ///////////////////////////////////////////////////////////////////////////
     /// Swapchain management
 
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
@@ -73,6 +78,20 @@ private:
     [[nodiscard]] Extent2D recreateSwapchain();
 
     void createWindowRenderTargetFrontend();
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// ImGui related
+
+    void setupDearImgui();
+    void destroyDearImgui();
+
+    void updateDearImguiFramebuffers();
+    void renderDearImguiFrame(VkCommandBuffer, uint32_t swapchainImageIndex);
+
+    bool m_guiIsSetup { false };
+    VkDescriptorPool m_guiDescriptorPool {};
+    VkRenderPass m_guiRenderPass {};
+    std::vector<VkFramebuffer> m_guiFramebuffers {};
 
     ///////////////////////////////////////////////////////////////////////////
     /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.

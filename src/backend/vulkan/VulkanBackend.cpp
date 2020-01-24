@@ -11,6 +11,9 @@
 #include "utility/util.h"
 #include <algorithm>
 #include <cstring>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 #include <stb_image.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -70,14 +73,14 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
     createWindowRenderTargetFrontend();
 
+    setupDearImgui();
+
     m_staticResourceManager = std::make_unique<StaticResourceManager>();
     m_app.setup(*m_staticResourceManager);
     createStaticResources();
 
     m_renderGraph = std::make_unique<RenderGraph>(m_numSwapchainImages);
     m_app.makeRenderGraph(*m_renderGraph);
-
-    ApplicationState appState { m_swapchainExtent, 0.0, 0.0, 0 };
     reconstructRenderGraphResources(*m_renderGraph);
 
     for (size_t i = 0; i < m_numSwapchainImages; ++i) {
@@ -90,6 +93,8 @@ VulkanBackend::~VulkanBackend()
 {
     // Before destroying stuff, make sure it's done with all scheduled work
     vkDeviceWaitIdle(m_device);
+
+    destroyDearImgui();
 
     vkFreeCommandBuffers(m_device, m_renderGraphFrameCommandPool, m_frameCommandBuffers.size(), m_frameCommandBuffers.data());
 
@@ -603,6 +608,11 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
 
     setupWindowRenderTargets();
 
+    if (m_guiIsSetup) {
+        ImGui_ImplVulkan_SetMinImageCount(m_numSwapchainImages);
+        updateDearImguiFramebuffers();
+    }
+
     // Create main command buffers, one per swapchain image
     m_frameCommandBuffers.resize(m_numSwapchainImages);
     {
@@ -711,6 +721,181 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     }
 }
 
+void VulkanBackend::setupDearImgui()
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    //
+
+    ImGui_ImplGlfw_InitForVulkan(m_window, false);
+
+    //
+
+    VkDescriptorPoolSize poolSizes[] = {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    };
+    VkDescriptorPoolCreateInfo descPoolCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+    descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    descPoolCreateInfo.maxSets = 1000 * IM_ARRAYSIZE(poolSizes);
+    descPoolCreateInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(poolSizes);
+    descPoolCreateInfo.pPoolSizes = poolSizes;
+    if (vkCreateDescriptorPool(m_device, &descPoolCreateInfo, nullptr, &m_guiDescriptorPool) != VK_SUCCESS) {
+        LogErrorAndExit("DearImGui error while setting up descriptor pool\n");
+    }
+
+    //
+
+    VkAttachmentDescription colorAttachment = {};
+    colorAttachment.format = m_swapchainImageFormat;
+    colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // TODO: Should it really be undefined here?
+    colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference colorAttachmentRef = {};
+    colorAttachmentRef.attachment = 0;
+    colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pDepthStencilAttachment = VK_NULL_HANDLE;
+
+    // TODO: Is this needed here??
+    // Setup subpass dependency to make sure we have the right stuff before drawing to a swapchain image.
+    // see https://vulkan-tutorial.com/en/Drawing_a_triangle/Drawing/Rendering_and_presentation for info.
+    VkSubpassDependency subpassDependency = {};
+    subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    subpassDependency.dstSubpass = 0; // i.e. the first and only subpass we have here
+    subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.srcAccessMask = 0;
+    subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    VkRenderPassCreateInfo renderPassCreateInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
+    renderPassCreateInfo.attachmentCount = 1;
+    renderPassCreateInfo.pAttachments = &colorAttachment;
+    renderPassCreateInfo.subpassCount = 1;
+    renderPassCreateInfo.pSubpasses = &subpass;
+    renderPassCreateInfo.dependencyCount = 1;
+    renderPassCreateInfo.pDependencies = &subpassDependency;
+
+    if (vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &m_guiRenderPass) != VK_SUCCESS) {
+        LogErrorAndExit("DearImGui error while setting up render pass\n");
+    }
+
+    //
+
+    updateDearImguiFramebuffers();
+
+    //
+
+    ImGui_ImplVulkan_InitInfo initInfo = {};
+    initInfo.CheckVkResultFn = [](VkResult result) {
+        if (result != VK_SUCCESS) {
+            LogErrorAndExit("DearImGui vulkan error!\n");
+        }
+    };
+
+    initInfo.Instance = m_instance;
+    initInfo.PhysicalDevice = m_physicalDevice;
+    initInfo.Device = m_device;
+    initInfo.Allocator = nullptr;
+
+    initInfo.QueueFamily = m_queueInfo.graphicsQueueFamilyIndex;
+    initInfo.Queue = m_graphicsQueue;
+
+    initInfo.MinImageCount = m_numSwapchainImages; // (todo: should this be something different than the actual count??)
+    initInfo.ImageCount = m_numSwapchainImages;
+
+    initInfo.DescriptorPool = m_guiDescriptorPool;
+    initInfo.PipelineCache = VK_NULL_HANDLE;
+
+    ImGui_ImplVulkan_Init(&initInfo, m_guiRenderPass);
+
+    //
+
+    issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+        ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+    });
+    ImGui_ImplVulkan_DestroyFontUploadObjects();
+
+    //
+
+    m_guiIsSetup = true;
+}
+
+void VulkanBackend::destroyDearImgui()
+{
+    vkDestroyDescriptorPool(m_device, m_guiDescriptorPool, nullptr);
+    vkDestroyRenderPass(m_device, m_guiRenderPass, nullptr);
+    for (VkFramebuffer framebuffer : m_guiFramebuffers) {
+        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    }
+
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    m_guiIsSetup = false;
+}
+
+void VulkanBackend::updateDearImguiFramebuffers()
+{
+    for (VkFramebuffer& framebuffer : m_guiFramebuffers) {
+        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+    }
+    m_guiFramebuffers.clear();
+
+    for (uint32_t idx = 0; idx < m_numSwapchainImages; ++idx) {
+        VkFramebufferCreateInfo framebufferCreateInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+        framebufferCreateInfo.renderPass = m_guiRenderPass;
+        framebufferCreateInfo.attachmentCount = 1;
+        framebufferCreateInfo.pAttachments = &m_swapchainImageViews[idx];
+        framebufferCreateInfo.width = m_swapchainExtent.width();
+        framebufferCreateInfo.height = m_swapchainExtent.height();
+        framebufferCreateInfo.layers = 1;
+
+        VkFramebuffer framebuffer;
+        if (vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
+            LogErrorAndExit("DearImGui error while setting up framebuffer\n");
+        }
+        m_guiFramebuffers.push_back(framebuffer);
+    }
+}
+
+void VulkanBackend::renderDearImguiFrame(VkCommandBuffer commandBuffer, uint32_t swapchainImageIndex)
+{
+    VkRenderPassBeginInfo passBeginInfo = {};
+    passBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    passBeginInfo.renderPass = m_guiRenderPass;
+    passBeginInfo.framebuffer = m_guiFramebuffers[swapchainImageIndex];
+    passBeginInfo.renderArea.extent.width = m_swapchainExtent.width();
+    passBeginInfo.renderArea.extent.height = m_swapchainExtent.height();
+    passBeginInfo.clearValueCount = 0;
+    passBeginInfo.pClearValues = nullptr;
+
+    vkCmdBeginRenderPass(commandBuffer, &passBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+    vkCmdEndRenderPass(commandBuffer);
+}
+
 void VulkanBackend::createStaticResources()
 {
     ResourceManager& resourceManager = m_staticResourceManager->internal(backendBadge());
@@ -775,10 +960,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     textureInfo(currentColorTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     textureInfo(m_swapchainDepthTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    m_app.update(elapsedTime, deltaTime);
-
-    ASSERT(m_renderGraph);
-    executeRenderGraph(appState, *m_renderGraph, swapchainImageIndex);
+    drawFrame(appState, elapsedTime, deltaTime, swapchainImageIndex);
 
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
@@ -808,10 +990,15 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     return true;
 }
 
-void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const RenderGraph& renderGraph, uint32_t swapchainImageIndex)
+void VulkanBackend::drawFrame(const ApplicationState& appState, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex)
 {
-    FrameAllocator& frameAllocator = *m_frameAllocators[swapchainImageIndex];
-    frameAllocator.reset();
+    ASSERT(m_renderGraph);
+
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    m_app.update(elapsedTime, deltaTime);
 
     VkCommandBufferBeginInfo commandBufferBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     commandBufferBeginInfo.flags = 0u;
@@ -822,13 +1009,20 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
         LogError("VulkanBackend::executeRenderGraph(): error beginning command buffer command!\n");
     }
 
-    bool didWriteToSwapchain = false;
-    auto& swapchainRenderTarget = m_swapchainRenderTargets[swapchainImageIndex];
-    auto checkIfSwapchainWrite = [&](const RenderTarget& renderTarget) {
-        if (renderTarget.id() == swapchainRenderTarget.id()) {
-            didWriteToSwapchain = true;
-        }
-    };
+    executeRenderGraph(appState, *m_renderGraph, commandBuffer, swapchainImageIndex);
+
+    ImGui::Render();
+    renderDearImguiFrame(commandBuffer, swapchainImageIndex);
+
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        LogError("VulkanBackend::executeRenderGraph(): error ending command buffer command!\n");
+    }
+}
+
+void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const RenderGraph& renderGraph, VkCommandBuffer commandBuffer, uint32_t swapchainImageIndex)
+{
+    FrameAllocator& frameAllocator = *m_frameAllocators[swapchainImageIndex];
+    frameAllocator.reset();
 
     renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
         CommandList cmdList {};
@@ -848,7 +1042,6 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
 
             if (command.is<CmdSetRenderState>()) {
                 auto& cmd = command.as<CmdSetRenderState>();
-                checkIfSwapchainWrite(cmd.renderState.renderTarget());
                 if (cmdList.hasNext() && cmdList.peekNext().is<CmdClear>()) {
                     executeSetRenderState(commandBuffer, cmd, &cmdList.next().as<CmdClear>());
                 } else {
@@ -888,16 +1081,6 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
 
         endCurrentRenderPassIfAny();
     });
-
-    if (!didWriteToSwapchain) {
-        LogInfo("Manual layout transition!\n");
-        transitionImageLayout(m_swapchainImages[swapchainImageIndex], m_swapchainImageFormat,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, &commandBuffer);
-    }
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        LogError("VulkanBackend::executeRenderGraph(): error ending command buffer command!\n");
-    }
 }
 
 void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const CmdSetRenderState& cmd, const CmdClear* clearCmd)
