@@ -12,4 +12,6 @@ public:
 
     virtual void setup(StaticResourceManager&) = 0;
     virtual void makeRenderGraph(RenderGraph&) = 0;
+
+    virtual void update(float elapsedTime, float deltaTime) = 0;
 };

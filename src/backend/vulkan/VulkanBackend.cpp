@@ -5,6 +5,7 @@
 
 #include "VulkanQueueInfo.h"
 #include "rendering/ShaderManager.h"
+#include "utility/GlobalState.h"
 #include "utility/fileio.h"
 #include "utility/logging.h"
 #include "utility/util.h"
@@ -20,7 +21,11 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     : m_window(window)
     , m_app(app)
 {
-    glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int, int) {
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+    GlobalState::getMutable(backendBadge()).updateWindowExtent({ width, height });
+    glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int width, int height) {
+        GlobalState::getMutable(backendBadge()).updateWindowExtent({ width, height });
         s_unhandledWindowResize = true;
     }));
 
@@ -769,6 +774,8 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     const Texture& currentColorTexture = m_swapchainColorTextures[swapchainImageIndex];
     textureInfo(currentColorTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     textureInfo(m_swapchainDepthTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    m_app.update(elapsedTime, deltaTime);
 
     ASSERT(m_renderGraph);
     executeRenderGraph(appState, *m_renderGraph, swapchainImageIndex);
