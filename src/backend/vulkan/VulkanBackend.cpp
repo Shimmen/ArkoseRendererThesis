@@ -1024,7 +1024,8 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
     FrameAllocator& frameAllocator = *m_frameAllocators[swapchainImageIndex];
     frameAllocator.reset();
 
-    renderGraph.forEachNodeInResolvedOrder([&](const RenderGraphNode& node) {
+    const ResourceManager& associatedResourceManager = *m_frameResourceManagers[swapchainImageIndex];
+    renderGraph.forEachNodeInResolvedOrder(associatedResourceManager, [&](const RenderGraphNode& node) {
         CommandList cmdList {};
         node.executeForFrame(appState, cmdList, frameAllocator, swapchainImageIndex);
 
@@ -1084,7 +1085,26 @@ void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const R
         }
 
         endCurrentRenderPassIfAny();
+
+        // TODO: Currently this doesn't actually need to be here, but soon enough it might be critical! So I'll leave it here for now.
+        executeRenderGraphNodeBarrier(commandBuffer);
     });
+}
+void VulkanBackend::executeRenderGraphNodeBarrier(VkCommandBuffer commandBuffer)
+{
+    // TODO: This probably doesn't need to be this harsh!
+    VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+    // TODO: This probably doesn't need to be this harsh!
+    VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
+        1, &barrier,
+        0, nullptr,
+        0, nullptr);
 }
 
 void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const CmdSetRenderState& cmd, const CmdClear* clearCmd)
@@ -1504,13 +1524,56 @@ void VulkanBackend::newTexture(const Texture& texture)
         LogError("VulkanBackend::newTexture(): could not create sampler for the image.\n");
     }
 
+    VkImageLayout layout;
+    switch (texture.usage()) {
+    case Texture::Usage::Attachment:
+        layout = texture.hasDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        break;
+    case Texture::Usage::Sampled:
+        layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        break;
+    case Texture::Usage::All:
+        layout = VK_IMAGE_LAYOUT_GENERAL;
+        break;
+    }
+    {
+        VkImageMemoryBarrier imageBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+        imageBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageBarrier.newLayout = layout;
+        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+        imageBarrier.image = image;
+        imageBarrier.subresourceRange.aspectMask = texture.hasDepthFormat() ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBarrier.subresourceRange.baseMipLevel = 0;
+        imageBarrier.subresourceRange.levelCount = texture.mipLevels();
+        imageBarrier.subresourceRange.baseArrayLayer = 0;
+        imageBarrier.subresourceRange.layerCount = 1;
+
+        // NOTE: This is very slow, since it blocks everything, but it should be fine for this purpose
+        VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+        bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+            vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
+                0, nullptr,
+                0, nullptr,
+                1, &imageBarrier);
+        });
+        if (!success) {
+            LogErrorAndExit("VulkanBackend::newTexture():could not transition image to the preferred layout.\n");
+        }
+    }
+
     TextureInfo textureInfo {};
     textureInfo.image = image;
     textureInfo.allocation = allocation;
     textureInfo.format = format;
     textureInfo.view = imageView;
     textureInfo.sampler = sampler;
-    textureInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    textureInfo.currentLayout = layout;
 
     size_t index = m_textureInfos.add(textureInfo);
     texture.registerBackend(backendBadge(), index);
@@ -1627,7 +1690,6 @@ void VulkanBackend::generateMipmaps(const Texture& texture, VkImageLayout finalL
     VkImage image = texInfo.image;
 
     VkImageAspectFlagBits aspectMask = texture.hasDepthFormat() ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-    //transitionImageLayout(image, texInfo.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
 
     VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     barrier.subresourceRange.aspectMask = aspectMask;

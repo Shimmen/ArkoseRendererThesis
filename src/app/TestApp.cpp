@@ -45,7 +45,7 @@ void TestApp::setup(StaticResourceManager& staticResources)
 void TestApp::makeRenderGraph(RenderGraph& graph)
 {
     graph.addNode("forward", ForwardRendererNode::construct(m_scene));
-    //graph.addNode("final", FinalPostFxNode::construct());
+    graph.addNode("final", FinalPostFxNode::construct());
 }
 
 void TestApp::update(float elapsedTime, float deltaTime)

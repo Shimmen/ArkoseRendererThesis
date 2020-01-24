@@ -40,12 +40,13 @@ RenderGraphNode::NodeConstructorFunction ForwardRendererNode::construct(const Fo
         rasterState.backfaceCullingEnabled = false;
 
         Texture& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        resourceManager.publish("color", colorTexture);
+
         Texture& depthTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
         RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
-        //RenderState& renderState = resourceManager.createRenderState(renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
+        RenderState& renderState = resourceManager.createRenderState(renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
         return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             auto& cameraState = frameAllocator.allocate<CameraState>();
@@ -55,8 +56,8 @@ RenderGraphNode::NodeConstructorFunction ForwardRendererNode::construct(const Fo
             cameraState.projection_from_view = scene.camera->projectionMatrix();
             cameraState.view_from_local = cameraState.view_from_world * cameraState.world_from_local;
             cameraState.projection_from_local = cameraState.projection_from_view * cameraState.view_from_local;
-
             commandList.add<CmdUpdateBuffer>(cameraUniformBuffer, &cameraState, sizeof(CameraState));
+
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
             commandList.add<CmdDrawIndexed>(*object.vertexBuffer, *object.indexBuffer, object.indexCount, DrawMode::Triangles);

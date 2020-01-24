@@ -1,17 +1,19 @@
 #pragma once
 
 #include "ApplicationState.h"
+#include "NodeDependency.h"
 #include "ResourceChange.h"
 #include "Resources.h"
 #include "utility/CapList.h"
 #include "utility/util.h"
 #include <unordered_map>
+#include <unordered_set>
 
 class ResourceManager {
 public:
     explicit ResourceManager(const RenderTarget* windowRenderTarget);
 
-    void setCurrentPass(std::string);
+    void setCurrentNode(std::string);
 
     [[nodiscard]] const RenderTarget& windowRenderTarget();
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
@@ -32,31 +34,34 @@ public:
 
     [[nodiscard]] const Texture* getTexture2D(const std::string& renderPass, const std::string& name);
 
+    [[nodiscard]] const std::unordered_set<NodeDependency>& nodeDependencies() const;
+
     void setBufferDataImmediately(Buffer&, const std::byte* data, size_t size);
 
-    const std::vector<Buffer>& buffers() const;
-    const std::vector<Texture>& textures() const;
-    const std::vector<RenderTarget>& renderTargets() const;
-    const std::vector<RenderState>& renderStates() const;
-    const std::vector<BufferUpdate>& bufferUpdates() const;
-    const std::vector<TextureUpdateFromFile>& textureUpdates() const;
+    [[nodiscard]] const std::vector<Buffer>& buffers() const;
+    [[nodiscard]] const std::vector<Texture>& textures() const;
+    [[nodiscard]] const std::vector<RenderTarget>& renderTargets() const;
+    [[nodiscard]] const std::vector<RenderState>& renderStates() const;
+    [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
+    [[nodiscard]] const std::vector<TextureUpdateFromFile>& textureUpdates() const;
 
-    Badge<ResourceManager> exchangeBadges(Badge<Backend>) const;
+    [[nodiscard]] Badge<ResourceManager> exchangeBadges(Badge<Backend>) const;
 
 protected:
-    std::string makeQualifiedName(const std::string& pass, const std::string& name);
+    std::string makeQualifiedName(const std::string& node, const std::string& name);
 
 private:
-    std::optional<std::string> m_current_pass_name;
+    std::optional<std::string> m_currentNodeName;
+    std::unordered_set<NodeDependency> m_nodeDependencies;
 
     const RenderTarget* m_windowRenderTarget;
 
-    std::unordered_map<std::string, const Buffer*> m_name_buffer_map;
-    std::unordered_map<std::string, const Texture*> m_name_texture_map;
-    std::unordered_map<std::string, const RenderTarget*> m_name_render_target_map;
+    std::unordered_map<std::string, const Buffer*> m_nameBufferMap;
+    std::unordered_map<std::string, const Texture*> m_nameTextureMap;
+    std::unordered_map<std::string, const RenderTarget*> m_nameRenderTargetMap;
 
-    std::vector<BufferUpdate> m_immediate_buffer_updates;
-    std::vector<TextureUpdateFromFile> m_immediate_texture_updates;
+    std::vector<BufferUpdate> m_immediateBufferUpdates;
+    std::vector<TextureUpdateFromFile> m_immediateTextureUpdates;
 
     static constexpr int maxNumBuffers { 10 };
     CapList<Buffer> m_buffers { maxNumBuffers };

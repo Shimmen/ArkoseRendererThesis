@@ -20,10 +20,5 @@ private:
     ForwardRendererNode::Object m_object {};
     ForwardRendererNode::Scene m_scene {};
 
-    //Texture* m_testTexture {};
-    //Buffer* m_vertexBuffer {};
-    //Buffer* m_indexBuffer {};
-    //size_t m_indexCount {};
-
     FpsCamera m_camera {};
 };

@@ -10,9 +10,9 @@ ResourceManager::ResourceManager(const RenderTarget* windowRenderTarget)
 {
 }
 
-void ResourceManager::setCurrentPass(std::string pass)
+void ResourceManager::setCurrentNode(std::string node)
 {
-    m_current_pass_name = std::move(pass);
+    m_currentNodeName = std::move(node);
 }
 
 const RenderTarget& ResourceManager::windowRenderTarget()
@@ -79,7 +79,7 @@ Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb,
     m_textures.push_back({ {}, { width, height }, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, mipmapMode });
     Texture& texture = m_textures.back();
 
-    m_immediate_texture_updates.emplace_back(texture, imagePath, generateMipmaps);
+    m_immediateTextureUpdates.emplace_back(texture, imagePath, generateMipmaps);
 
     return texture;
 }
@@ -96,49 +96,59 @@ RenderState& ResourceManager::createRenderState(
 
 void ResourceManager::publish(const std::string& name, const Buffer& buffer)
 {
-    ASSERT(m_current_pass_name.has_value());
-    std::string fullName = makeQualifiedName(m_current_pass_name.value(), name);
-    auto entry = m_name_buffer_map.find(fullName);
-    ASSERT(entry == m_name_buffer_map.end());
-    m_name_buffer_map[fullName] = &buffer;
+    ASSERT(m_currentNodeName.has_value());
+    std::string fullName = makeQualifiedName(m_currentNodeName.value(), name);
+    auto entry = m_nameBufferMap.find(fullName);
+    ASSERT(entry == m_nameBufferMap.end());
+    m_nameBufferMap[fullName] = &buffer;
 }
 
 void ResourceManager::publish(const std::string& name, const Texture& texture)
 {
-    ASSERT(m_current_pass_name.has_value());
-    std::string fullName = makeQualifiedName(m_current_pass_name.value(), name);
-    auto entry = m_name_texture_map.find(fullName);
-    ASSERT(entry == m_name_texture_map.end());
-    m_name_texture_map[fullName] = &texture;
+    ASSERT(m_currentNodeName.has_value());
+    std::string fullName = makeQualifiedName(m_currentNodeName.value(), name);
+    auto entry = m_nameTextureMap.find(fullName);
+    ASSERT(entry == m_nameTextureMap.end());
+    m_nameTextureMap[fullName] = &texture;
 }
 
 void ResourceManager::publish(const std::string& name, const RenderTarget& renderTarget)
 {
-    ASSERT(m_current_pass_name.has_value());
-    std::string fullName = makeQualifiedName(m_current_pass_name.value(), name);
-    auto entry = m_name_render_target_map.find(fullName);
-    ASSERT(entry == m_name_render_target_map.end());
-    m_name_render_target_map[fullName] = &renderTarget;
+    ASSERT(m_currentNodeName.has_value());
+    std::string fullName = makeQualifiedName(m_currentNodeName.value(), name);
+    auto entry = m_nameRenderTargetMap.find(fullName);
+    ASSERT(entry == m_nameRenderTargetMap.end());
+    m_nameRenderTargetMap[fullName] = &renderTarget;
 }
 
 const Texture* ResourceManager::getTexture2D(const std::string& renderPass, const std::string& name)
 {
-    std::string fullName = makeQualifiedName(renderPass, name);
-    auto entry = m_name_texture_map.find(fullName);
+    ASSERT(m_currentNodeName.has_value());
 
-    if (entry == m_name_texture_map.end()) {
+    std::string fullName = makeQualifiedName(renderPass, name);
+    auto entry = m_nameTextureMap.find(fullName);
+
+    if (entry == m_nameTextureMap.end()) {
         return nullptr;
     }
 
+    NodeDependency dependency { m_currentNodeName.value(), renderPass };
+    m_nodeDependencies.insert(dependency);
+
     const Texture* texture = entry->second;
     return texture;
+}
+
+const std::unordered_set<NodeDependency>& ResourceManager::nodeDependencies() const
+{
+    return m_nodeDependencies;
 }
 
 void ResourceManager::setBufferDataImmediately(Buffer& buffer, const std::byte* data, size_t size)
 {
     // TODO: Don't make a copy here! I think it should be made explicit at the calling site.
     std::vector<std::byte> data_copy { data, data + size };
-    m_immediate_buffer_updates.emplace_back(buffer, std::move(data_copy));
+    m_immediateBufferUpdates.emplace_back(buffer, std::move(data_copy));
 }
 
 const std::vector<Buffer>& ResourceManager::buffers() const
@@ -163,12 +173,12 @@ const std::vector<RenderState>& ResourceManager::renderStates() const
 
 const std::vector<BufferUpdate>& ResourceManager::bufferUpdates() const
 {
-    return m_immediate_buffer_updates;
+    return m_immediateBufferUpdates;
 }
 
 const std::vector<TextureUpdateFromFile>& ResourceManager::textureUpdates() const
 {
-    return m_immediate_texture_updates;
+    return m_immediateTextureUpdates;
 }
 
 Badge<ResourceManager> ResourceManager::exchangeBadges(Badge<Backend>) const
@@ -176,7 +186,7 @@ Badge<ResourceManager> ResourceManager::exchangeBadges(Badge<Backend>) const
     return {};
 }
 
-std::string ResourceManager::makeQualifiedName(const std::string& pass, const std::string& name)
+std::string ResourceManager::makeQualifiedName(const std::string& node, const std::string& name)
 {
-    return pass + ':' + name;
+    return node + ':' + name;
 }

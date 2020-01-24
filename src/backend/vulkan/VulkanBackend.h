@@ -34,6 +34,7 @@ private:
     /// Command translation & resource management
 
     void executeRenderGraph(const ApplicationState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
+    void executeRenderGraphNodeBarrier(VkCommandBuffer);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
     void executeDrawArray(VkCommandBuffer, const CmdDrawArray&);

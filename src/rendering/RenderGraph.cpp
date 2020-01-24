@@ -10,7 +10,7 @@ RenderGraph::RenderGraph(size_t frameMultiplicity)
 void RenderGraph::constructAllForFrame(ResourceManager& resourceManager, uint32_t frame)
 {
     for (const auto& [name, node] : m_nodes) {
-        resourceManager.setCurrentPass(name);
+        resourceManager.setCurrentNode(name);
         node->constructForFrame(resourceManager, frame);
     }
 }
@@ -23,21 +23,27 @@ void RenderGraph::addNode(const std::string& name, const RenderGraphNode::NodeCo
 
 void RenderGraph::addNode(const std::string& name, std::unique_ptr<RenderGraphNode> node)
 {
-    const auto& previousNode = m_nodes.find(name);
-    if (previousNode != m_nodes.end()) {
+    const auto& previousNode = m_nodeIndexFromName.find(name);
+    if (previousNode != m_nodeIndexFromName.end()) {
         LogErrorAndExit("GpuPipeline::addNode: called for node with name '%s' but it already exist in this graph!\n", name.c_str());
     }
 
     node->setFrameMultiplicity(m_frameMultiplicity);
-    m_nodes[name] = std::move(node);
+    m_nodeIndexFromName[name] = m_nodes.size();
+    m_nodes.emplace_back(name, std::move(node));
 }
 
-void RenderGraph::forEachNodeInResolvedOrder(const std::function<void(const RenderGraphNode&)>& callback) const
+void RenderGraph::forEachNodeInResolvedOrder(const ResourceManager& associatedResourceManager, const std::function<void(const RenderGraphNode&)>& callback) const
 {
-    // TODO: This is obviously a temporary limitation, hehe..
-    ASSERT(m_nodes.size() == 1);
+    // TODO: We also have to make sure that nodes rendering to the screen are last (and in some respective order that makes sense)
+    auto& dependencies = associatedResourceManager.nodeDependencies();
 
-    for (auto& [name, node] : m_nodes) {
+    // TODO: Actually run the callback in the correctly resolved order!
+    // TODO: Actually run the callback in the correctly resolved order!
+    // TODO: Actually run the callback in the correctly resolved order!
+    // TODO: Actually run the callback in the correctly resolved order!
+
+    for (auto& [_, node] : m_nodes) {
         callback(*node);
     }
 }

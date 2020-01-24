@@ -21,10 +21,11 @@ public:
     void addNode(const std::string& name, const RenderGraphNode::NodeConstructorFunction&);
     void addNode(const std::string& name, std::unique_ptr<RenderGraphNode>);
 
-    void forEachNodeInResolvedOrder(const std::function<void(const RenderGraphNode&)>&) const;
+    void forEachNodeInResolvedOrder(const ResourceManager&, const std::function<void(const RenderGraphNode&)>&) const;
 
 private:
-    std::unordered_map<std::string, std::unique_ptr<RenderGraphNode>> m_nodes;
+    std::vector<std::pair<std::string, std::unique_ptr<RenderGraphNode>>> m_nodes;
+    std::unordered_map<std::string, size_t> m_nodeIndexFromName;
 
     //! The number of swapchain images / frames that this node needs to "manage"
     uint32_t m_frameMultiplicity;

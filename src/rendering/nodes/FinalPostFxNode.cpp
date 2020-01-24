@@ -11,14 +11,11 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
         std::vector<vec2> fullScreenTriangle { { -1, -3 }, { -1, 1 }, { 3, 1 } };
         Buffer& vertexBuffer = resourceManager.createBuffer(std::move(fullScreenTriangle), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal);
 
-#if 0
-        const Texture* sourceTexture = resourceManager.getTexture2D("", sourceName);
+        const Texture* sourceTexture = resourceManager.getTexture2D("forward", "color");
         if (!sourceTexture) {
-            LogError("FinalPostFxNode: could not find the input texture '%s'\n", sourceName.c_str());
+            LogError("FinalPostFxNode: could not find the input texture 'forward:color', using test texture\n");
+            sourceTexture = &resourceManager.loadTexture2D("assets/test-pattern.png", true, true);
         }
-#else
-        const Texture* sourceTexture = &resourceManager.loadTexture2D("assets/test-pattern.png", true, true);
-#endif
 
         ShaderBinding textureSamplerBinding = { 0, ShaderStage::Fragment, sourceTexture };
         ShaderBindingSet shaderBindingSet { textureSamplerBinding };

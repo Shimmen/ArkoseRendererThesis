@@ -106,9 +106,9 @@ struct CmdCopyTexture : public FrontendCommand {
 
 struct ClearColor {
     ClearColor(float r, float g, float b, float a = 1.0f)
-        : r(r)
-        , g(g)
-        , b(b)
+        : r(pow(r, 2.2f))
+        , g(pow(g, 2.2f))
+        , b(pow(b, 2.2f))
         , a(a)
     {
     }

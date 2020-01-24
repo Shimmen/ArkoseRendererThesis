@@ -5,7 +5,7 @@
 StaticResourceManager::StaticResourceManager()
     : m_resourceManager(nullptr)
 {
-    m_resourceManager.setCurrentPass("static");
+    m_resourceManager.setCurrentNode("[static]");
 }
 
 Texture& StaticResourceManager::loadTexture2D(std::string imagePath, bool srgb, bool generateMipmaps)
