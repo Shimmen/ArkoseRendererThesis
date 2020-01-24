@@ -10,8 +10,8 @@ public:
     static const GlobalState& get();
     static GlobalState& getMutable(Badge<Backend>);
 
-    Extent2D windowExtent() const;
-    void updateWindowExtent(Extent2D);
+    [[nodiscard]] Extent2D windowExtent() const;
+    void updateWindowExtent(const Extent2D&);
 
 private:
     Extent2D m_windowExtent {};

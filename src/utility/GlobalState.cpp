@@ -16,7 +16,7 @@ Extent2D GlobalState::windowExtent() const
 {
     return m_windowExtent;
 }
-void GlobalState::updateWindowExtent(Extent2D newExtent)
+void GlobalState::updateWindowExtent(const Extent2D& newExtent)
 {
     m_windowExtent = newExtent;
 }
