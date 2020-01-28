@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rendering/App.h"
-#include "rendering/nodes/ForwardRendererNode.h"
+#include "rendering/nodes/ForwardRenderNode.h"
 #include "utility/FpsCamera.h"
 
 class TestApp : public App {
@@ -17,8 +17,8 @@ private:
         vec2 texCoord;
     };
 
-    ForwardRendererNode::Object m_object {};
-    ForwardRendererNode::Scene m_scene {};
+    ForwardRenderNode::Object m_object {};
+    ForwardRenderNode::Scene m_scene {};
 
     FpsCamera m_camera {};
 };

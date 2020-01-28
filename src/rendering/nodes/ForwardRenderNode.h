@@ -3,7 +3,7 @@
 #include "../RenderGraphNode.h"
 #include "utility/FpsCamera.h"
 
-class ForwardRendererNode {
+class ForwardRenderNode {
 public:
     // TODO: All of this is stupid and shouldn't be here
     struct Vertex {

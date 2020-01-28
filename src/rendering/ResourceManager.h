@@ -33,6 +33,7 @@ public:
     void publish(const std::string& name, const RenderTarget&);
 
     [[nodiscard]] const Texture* getTexture2D(const std::string& renderPass, const std::string& name);
+    [[nodiscard]] const Buffer* getBuffer(const std::string& renderPass, const std::string& name);
 
     [[nodiscard]] const std::unordered_set<NodeDependency>& nodeDependencies() const;
 

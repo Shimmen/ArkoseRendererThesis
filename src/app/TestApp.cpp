@@ -1,7 +1,8 @@
 #include "TestApp.h"
 
+#include "rendering/nodes/CameraUniformNode.h"
 #include "rendering/nodes/FinalPostFxNode.h"
-#include "rendering/nodes/ForwardRendererNode.h"
+#include "rendering/nodes/ForwardRenderNode.h"
 #include "utility/GlobalState.h"
 #include "utility/Input.h"
 #include <imgui.h>
@@ -44,7 +45,8 @@ void TestApp::setup(StaticResourceManager& staticResources)
 
 void TestApp::makeRenderGraph(RenderGraph& graph)
 {
-    graph.addNode("forward", ForwardRendererNode::construct(m_scene));
+    graph.addNode("camera-uniform", CameraUniformNode::construct(m_camera));
+    graph.addNode("forward", ForwardRenderNode::construct(m_scene));
     graph.addNode("final", FinalPostFxNode::construct());
 }
 

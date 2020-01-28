@@ -139,6 +139,24 @@ const Texture* ResourceManager::getTexture2D(const std::string& renderPass, cons
     return texture;
 }
 
+const Buffer* ResourceManager::getBuffer(const std::string& renderPass, const std::string& name)
+{
+    ASSERT(m_currentNodeName.has_value());
+
+    std::string fullName = makeQualifiedName(renderPass, name);
+    auto entry = m_nameBufferMap.find(fullName);
+
+    if (entry == m_nameBufferMap.end()) {
+        return nullptr;
+    }
+
+    NodeDependency dependency { m_currentNodeName.value(), renderPass };
+    m_nodeDependencies.insert(dependency);
+
+    const Buffer* buffer = entry->second;
+    return buffer;
+}
+
 const std::unordered_set<NodeDependency>& ResourceManager::nodeDependencies() const
 {
     return m_nodeDependencies;
