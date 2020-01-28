@@ -1133,6 +1133,26 @@ void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const C
 
     const RenderTargetInfo& targetInfo = renderTargetInfo(renderTarget);
 
+    // (there is automatic image layout transitions for attached textures, so when we bind the
+    //  render target here, make sure to also swap to the new layout in the cache variable)
+    for (const auto& attachedTexture : targetInfo.attachedTextures) {
+        textureInfo(*attachedTexture).currentLayout = attachedTexture->hasDepthFormat()
+            ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    }
+
+    // Explicitly transition the layouts of the sampled textures to an optimal layout (if it isn't already)
+    {
+        RenderStateInfo& stateInfo = renderStateInfo(cmd.renderState);
+        for (const Texture* texture : stateInfo.sampledTextures) {
+            auto& texInfo = textureInfo(*texture);
+            if (texInfo.currentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+                transitionImageLayout(texInfo.image, texInfo.format, texInfo.currentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &commandBuffer);
+            }
+            texInfo.currentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
+    }
+
     renderPassBeginInfo.renderPass = targetInfo.compatibleRenderPass;
     renderPassBeginInfo.framebuffer = targetInfo.framebuffer;
 
@@ -1654,8 +1674,6 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     if (!transitionImageLayout(texInfo.image, texInfo.format, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
         LogError("VulkanBackend::updateTexture(): could not transition the image to transfer layout.\n");
     }
-    texInfo.currentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-
     if (!copyBufferToImage(stagingBuffer, texInfo.image, width, height)) {
         LogError("VulkanBackend::updateTexture(): could not copy the staging buffer to the image.\n");
     }
@@ -1672,6 +1690,7 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
         finalLayout = VK_IMAGE_LAYOUT_GENERAL;
         break;
     }
+    texInfo.currentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
     if (update.generateMipmaps()) {
         generateMipmaps(update.texture(), finalLayout);
@@ -1843,7 +1862,12 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
             finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         }
 
-        attachment.initialLayout = texInfo.currentLayout;
+        // TODO/FIXME: This works for now since we have VK_ATTACHMENT_LOAD_OP_CLEAR above, but in the future,
+        //  when we don't clear every time this will need to be changed. Using texInfo.currentLayout also won't
+        //  work since we only use the layout at the time of creating this render pass, and not what it is in
+        //  runtime. Not sure what the best way of doing this is. Maybe always using explicit transitions, and
+        //  here just specifying the same initialLayout and finalLayout so nothing(?) happens. Maybe..
+        attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; //texInfo.currentLayout;
         attachment.finalLayout = finalLayout;
 
         uint32_t attachmentIndex = allAttachments.size();
@@ -1901,6 +1925,9 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     RenderTargetInfo renderTargetInfo {};
     renderTargetInfo.compatibleRenderPass = renderPass;
     renderTargetInfo.framebuffer = framebuffer;
+    for (auto& [_, texture] : renderTarget.sortedAttachments()) {
+        renderTargetInfo.attachedTextures.push_back(texture);
+    }
 
     size_t index = m_renderTargetInfos.add(renderTargetInfo);
     renderTarget.registerBackend(backendBadge(), index);
@@ -2427,8 +2454,9 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
                 descImageInfo.sampler = texInfo.sampler;
                 descImageInfo.imageView = texInfo.view;
 
-                ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_GENERAL || texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                descImageInfo.imageLayout = texInfo.currentLayout;
+                //ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                ASSERT(bindingInfo.texture->usage() == Texture::Usage::Sampled || bindingInfo.texture->usage() == Texture::Usage::All);
+                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;//texInfo.currentLayout;
 
                 descImageInfos.push_back(descImageInfo);
                 write.pImageInfo = &descImageInfos.back();
@@ -2452,6 +2480,12 @@ void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swap
     renderStateInfo.descriptorPool = descriptorPool;
     renderStateInfo.pipelineLayout = pipelineLayout;
     renderStateInfo.pipeline = graphicsPipeline;
+
+    for (auto& bindingInfo : renderState.shaderBindingSet().shaderBindings()) {
+        if (bindingInfo.type == ShaderBindingType::TextureSampler) {
+            renderStateInfo.sampledTextures.push_back(bindingInfo.texture);
+        }
+    }
 
     size_t index = m_renderStateInfos.add(renderStateInfo);
     renderState.registerBackend(backendBadge(), index);
@@ -2769,6 +2803,16 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
         imageBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    } else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+
+        // Wait for all color attachment writes ...
+        sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        // ... before allowing any shaders to read the memory
+        destinationStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
     } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {

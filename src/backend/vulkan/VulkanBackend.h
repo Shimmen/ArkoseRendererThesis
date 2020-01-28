@@ -220,6 +220,8 @@ private:
     struct RenderTargetInfo {
         VkFramebuffer framebuffer {};
         VkRenderPass compatibleRenderPass {};
+
+        std::vector<const Texture*> attachedTextures {};
     };
 
     struct RenderStateInfo {
@@ -228,6 +230,8 @@ private:
         VkDescriptorSetLayout descriptorSetLayout {};
         VkPipelineLayout pipelineLayout {};
         VkPipeline pipeline {};
+
+        std::vector<const Texture*> sampledTextures {};
     };
 
     // (helpers for accessing from *Infos vectors)
