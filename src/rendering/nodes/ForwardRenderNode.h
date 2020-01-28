@@ -22,5 +22,6 @@ public:
         const FpsCamera* camera {};
     };
 
+    static std::string name();
     static RenderGraphNode::NodeConstructorFunction construct(const Scene&);
 };

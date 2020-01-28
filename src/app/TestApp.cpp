@@ -45,9 +45,10 @@ void TestApp::setup(StaticResourceManager& staticResources)
 
 void TestApp::makeRenderGraph(RenderGraph& graph)
 {
-    graph.addNode("camera-uniform", CameraUniformNode::construct(m_camera));
-    graph.addNode("forward", ForwardRenderNode::construct(m_scene));
-    graph.addNode("final", FinalPostFxNode::construct());
+    // TODO: It would be nice if there was a way to do this without specifying the name if you just want the default anyway..
+    graph.addNode(CameraUniformNode::name(), CameraUniformNode::construct(m_camera));
+    graph.addNode(ForwardRenderNode::name(), ForwardRenderNode::construct(m_scene));
+    graph.addNode(FinalPostFxNode::name(), FinalPostFxNode::construct());
 }
 
 void TestApp::update(float elapsedTime, float deltaTime)

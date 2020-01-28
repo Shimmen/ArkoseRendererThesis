@@ -1,6 +1,11 @@
 #include "ForwardRenderNode.h"
 
-#include "camera_state.h"
+#include "CameraUniformNode.h"
+
+std::string ForwardRenderNode::name()
+{
+    return "forward";
+}
 
 RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const ForwardRenderNode::Scene& scene)
 {
@@ -18,7 +23,7 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Forw
                 { 2, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
         };
 
-        ShaderBinding uniformBufferBinding = { 0, ShaderStage::Vertex, resourceManager.getBuffer("camera-uniform", "buffer") };
+        ShaderBinding uniformBufferBinding = { 0, ShaderStage::Vertex, resourceManager.getBuffer(CameraUniformNode::name(), "buffer") };
         ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, object.diffuseTexture };
         ShaderBindingSet shaderBindingSet { uniformBufferBinding, textureSamplerBinding };
 

@@ -2,6 +2,11 @@
 
 #include "camera_state.h"
 
+std::string CameraUniformNode::name()
+{
+    return "camera-uniform";
+}
+
 RenderGraphNode::NodeConstructorFunction CameraUniformNode::construct(const FpsCamera& fpsCamera)
 {
     return [&](ResourceManager& resourceManager) {
