@@ -76,11 +76,9 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     setupDearImgui();
 
     m_staticResourceManager = std::make_unique<StaticResourceManager>();
-    m_app.setup(*m_staticResourceManager);
-    createStaticResources();
-
     m_renderGraph = std::make_unique<RenderGraph>(m_numSwapchainImages);
-    m_app.makeRenderGraph(*m_renderGraph);
+    m_app.setup(*m_staticResourceManager, *m_renderGraph);
+    createStaticResources();
     reconstructRenderGraphResources(*m_renderGraph);
 
     for (size_t i = 0; i < m_numSwapchainImages; ++i) {
@@ -1398,9 +1396,6 @@ void VulkanBackend::newTexture(const Texture& texture)
     case Texture::Format::RGB8:
         format = VK_FORMAT_R8G8B8_UNORM;
         break;
-    case Texture::Format::sRGB8:
-        format = VK_FORMAT_R8G8B8_SRGB;
-        break;
     case Texture::Format::RGBA8:
         format = VK_FORMAT_R8G8B8A8_UNORM;
         break;
@@ -1628,8 +1623,27 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     // TODO: Well, if the texture isn't a float texture
     ASSERT(!stbi_is_hdr(update.path().c_str()));
 
-    int width, height, numChannels;
-    stbi_uc* pixels = stbi_load(update.path().c_str(), &width, &height, &numChannels, 0);
+    int numChannels;
+    switch (update.texture().format()) {
+    case Texture::Format::RGB8:
+        numChannels = 3;
+        break;
+    case Texture::Format::RGBA8:
+        numChannels = 4;
+        break;
+    case Texture::Format::sRGBA8:
+        numChannels = 4;
+        break;
+    case Texture::Format::Depth32F:
+        numChannels = 1;
+        break;
+    case Texture::Format::Unknown:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+
+    int width, height;
+    stbi_uc* pixels = stbi_load(update.path().c_str(), &width, &height, nullptr, numChannels);
     if (!pixels) {
         LogError("VulkanBackend::updateTexture(): stb_image could not read the contents of '%s'.\n", update.path().c_str());
         return;

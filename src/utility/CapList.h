@@ -19,7 +19,7 @@ public:
     void push_back(T val)
     {
         if (m_internal.size() >= m_internal.capacity()) {
-            LogErrorAndExit("CapList: reached max capacity %i.\n", m_capacity);
+            LogErrorAndExit("CapList: reached max capacity %i.\n", m_internal.capacity());
         }
         m_internal.push_back(val);
     }
@@ -45,5 +45,4 @@ public:
 
 private:
     std::vector<T> m_internal;
-    size_t m_capacity;
 };

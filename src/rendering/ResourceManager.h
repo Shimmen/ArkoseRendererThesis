@@ -64,10 +64,10 @@ private:
     std::vector<BufferUpdate> m_immediateBufferUpdates;
     std::vector<TextureUpdateFromFile> m_immediateTextureUpdates;
 
-    static constexpr int maxNumBuffers { 10 };
+    static constexpr int maxNumBuffers { 50 };
     CapList<Buffer> m_buffers { maxNumBuffers };
 
-    static constexpr int maxNumTextures { 10 };
+    static constexpr int maxNumTextures { 50 };
     CapList<Texture> m_textures { maxNumTextures };
 
     static constexpr int maxNumRenderTargets { 4 };

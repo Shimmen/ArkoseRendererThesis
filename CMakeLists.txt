@@ -19,6 +19,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/ForwardRenderNode.cpp
         src/utility/FrameAllocator.cpp
         src/utility/GlobalState.cpp
+        src/utility/GltfModel.cpp
         src/utility/FpsCamera.cpp
         src/utility/Input.cpp
         src/utility/fileio.cpp

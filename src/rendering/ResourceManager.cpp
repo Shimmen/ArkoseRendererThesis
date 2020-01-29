@@ -62,7 +62,8 @@ Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb,
     Texture::Format format;
     switch (componentCount) {
     case 3:
-        format = (srgb) ? Texture::Format::sRGB8 : Texture::Format::RGB8;
+        // NOTE: sRGB (without alpha) is often not supported, so we don't support it in ArkoseRenderer
+        format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGB8;
         break;
     case 4:
         format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGBA8;

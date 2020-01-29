@@ -160,9 +160,6 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
 {
     ASSERT(!data.glslSource.empty());
 
-    shaderc::Compiler compiler {};
-    shaderc::CompileOptions options {};
-
     class Includer : public shaderc::CompileOptions::IncluderInterface {
     public:
         explicit Includer(const ShaderManager& shaderManager)
@@ -202,7 +199,15 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
     private:
         const ShaderManager& m_shaderManager;
     };
+
+    shaderc::Compiler compiler {};
+
+    shaderc::CompileOptions options {};
     options.SetIncluder(std::make_unique<Includer>(*this));
+    options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
+    options.SetTargetSpirv(shaderc_spirv_version_1_0);
+    options.SetSourceLanguage(shaderc_source_language_glsl);
+    options.SetForcedVersionProfile(450, shaderc_profile_none);
 
     // TODO: Why doesn't the automatic inferring work?!
     shaderc_shader_kind kind = shaderc_glsl_infer_from_source;

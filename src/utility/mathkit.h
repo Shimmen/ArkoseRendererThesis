@@ -1,11 +1,14 @@
 #pragma once
 
+#include "utility/util.h"
 #include <cmath>
+#include <vector>
 
 #define GLM_FORCE_CXX17
 #define GLM_FORCE_LEFT_HANDED
 
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/mat3x3.hpp>
 #include <glm/mat4x4.hpp>
@@ -47,7 +50,6 @@ inline float mix(float a, float b, float blend)
     return glm::mix(a, b, blend);
 }
 
-
 inline float length2(const vec3& v)
 {
     return glm::dot(v, v);
@@ -80,6 +82,11 @@ inline mat4 translate(float x, float y, float z)
     return glm::translate(mat4 { 1.0f }, { x, y, z });
 }
 
+inline mat4 scale(float x, float y, float z)
+{
+    return glm::scale(mat4 { 1.0f }, { x, y, z });
+}
+
 inline mat4 infinitePerspective(float fieldOfViewY, float aspectRatio, float zNear)
 {
     mat4 matrix = glm::infinitePerspective(fieldOfViewY, aspectRatio, zNear);
@@ -90,6 +97,16 @@ inline mat4 infinitePerspective(float fieldOfViewY, float aspectRatio, float zNe
 inline vec3 rotateWithQuaternion(vec3 vector, quat rotation)
 {
     return glm::rotate(rotation, vector);
+}
+
+inline mat4 linearToMat4(const std::vector<double>& vals)
+{
+    if (vals.empty()) {
+        return mat4(1.0f);
+    }
+
+    ASSERT(vals.size() == 16);
+    return glm::make_mat4(vals.data());
 }
 
 }

@@ -7,10 +7,29 @@ std::string ForwardRenderNode::name()
     return "forward";
 }
 
-RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const ForwardRenderNode::Scene& scene)
+RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scene& scene, StaticResourceManager& staticResources)
 {
-    ASSERT(scene.objects.size() == 1);
-    const Object& object = scene.objects[0];
+    ASSERT(scene.modelCount() == 1);
+    const Model& model = *scene[0];
+    const Mesh& mesh = *model[0];
+
+    std::vector<Vertex> vertices {};
+    {
+        auto posData = mesh.positionData();
+        auto texData = mesh.texcoordData();
+        ASSERT(posData.size() == texData.size());
+        for (int i = 0; i < posData.size(); ++i) {
+            Vertex vertex {};
+            vertex.position = posData[i];
+            vertex.texCoord = texData[i];
+            vertices.push_back(vertex);
+        }
+    }
+
+    Buffer& vertexBuffer = staticResources.createBuffer(Buffer::Usage::Vertex, std::move(vertices));
+    Buffer& indexBuffer = staticResources.createBuffer(Buffer::Usage::Index, mesh.indexData());
+
+    Texture& diffuseTexture = staticResources.loadTexture2D("assets/BoomBox/BoomBoxWithAxes_baseColor.png", true, true);
 
     return [&](ResourceManager& resourceManager) {
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
@@ -19,12 +38,11 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Forw
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),
             { { 0, VertexAttributeType::Float4, offsetof(Vertex, position) },
-                { 1, VertexAttributeType::Float3, offsetof(Vertex, color) },
-                { 2, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
+                { 1, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
         };
 
         ShaderBinding uniformBufferBinding = { 0, ShaderStage::Vertex, resourceManager.getBuffer(CameraUniformNode::name(), "buffer") };
-        ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, object.diffuseTexture };
+        ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, &diffuseTexture };
         ShaderBindingSet shaderBindingSet { uniformBufferBinding, textureSamplerBinding };
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
@@ -53,7 +71,7 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Forw
         return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
-            commandList.add<CmdDrawIndexed>(*object.vertexBuffer, *object.indexBuffer, object.indexCount, DrawMode::Triangles);
+            commandList.add<CmdDrawIndexed>(vertexBuffer, indexBuffer, mesh.indexCount(), DrawMode::Triangles);
         };
     };
 }

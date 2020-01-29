@@ -1,17 +1,13 @@
 #pragma once
 
-#include "ApplicationState.h"
 #include "RenderGraph.h"
-#include "RenderGraphNode.h"
 #include "StaticResourceManager.h"
 
 class App {
 public:
-    App() {}
-    virtual ~App() {}
+    App() = default;
+    virtual ~App() = default;
 
-    virtual void setup(StaticResourceManager&) = 0;
-    virtual void makeRenderGraph(RenderGraph&) = 0;
-
+    virtual void setup(StaticResourceManager&, RenderGraph&) = 0;
     virtual void update(float elapsedTime, float deltaTime) = 0;
 };

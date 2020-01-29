@@ -1,27 +1,18 @@
 #pragma once
 
 #include "../RenderGraphNode.h"
+#include "rendering/StaticResourceManager.h"
 #include "utility/FpsCamera.h"
+#include "utility/Model.h"
 
 class ForwardRenderNode {
 public:
-    // TODO: All of this is stupid and shouldn't be here
+    static std::string name();
+    static RenderGraphNode::NodeConstructorFunction construct(const Scene&, StaticResourceManager&);
+
+private:
     struct Vertex {
         vec3 position;
-        vec3 color;
         vec2 texCoord;
     };
-    struct Object {
-        Texture* diffuseTexture {};
-        Buffer* vertexBuffer {};
-        Buffer* indexBuffer {};
-        size_t indexCount {};
-    };
-    struct Scene {
-        std::vector<Object> objects {};
-        const FpsCamera* camera {};
-    };
-
-    static std::string name();
-    static RenderGraphNode::NodeConstructorFunction construct(const Scene&);
 };
