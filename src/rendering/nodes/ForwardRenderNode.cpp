@@ -9,41 +9,31 @@ std::string ForwardRenderNode::name()
 
 RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scene& scene, StaticResourceManager& staticResources)
 {
-    ASSERT(scene.modelCount() == 1);
-    const Model& model = *scene[0];
-    const Mesh& mesh = *model[0];
-
-    std::vector<Vertex> vertices {};
-    {
-        auto posData = mesh.positionData();
-        auto texData = mesh.texcoordData();
-        ASSERT(posData.size() == texData.size());
-        for (int i = 0; i < posData.size(); ++i) {
-            Vertex vertex {};
-            vertex.position = posData[i];
-            vertex.texCoord = texData[i];
-            vertices.push_back(vertex);
-        }
-    }
-
-    Buffer& vertexBuffer = staticResources.createBuffer(Buffer::Usage::Vertex, std::move(vertices));
-    Buffer& indexBuffer = staticResources.createBuffer(Buffer::Usage::Index, mesh.indexData());
-
-    Texture& diffuseTexture = staticResources.loadTexture2D("assets/BoomBox/BoomBoxWithAxes_baseColor.png", true, true);
+    // NOTE: This is run only once and since we are heavy on lambdas everything will go out of scope...
+    //  So here we use the static resource allocator to make sure we get something that will outlive the lambdas.
+    auto& state = staticResources.allocator().allocateSingle<State>();
+    setupState(scene, staticResources, state);
 
     return [&](ResourceManager& resourceManager) {
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
-        Shader shader = Shader::createBasic("basic", "example.vert", "example.frag");
+        Shader shader = Shader::createBasic("forward", "forward.vert", "forward.frag");
+
+        size_t transformBufferSize = state.drawables.size() * sizeof(mat4);
+        Buffer& transformBuffer = resourceManager.createBuffer(transformBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),
-            { { 0, VertexAttributeType::Float4, offsetof(Vertex, position) },
+            { { 0, VertexAttributeType::Float3, offsetof(Vertex, position) },
                 { 1, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
         };
 
-        ShaderBinding uniformBufferBinding = { 0, ShaderStage::Vertex, resourceManager.getBuffer(CameraUniformNode::name(), "buffer") };
-        ShaderBinding textureSamplerBinding = { 1, ShaderStage::Fragment, &diffuseTexture };
-        ShaderBindingSet shaderBindingSet { uniformBufferBinding, textureSamplerBinding };
+        // TODO!
+        Texture* diffuseTexture = state.textures[0];
+
+        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStage::Vertex, resourceManager.getBuffer(CameraUniformNode::name(), "buffer") };
+        ShaderBinding transformBufferBinding = { 1, ShaderStage::Vertex, &transformBuffer };
+        ShaderBinding textureSamplerBinding = { 2, ShaderStage::Fragment, diffuseTexture };
+        ShaderBindingSet shaderBindingSet { cameraUniformBufferBinding, transformBufferBinding, textureSamplerBinding };
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
 
@@ -68,10 +58,67 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
 
         RenderState& renderState = resourceManager.createRenderState(renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
-        return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
+        return [&](const AppState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
-            commandList.add<CmdDrawIndexed>(vertexBuffer, indexBuffer, mesh.indexCount(), DrawMode::Triangles);
+
+            int numDrawables = state.drawables.size();
+            mat4* transformData = frameAllocator.allocate<mat4>(numDrawables);
+            for (int i = 0; i < numDrawables; ++i) {
+                transformData[i] = state.drawables[i].mesh->transform().worldMatrix();
+            }
+            commandList.add<CmdUpdateBuffer>(transformBuffer, transformData, numDrawables * sizeof(mat4));
+
+            for (int i = 0; i < numDrawables; ++i) {
+                Drawable& drawable = state.drawables[i];
+                commandList.add<CmdDrawIndexed>(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, DrawMode::Triangles, i);
+            }
         };
     };
+}
+
+void ForwardRenderNode::setupState(const Scene& scene, StaticResourceManager& staticResources, State& state)
+{
+    state.drawables.clear();
+    state.materials.clear();
+    state.textures.clear();
+
+    for (int i = 0; i < scene.modelCount(); ++i) {
+        const Model& model = *scene[i];
+        model.forEachMesh([&](const Mesh& mesh) {
+            std::vector<Vertex> vertices {};
+            {
+                auto posData = mesh.positionData();
+                auto texData = mesh.texcoordData();
+                ASSERT(posData.size() == texData.size());
+
+                for (int i = 0; i < posData.size(); ++i) {
+                    Vertex vertex {};
+                    vertex.position = posData[i];
+                    vertex.texCoord = texData[i];
+                    vertices.push_back(vertex);
+                }
+            }
+
+            Drawable drawable {};
+            drawable.mesh = &mesh;
+
+            drawable.vertexBuffer = &staticResources.createBuffer(Buffer::Usage::Vertex, std::move(vertices));
+            drawable.indexBuffer = &staticResources.createBuffer(Buffer::Usage::Index, mesh.indexData());
+            drawable.indexCount = mesh.indexCount();
+
+            // Create texture
+            int samplerIndex = state.textures.size();
+            Texture& baseColorTexture = staticResources.loadTexture("assets/BoomBox/BoomBoxWithAxes_baseColor.png", true, true);
+            state.textures.push_back(&baseColorTexture);
+
+            // Create material
+            ForwardMaterial material {};
+            material.samplerIndex = samplerIndex;
+            drawable.materialIndex = state.materials.size();
+            state.materials.push_back(material);
+
+            state.drawables.push_back(drawable);
+        });
+    }
 }

@@ -87,6 +87,11 @@ inline mat4 scale(float x, float y, float z)
     return glm::scale(mat4 { 1.0f }, { x, y, z });
 }
 
+inline mat4 rotate(quat quaternion)
+{
+    return glm::toMat4(quaternion);
+}
+
 inline mat4 infinitePerspective(float fieldOfViewY, float aspectRatio, float zNear)
 {
     mat4 matrix = glm::infinitePerspective(fieldOfViewY, aspectRatio, zNear);

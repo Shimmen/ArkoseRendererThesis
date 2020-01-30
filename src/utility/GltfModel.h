@@ -5,9 +5,11 @@
 #include <string>
 #include <tiny_gltf.h>
 
+class GltfModel;
+
 class GltfMesh : public Mesh {
 public:
-    explicit GltfMesh(std::string name, const tinygltf::Model&, const tinygltf::Primitive&, mat4 matrix);
+    explicit GltfMesh(std::string name, const Transform* parent, const tinygltf::Model&, const tinygltf::Primitive&, mat4 matrix);
     ~GltfMesh() = default;
 
     [[nodiscard]] std::vector<vec3> positionData() const override;
@@ -24,7 +26,6 @@ private:
 
 private:
     std::string m_name;
-    mat4 m_localMatrix;
     const tinygltf::Model* m_model;
     const tinygltf::Primitive* m_primitive;
 };

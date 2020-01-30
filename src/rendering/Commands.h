@@ -52,19 +52,20 @@ struct CmdDrawArray : public FrontendCommand {
 
 struct CmdDrawIndexed : public FrontendCommand {
 
-    CmdDrawIndexed(Buffer& vBuf, Buffer& iBuf, size_t numI, DrawMode dMode)
+    CmdDrawIndexed(Buffer& vBuf, Buffer& iBuf, size_t numI, DrawMode dMode, uint32_t instanceIdx = 0)
         : vertexBuffer(vBuf)
         , indexBuffer(iBuf)
         , numIndices(numI)
         , mode(dMode)
+        , instanceIndex(instanceIdx)
     {
     }
 
     Buffer& vertexBuffer;
-
     Buffer& indexBuffer;
     size_t numIndices;
     DrawMode mode { DrawMode::Triangles };
+    uint32_t instanceIndex;
 };
 
 struct CmdSetRenderState : public FrontendCommand {

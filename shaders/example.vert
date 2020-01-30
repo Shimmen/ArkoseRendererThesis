@@ -15,5 +15,5 @@ layout(location = 0) out vec2 vTexCoord;
 void main()
 {
     vTexCoord = aTexCoord;
-    gl_Position = camera.projection_from_local * vec4(aPosition, 1.0);
+    gl_Position = camera.projectionFromLocal * vec4(aPosition, 1.0);
 }

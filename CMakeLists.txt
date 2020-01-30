@@ -17,7 +17,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/CameraUniformNode.cpp
         src/rendering/nodes/FinalPostFxNode.cpp
         src/rendering/nodes/ForwardRenderNode.cpp
-        src/utility/FrameAllocator.cpp
+        src/utility/ArenaAllocator.cpp
         src/utility/GlobalState.cpp
         src/utility/GltfModel.cpp
         src/utility/FpsCamera.cpp

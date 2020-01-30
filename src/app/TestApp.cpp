@@ -30,4 +30,9 @@ void TestApp::update(float elapsedTime, float deltaTime)
 
     const Input& input = Input::instance();
     m_camera.update(input, GlobalState::get().windowExtent(), deltaTime);
+
+    //mat4 matrix = mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(50, 50, 50);
+    mat4 matrix = mathkit::axisAngleMatrix({ 0, 1, 0 }, 3.0f / 4.0f * mathkit::PI) * mathkit::scale(50, 50, 50);
+    m_model->transform().setLocalMatrix(matrix);
+
 }

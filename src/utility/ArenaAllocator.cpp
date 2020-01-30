@@ -1,9 +1,9 @@
-#include "FrameAllocator.h"
+#include "ArenaAllocator.h"
 
 #include "utility/logging.h"
 
-
-FrameAllocator::FrameAllocator(size_t capacity)
+/*
+ArenaAllocator::ArenaAllocator(size_t capacity)
     : m_capacity(capacity)
     , m_cursor(0u)
 {
@@ -12,12 +12,8 @@ FrameAllocator::FrameAllocator(size_t capacity)
     m_memory.reset(data);
 }
 
-void FrameAllocator::reset()
-{
-    m_cursor = 0;
-}
 
-std::byte* FrameAllocator::allocate(size_t size)
+std::byte* ArenaAllocator::allocate(size_t size)
 {
     if (m_cursor + size >= m_capacity) {
         LogError("FrameAllocator::allocate(): trying to allocate more than the reserved capacity! Up the capacity or allocate less.\n");
@@ -29,3 +25,4 @@ std::byte* FrameAllocator::allocate(size_t size)
 
     return allocated;
 }
+ */

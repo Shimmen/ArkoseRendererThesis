@@ -1020,7 +1020,7 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
 void VulkanBackend::executeRenderGraph(const AppState& appState, const RenderGraph& renderGraph, VkCommandBuffer commandBuffer, uint32_t swapchainImageIndex)
 {
     FrameAllocator& frameAllocator = *m_frameAllocators[swapchainImageIndex];
-    frameAllocator.reset();
+    frameAllocator.reset(backendBadge());
 
     const ResourceManager& associatedResourceManager = *m_frameResourceManagers[swapchainImageIndex];
     renderGraph.forEachNodeInResolvedOrder(associatedResourceManager, [&](const RenderGraphNode& node) {
@@ -1281,7 +1281,7 @@ void VulkanBackend::executeDrawIndexed(VkCommandBuffer commandBuffer, const CmdD
 
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16); // TODO: Index type!
-    vkCmdDrawIndexed(commandBuffer, command.numIndices, 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, command.numIndices, 1, 0, 0, command.instanceIndex);
 }
 
 void VulkanBackend::newBuffer(const Buffer& buffer)
@@ -2427,8 +2427,8 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
         // TODO: Handle multiple descriptor sets!
 
         std::vector<VkWriteDescriptorSet> descriptorSetWrites {};
-        std::vector<VkDescriptorBufferInfo> descBufferInfos {};
-        std::vector<VkDescriptorImageInfo> descImageInfos {};
+        CapList<VkDescriptorBufferInfo> descBufferInfos { 10 };
+        CapList<VkDescriptorImageInfo> descImageInfos { 10 };
 
         const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
         for (auto& bindingInfo : bindingSet.shaderBindings()) {

@@ -1,13 +1,17 @@
 #pragma once
 
 #include "ResourceManager.h"
+#include "utility/ArenaAllocator.h"
 #include "utility/Badge.h"
 #include <vector>
 
-class StaticResourceManager {
+using StaticAllocator = ArenaAllocator<class StaticResourceManager>;
 
+class StaticResourceManager {
 public:
-    explicit StaticResourceManager();
+    StaticResourceManager();
+
+    StaticAllocator& allocator();
 
     template<typename T>
     [[nodiscard]] Buffer& createBuffer(Buffer::Usage, std::vector<T>&&);
@@ -21,6 +25,7 @@ public:
 
 private:
     ResourceManager m_resourceManager;
+    StaticAllocator m_staticAllocator;
 
     // TODO: Should we allow nodes to add stuff to the static manager after startup?
     std::vector<Buffer*> m_newBuffers {};

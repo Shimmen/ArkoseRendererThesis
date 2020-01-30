@@ -5,7 +5,7 @@
 #include "Commands.h"
 #include "ResourceManager.h"
 #include "Resources.h"
-#include "utility/FrameAllocator.h"
+#include "utility/ArenaAllocator.h"
 #include "utility/copying.h"
 #include <functional>
 #include <memory>
