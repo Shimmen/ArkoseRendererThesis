@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ApplicationState.h"
+#include "AppState.h"
 #include "CommandList.h"
 #include "Commands.h"
 #include "ResourceManager.h"
@@ -13,7 +13,7 @@
 
 class RenderGraphNode {
 public:
-    using CommandSubmissionCallback = std::function<void(const ApplicationState&, CommandList&, FrameAllocator&)>;
+    using CommandSubmissionCallback = std::function<void(const AppState&, CommandList&, FrameAllocator&)>;
     using NodeConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&)>;
 
     explicit RenderGraphNode(NodeConstructorFunction);
@@ -27,7 +27,7 @@ public:
     void constructForFrame(ResourceManager&, uint32_t frame);
 
     //! Executes the node and returns the commands that need to be performed.
-    void executeForFrame(const ApplicationState&, CommandList&, FrameAllocator&, uint32_t frame) const;
+    void executeForFrame(const AppState&, CommandList&, FrameAllocator&, uint32_t frame) const;
 
 private:
     //! Call this function to regenerate the node resources.

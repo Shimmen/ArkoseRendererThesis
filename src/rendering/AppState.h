@@ -2,10 +2,10 @@
 
 #include "Resources.h"
 
-class ApplicationState {
+class AppState {
 public:
-    ApplicationState() = default;
-    ApplicationState(const Extent2D& windowExtent, double deltaTime, double timeSinceStartup, uint32_t frameIndex)
+    AppState() = default;
+    AppState(const Extent2D& windowExtent, double deltaTime, double timeSinceStartup, uint32_t frameIndex)
         : m_frameIndex(frameIndex)
         , m_windowExtent(windowExtent)
         , m_deltaTime(deltaTime)
@@ -19,9 +19,9 @@ public:
     double deltaTime() const { return m_deltaTime; }
     double elapsedTime() const { return m_timeSinceStartup; }
 
-    [[nodiscard]] ApplicationState updateWindowExtent(Extent2D& newExtent)
+    [[nodiscard]] AppState updateWindowExtent(Extent2D& newExtent)
     {
-        ApplicationState copy = *this;
+        AppState copy = *this;
         copy.m_windowExtent = newExtent;
         return copy;
     }

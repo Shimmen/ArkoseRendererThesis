@@ -40,7 +40,7 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
 
         RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
-        return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
+        return [&](const AppState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
             commandList.add<CmdDrawArray>(vertexBuffer, 3, DrawMode::Triangles);

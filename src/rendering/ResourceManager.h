@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ApplicationState.h"
+#include "AppState.h"
 #include "NodeDependency.h"
 #include "ResourceChange.h"
 #include "Resources.h"

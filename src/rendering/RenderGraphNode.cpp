@@ -21,7 +21,7 @@ void RenderGraphNode::constructForFrame(ResourceManager& resourceManager, uint32
     m_command_submission_callbacks[frame] = m_constructor_function(resourceManager);
 }
 
-void RenderGraphNode::executeForFrame(const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator, uint32_t frame) const
+void RenderGraphNode::executeForFrame(const AppState& appState, CommandList& commandList, FrameAllocator& frameAllocator, uint32_t frame) const
 {
     ASSERT(m_frameMultiplicity > 0);
     ASSERT(frame >= 0 && frame < m_frameMultiplicity);

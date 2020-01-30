@@ -33,7 +33,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
-    void executeRenderGraph(const ApplicationState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
+    void executeRenderGraph(const AppState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
     void executeRenderGraphNodeBarrier(VkCommandBuffer);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
@@ -68,7 +68,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Drawing
 
-    void drawFrame(const ApplicationState&, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex);
+    void drawFrame(const AppState&, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Swapchain management

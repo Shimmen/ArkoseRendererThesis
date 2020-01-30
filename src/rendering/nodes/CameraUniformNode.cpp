@@ -13,7 +13,7 @@ RenderGraphNode::NodeConstructorFunction CameraUniformNode::construct(const FpsC
         Buffer& cameraUniformBuffer = resourceManager.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
         resourceManager.publish("buffer", cameraUniformBuffer);
 
-        return [&](const ApplicationState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
+        return [&](const AppState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
             auto& cameraState = frameAllocator.allocate<CameraState>();
 
             // TODO: Remove this line, it's the model matrix!

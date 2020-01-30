@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ApplicationState.h"
+#include "AppState.h"
 #include "RenderGraphNode.h"
 #include "ResourceManager.h"
 #include <functional>

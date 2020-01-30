@@ -932,7 +932,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (frame %u).\n", m_currentFrameIndex);
     }
 
-    ApplicationState appState { m_swapchainExtent, deltaTime, elapsedTime, m_currentFrameIndex };
+    AppState appState { m_swapchainExtent, deltaTime, elapsedTime, m_currentFrameIndex };
 
     uint32_t swapchainImageIndex;
     VkResult acquireResult = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[currentFrameMod], VK_NULL_HANDLE, &swapchainImageIndex);
@@ -988,7 +988,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     return true;
 }
 
-void VulkanBackend::drawFrame(const ApplicationState& appState, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex)
+void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex)
 {
     ASSERT(m_renderGraph);
 
@@ -1017,7 +1017,7 @@ void VulkanBackend::drawFrame(const ApplicationState& appState, double elapsedTi
     }
 }
 
-void VulkanBackend::executeRenderGraph(const ApplicationState& appState, const RenderGraph& renderGraph, VkCommandBuffer commandBuffer, uint32_t swapchainImageIndex)
+void VulkanBackend::executeRenderGraph(const AppState& appState, const RenderGraph& renderGraph, VkCommandBuffer commandBuffer, uint32_t swapchainImageIndex)
 {
     FrameAllocator& frameAllocator = *m_frameAllocators[swapchainImageIndex];
     frameAllocator.reset();
