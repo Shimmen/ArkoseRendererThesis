@@ -46,7 +46,10 @@ Buffer& ResourceManager::createBuffer(size_t size, Buffer::Usage usage, Buffer::
 Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
     Buffer& buffer = createBuffer(size, usage, memoryHint);
-    setBufferDataImmediately(buffer, data, size);
+
+    std::vector<std::byte> data_copy { data, data + size };
+    m_immediateBufferUpdates.emplace_back(buffer, std::move(data_copy));
+
     return buffer;
 }
 
@@ -122,10 +125,8 @@ void ResourceManager::publish(const std::string& name, const RenderTarget& rende
     m_nameRenderTargetMap[fullName] = &renderTarget;
 }
 
-const Texture* ResourceManager::getTexture2D(const std::string& renderPass, const std::string& name)
+const Texture* ResourceManager::getTexture(const std::string& renderPass, const std::string& name)
 {
-    ASSERT(m_currentNodeName.has_value());
-
     std::string fullName = makeQualifiedName(renderPass, name);
     auto entry = m_nameTextureMap.find(fullName);
 
@@ -133,6 +134,7 @@ const Texture* ResourceManager::getTexture2D(const std::string& renderPass, cons
         return nullptr;
     }
 
+    ASSERT(m_currentNodeName.has_value());
     NodeDependency dependency { m_currentNodeName.value(), renderPass };
     m_nodeDependencies.insert(dependency);
 
@@ -142,8 +144,6 @@ const Texture* ResourceManager::getTexture2D(const std::string& renderPass, cons
 
 const Buffer* ResourceManager::getBuffer(const std::string& renderPass, const std::string& name)
 {
-    ASSERT(m_currentNodeName.has_value());
-
     std::string fullName = makeQualifiedName(renderPass, name);
     auto entry = m_nameBufferMap.find(fullName);
 
@@ -151,6 +151,7 @@ const Buffer* ResourceManager::getBuffer(const std::string& renderPass, const st
         return nullptr;
     }
 
+    ASSERT(m_currentNodeName.has_value());
     NodeDependency dependency { m_currentNodeName.value(), renderPass };
     m_nodeDependencies.insert(dependency);
 
@@ -161,13 +162,6 @@ const Buffer* ResourceManager::getBuffer(const std::string& renderPass, const st
 const std::unordered_set<NodeDependency>& ResourceManager::nodeDependencies() const
 {
     return m_nodeDependencies;
-}
-
-void ResourceManager::setBufferDataImmediately(Buffer& buffer, const std::byte* data, size_t size)
-{
-    // TODO: Don't make a copy here! I think it should be made explicit at the calling site.
-    std::vector<std::byte> data_copy { data, data + size };
-    m_immediateBufferUpdates.emplace_back(buffer, std::move(data_copy));
 }
 
 const std::vector<Buffer>& ResourceManager::buffers() const

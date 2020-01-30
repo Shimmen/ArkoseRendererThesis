@@ -62,7 +62,7 @@ private:
     void setupWindowRenderTargets();
     void destroyWindowRenderTargets();
 
-    void newRenderState(const RenderState&, uint32_t swapchainImageIndex);
+    void newRenderState(const RenderState&);
     void deleteRenderState(const RenderState&);
 
     ///////////////////////////////////////////////////////////////////////////

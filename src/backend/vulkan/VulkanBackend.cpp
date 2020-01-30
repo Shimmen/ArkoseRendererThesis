@@ -2068,7 +2068,7 @@ VulkanBackend::RenderTargetInfo& VulkanBackend::renderTargetInfo(const RenderTar
     return renderTargetInfo;
 }
 
-void VulkanBackend::newRenderState(const RenderState& renderState, uint32_t swapchainImageIndex)
+void VulkanBackend::newRenderState(const RenderState& renderState)
 {
     VkVertexInputBindingDescription bindingDescription = {};
     std::vector<VkVertexInputAttributeDescription> attributeDescriptions {};
@@ -2573,7 +2573,7 @@ void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
             newRenderTarget(renderTarget);
         }
         for (auto& renderState : resourceManager->renderStates()) {
-            newRenderState(renderState, swapchainImageIndex);
+            newRenderState(renderState);
         }
 
         // Replace previous resource manager
