@@ -9,8 +9,10 @@ class GltfModel;
 
 class GltfMesh : public Mesh {
 public:
-    explicit GltfMesh(std::string name, const Transform* parent, const tinygltf::Model&, const tinygltf::Primitive&, mat4 matrix);
+    explicit GltfMesh(std::string name, const GltfModel* parent, const tinygltf::Model&, const tinygltf::Primitive&, mat4 matrix);
     ~GltfMesh() = default;
+
+    [[nodiscard]] Material material() const override;
 
     [[nodiscard]] std::vector<vec3> positionData() const override;
     [[nodiscard]] std::vector<vec2> texcoordData() const override;
@@ -26,6 +28,7 @@ private:
 
 private:
     std::string m_name;
+    const GltfModel* m_parentModel;
     const tinygltf::Model* m_model;
     const tinygltf::Primitive* m_primitive;
 };
@@ -40,6 +43,8 @@ public:
 
     const Mesh* operator[](size_t index) const override;
     void forEachMesh(std::function<void(const Mesh&)>) const override;
+
+    [[nodiscard]] std::string directory() const;
 
 private:
     std::string m_path {};

@@ -198,19 +198,23 @@ struct Viewport {
 enum class ShaderBindingType {
     UniformBuffer,
     TextureSampler,
+    TextureSamplerArray,
 };
 
 struct ShaderBinding {
 
     ShaderBinding(uint32_t index, ShaderStage, const Buffer*);
     ShaderBinding(uint32_t index, ShaderStage, const Texture*);
+    ShaderBinding(uint32_t index, ShaderStage, const std::vector<const Texture*>&, uint32_t count);
 
     uint32_t bindingIndex;
+    uint32_t count;
+
     ShaderStage shaderStage; // TODO: Later we want flags here I guess, so we can have multiple of them..
 
     ShaderBindingType type;
     const Buffer* buffer;
-    const Texture* texture;
+    std::vector<const Texture*> textures;
 };
 
 struct ShaderBindingSet {

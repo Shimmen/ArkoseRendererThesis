@@ -176,25 +176,49 @@ Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memo
 
 ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Buffer* buffer)
     : bindingIndex(index)
+    , count(1)
     , shaderStage(shaderStage)
     , type(ShaderBindingType::UniformBuffer) // TODO: Technically this could be some other type of buffer here (e.g. shader storage buffer)
     , buffer(buffer)
-    , texture(nullptr)
+    , textures()
 {
 }
 
 ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Texture* texture)
     : bindingIndex(index)
+    , count(1)
     , shaderStage(shaderStage)
     , type(ShaderBindingType::TextureSampler)
     , buffer(nullptr)
-    , texture(texture)
+    , textures({ texture })
 {
     if (!texture) {
         LogErrorAndExit("ShaderBinding error: null texture\n");
     }
     if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::All) {
         LogErrorAndExit("ShaderBinding error: texture does not support sampling\n");
+    }
+}
+
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std::vector<const Texture*>& textures, uint32_t count)
+    : bindingIndex(index)
+    , count(count)
+    , shaderStage(shaderStage)
+    , type(ShaderBindingType::TextureSamplerArray)
+    , buffer(nullptr)
+    , textures(textures)
+{
+    if (count < textures.size()) {
+        LogErrorAndExit("ShaderBinding error: too many textures in list\n");
+    }
+
+    for (auto texture : textures) {
+        if (!texture) {
+            LogErrorAndExit("ShaderBinding error: null texture in list\n");
+        }
+        if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::All) {
+            LogErrorAndExit("ShaderBinding error: texture in list does not support sampling\n");
+        }
     }
 }
 

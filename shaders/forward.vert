@@ -13,12 +13,6 @@ layout(binding = 0) uniform CameraStateBlock
     CameraState camera;
 };
 
-/*
-layout(binding = 1) buffer TransformBuffer
-{
-    mat4 transforms[];
-};
-*/
 layout(binding = 1) uniform TransformBlock
 {
     mat4 transforms[FORWARD_MAX_TRANSFORMS];
@@ -26,11 +20,12 @@ layout(binding = 1) uniform TransformBlock
 
 layout(location = 0) out vec2 vTexCoord;
 layout(location = 1) out vec3 vPosition;
+layout(location = 2) flat out int vObjectIndex;
 
 void main()
 {
-    int transformIndex = gl_InstanceIndex;
-    mat4 worldFromLocal = transforms[transformIndex];
+    vObjectIndex = gl_InstanceIndex;
+    mat4 worldFromLocal = transforms[vObjectIndex];
 
     vec4 viewSpacePos = camera.viewFromWorld * worldFromLocal * vec4(aPosition, 1.0);
     vPosition = viewSpacePos.xyz;

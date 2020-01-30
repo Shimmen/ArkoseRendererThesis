@@ -27,7 +27,7 @@ private:
 
     struct State {
         std::vector<Drawable> drawables {};
-        std::vector<Texture*> textures {};
+        std::vector<const Texture*> textures {};
         std::vector<ForwardMaterial> materials {};
     };
 

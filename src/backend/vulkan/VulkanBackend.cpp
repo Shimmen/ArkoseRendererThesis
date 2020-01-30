@@ -2160,17 +2160,17 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
 
             VkDescriptorSetLayoutBinding binding = {};
             binding.binding = bindingInfo.bindingIndex;
+            binding.descriptorCount = bindingInfo.count;
 
             switch (bindingInfo.type) {
             case ShaderBindingType::UniformBuffer:
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 break;
             case ShaderBindingType::TextureSampler:
+            case ShaderBindingType::TextureSamplerArray:
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                break;
             }
-
-            // NOTE: Should be 1 unless we have an array, which we currently don't support.
-            binding.descriptorCount = 1;
 
             switch (bindingInfo.shaderStage) {
             case ShaderStage::Vertex:
@@ -2372,14 +2372,16 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
             if (entry == bindingTypeIndex.end()) {
 
                 VkDescriptorPoolSize poolSize = {};
-                poolSize.descriptorCount = 1;
+                poolSize.descriptorCount = bindingInfo.count;
 
                 switch (bindingInfo.type) {
                 case ShaderBindingType::UniformBuffer:
                     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                     break;
                 case ShaderBindingType::TextureSampler:
+                case ShaderBindingType::TextureSamplerArray:
                     poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                    break;
                 }
 
                 bindingTypeIndex[type] = descriptorPoolSizes.size();
@@ -2389,7 +2391,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
 
                 size_t index = entry->second;
                 VkDescriptorPoolSize& poolSize = descriptorPoolSizes[index];
-                poolSize.descriptorCount += 1;
+                poolSize.descriptorCount += bindingInfo.count;
             }
         }
 
@@ -2427,19 +2429,17 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
         // TODO: Handle multiple descriptor sets!
 
         std::vector<VkWriteDescriptorSet> descriptorSetWrites {};
-        CapList<VkDescriptorBufferInfo> descBufferInfos { 10 };
-        CapList<VkDescriptorImageInfo> descImageInfos { 10 };
+        CapList<VkDescriptorBufferInfo> descBufferInfos { 1024 };
+        CapList<VkDescriptorImageInfo> descImageInfos { 1024 };
 
         const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
         for (auto& bindingInfo : bindingSet.shaderBindings()) {
 
             VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            write.pTexelBufferView = nullptr;
+
             write.dstSet = descriptorSet;
-
-            write.descriptorCount = 1;
             write.dstBinding = bindingInfo.bindingIndex;
-
-            write.dstArrayElement = 0;
 
             switch (bindingInfo.type) {
             case ShaderBindingType::UniformBuffer: {
@@ -2456,31 +2456,70 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
                 write.pBufferInfo = &descBufferInfos.back();
                 write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
+                write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
                 break;
             }
 
             case ShaderBindingType::TextureSampler: {
 
-                ASSERT(bindingInfo.texture);
-                const TextureInfo& texInfo = textureInfo(*bindingInfo.texture);
+                ASSERT(bindingInfo.textures.size() == 1);
+                ASSERT(bindingInfo.textures[0]);
+
+                const Texture& texture = *bindingInfo.textures[0];
+                const TextureInfo& texInfo = textureInfo(texture);
 
                 VkDescriptorImageInfo descImageInfo {};
                 descImageInfo.sampler = texInfo.sampler;
                 descImageInfo.imageView = texInfo.view;
 
                 //ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                ASSERT(bindingInfo.texture->usage() == Texture::Usage::Sampled || bindingInfo.texture->usage() == Texture::Usage::All);
-                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;//texInfo.currentLayout;
+                ASSERT(texture.usage() == Texture::Usage::Sampled || texture.usage() == Texture::Usage::All);
+                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //texInfo.currentLayout;
 
                 descImageInfos.push_back(descImageInfo);
                 write.pImageInfo = &descImageInfos.back();
                 write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
+                write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+
+            case ShaderBindingType::TextureSamplerArray: {
+
+                size_t numTextures = bindingInfo.textures.size();
+                ASSERT(numTextures > 0);
+
+                for (uint32_t i = 0; i < bindingInfo.count; ++i) {
+
+                    // NOTE: We always have to fill in the count here, but for the unused we just fill with a "default"
+                    const Texture* texture = (i >= numTextures) ? bindingInfo.textures.front() : bindingInfo.textures[i];
+
+                    ASSERT(texture);
+                    const TextureInfo& texInfo = textureInfo(*texture);
+
+                    VkDescriptorImageInfo descImageInfo {};
+                    descImageInfo.sampler = texInfo.sampler;
+                    descImageInfo.imageView = texInfo.view;
+
+                    ASSERT(texture->usage() == Texture::Usage::Sampled || texture->usage() == Texture::Usage::All);
+                    descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+                    descImageInfos.push_back(descImageInfo);
+                }
+
+                // NOTE: This should point at the first VkDescriptorImageInfo
+                write.pImageInfo = &descImageInfos.back() - (bindingInfo.count - 1);
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.descriptorCount = bindingInfo.count;
+                write.dstArrayElement = 0;
+
                 break;
             }
             }
-
-            write.pTexelBufferView = nullptr;
 
             descriptorSetWrites.push_back(write);
         }
@@ -2496,8 +2535,10 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     renderStateInfo.pipeline = graphicsPipeline;
 
     for (auto& bindingInfo : renderState.shaderBindingSet().shaderBindings()) {
-        if (bindingInfo.type == ShaderBindingType::TextureSampler) {
-            renderStateInfo.sampledTextures.push_back(bindingInfo.texture);
+        if (bindingInfo.type == ShaderBindingType::TextureSampler || bindingInfo.type == ShaderBindingType::TextureSamplerArray) {
+            for (auto texture : bindingInfo.textures) {
+                renderStateInfo.sampledTextures.push_back(texture);
+            }
         }
     }
 

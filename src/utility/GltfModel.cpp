@@ -80,7 +80,7 @@ GltfModel::GltfModel(std::string path, const tinygltf::Model& model)
                     meshName += "_" + std::to_string(i);
                 }
 
-                m_meshes.emplace_back(meshName, &transform(), model, mesh.primitives[i], matrix);
+                m_meshes.emplace_back(meshName, this, model, mesh.primitives[i], matrix);
             }
         }
 
@@ -112,9 +112,20 @@ void GltfModel::forEachMesh(std::function<void(const Mesh&)> callback) const
     }
 }
 
-GltfMesh::GltfMesh(std::string name, const Transform* parent, const tinygltf::Model& model, const tinygltf::Primitive& primitive, mat4 matrix)
-    : Mesh(Transform(matrix, parent))
+std::string GltfModel::directory() const
+{
+    int lastSlash = m_path.rfind('/');
+    if (lastSlash == -1) {
+        return "";
+    }
+    auto dir = m_path.substr(0, lastSlash + 1);
+    return dir;
+}
+
+GltfMesh::GltfMesh(std::string name, const GltfModel* parent, const tinygltf::Model& model, const tinygltf::Primitive& primitive, mat4 matrix)
+    : Mesh(Transform(matrix, &parent->transform()))
     , m_name(std::move(name))
+    , m_parentModel(parent)
     , m_model(&model)
     , m_primitive(&primitive)
 {
@@ -124,6 +135,25 @@ GltfMesh::GltfMesh(std::string name, const Transform* parent, const tinygltf::Mo
 
     // TODO: Add bounding boxes so we can do sorting, etc.
     //meshInfo.aabb = mathkit::aabb(position.minValues, position.maxValues);
+}
+
+Material GltfMesh::material() const
+{
+    auto& gltfMaterial = m_model->materials[m_primitive->material];
+
+    // TODO: Cache this maybe?
+    Material material {};
+
+    int texIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
+    auto& texture = m_model->textures[texIndex];
+    auto& image = m_model->images[texture.source];
+    if (!image.uri.empty()) {
+        material.baseColor = m_parentModel->directory() + image.uri;
+    } else {
+        material.baseColor = "assets/test-pattern.png";
+    }
+
+    return material;
 }
 
 const tinygltf::Accessor& GltfMesh::getAccessor(const char* name) const

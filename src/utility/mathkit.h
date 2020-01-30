@@ -5,7 +5,6 @@
 #include <vector>
 
 #define GLM_FORCE_CXX17
-#define GLM_FORCE_LEFT_HANDED
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -34,6 +33,10 @@ constexpr float TWO_PI = 2.0f * PI;
 constexpr vec3 globalX = vec3 { 1.0f, 0.0f, 0.0f };
 constexpr vec3 globalY = vec3 { 0.0f, 1.0f, 0.0f };
 constexpr vec3 globalZ = vec3 { 0.0f, 0.0f, 1.0f };
+
+constexpr vec3 globalRight = globalX;
+constexpr vec3 globalUp = globalY;
+constexpr vec3 globalForward = -globalZ;
 
 constexpr float radians(float degrees)
 {

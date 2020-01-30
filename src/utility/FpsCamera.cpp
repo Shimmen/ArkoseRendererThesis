@@ -9,19 +9,19 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
     vec3 acceleration { 0.0f };
 
     if (input.isKeyDown(GLFW_KEY_W))
-        acceleration.z += 1;
+        acceleration += mathkit::globalForward;
     if (input.isKeyDown(GLFW_KEY_S))
-        acceleration.z -= 1;
+        acceleration -= mathkit::globalForward;
 
     if (input.isKeyDown(GLFW_KEY_D))
-        acceleration.x += 1;
+        acceleration += mathkit::globalRight;
     if (input.isKeyDown(GLFW_KEY_A))
-        acceleration.x -= 1;
+        acceleration -= mathkit::globalRight;
 
     if (input.isKeyDown(GLFW_KEY_SPACE))
-        acceleration.y += 1;
+        acceleration += mathkit::globalUp;
     if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT))
-        acceleration.y -= 1;
+        acceleration -= mathkit::globalUp;
 
     if (mathkit::length2(acceleration) > 0.01f && !GlobalState::get().guiIsUsingTheKeyboard()) {
         acceleration = normalize(acceleration) * (maxSpeed / timeToMaxSpeed) * dt;
@@ -55,14 +55,14 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
         // Make rotations less sensitive when zoomed in
         float fovMultiplier = 0.2f + ((m_fieldOfView - minFieldOfView) / (maxFieldOfView - minFieldOfView)) * 0.8f;
 
-        m_pitchYawRoll.x += mouseDelta.x * rotationMultiplier * fovMultiplier * dt;
-        m_pitchYawRoll.y += mouseDelta.y * rotationMultiplier * fovMultiplier * dt;
+        m_pitchYawRoll.x += -mouseDelta.x * rotationMultiplier * fovMultiplier * dt;
+        m_pitchYawRoll.y += -mouseDelta.y * rotationMultiplier * fovMultiplier * dt;
     }
 
     // Calculate banking due to movement
 
-    vec3 right = rotate(m_orientation, mathkit::globalX);
-    vec3 forward = rotate(m_orientation, mathkit::globalZ);
+    vec3 right = rotate(m_orientation, mathkit::globalRight);
+    vec3 forward = rotate(m_orientation, mathkit::globalForward);
 
     if (speed > 0.0f) {
         auto direction = m_velocity / speed;
@@ -74,7 +74,7 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
         float signOrZeroRotation = float(rotationAlongY > 0.0f) - float(rotationAlongY < 0.0f);
         float bankAmountRotation = mathkit::clamp(std::abs(rotationAlongY) * 100.0f, 0.0f, 3.0f);
 
-        float targetBank = ((signOrZeroSpeed * -bankAmountSpeed) + (signOrZeroRotation * -bankAmountRotation)) * baselineBankAngle;
+        float targetBank = ((signOrZeroSpeed * bankAmountSpeed) + (signOrZeroRotation * bankAmountRotation)) * baselineBankAngle;
         m_pitchYawRoll.z = mathkit::mix(m_pitchYawRoll.z, targetBank, 1.0f - pow(0.35f, dt));
     }
 

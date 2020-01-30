@@ -3,6 +3,11 @@
 #include "mathkit.h"
 #include "rendering/Resources.h"
 
+class Material {
+public:
+    std::string baseColor {};
+};
+
 class Transform {
 public:
     explicit Transform(mat4 localMatrix = mat4(1.0f), const Transform* parent = nullptr)
@@ -44,6 +49,8 @@ public:
     virtual ~Mesh() = default;
 
     virtual const Transform& transform() const { return m_transform; }
+
+    virtual Material material() const = 0;
 
     virtual std::vector<vec3> positionData() const = 0;
     virtual std::vector<vec2> texcoordData() const = 0;

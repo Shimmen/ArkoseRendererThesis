@@ -18,21 +18,18 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("forward", "forward.vert", "forward.frag");
 
-        size_t transformBufferSize = state.drawables.size() * sizeof(mat4);
-        Buffer& transformBuffer = resourceManager.createBuffer(transformBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),
             { { 0, VertexAttributeType::Float3, offsetof(Vertex, position) },
                 { 1, VertexAttributeType::Float2, offsetof(Vertex, texCoord) } }
         };
 
-        // TODO!
-        Texture* diffuseTexture = state.textures[0];
+        size_t transformBufferSize = state.drawables.size() * sizeof(mat4);
+        Buffer& transformBuffer = resourceManager.createBuffer(transformBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
         ShaderBinding cameraUniformBufferBinding = { 0, ShaderStage::Vertex, resourceManager.getBuffer(CameraUniformNode::name(), "buffer") };
         ShaderBinding transformBufferBinding = { 1, ShaderStage::Vertex, &transformBuffer };
-        ShaderBinding textureSamplerBinding = { 2, ShaderStage::Fragment, diffuseTexture };
+        ShaderBinding textureSamplerBinding = { 2, ShaderStage::Fragment, state.textures, FORWARD_MAX_TEXTURES };
         ShaderBindingSet shaderBindingSet { cameraUniformBufferBinding, transformBufferBinding, textureSamplerBinding };
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
@@ -47,7 +44,8 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
 
         RasterState rasterState;
         rasterState.polygonMode = PolygonMode::Filled;
-        rasterState.backfaceCullingEnabled = false;
+        rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
+        rasterState.backfaceCullingEnabled = true;
 
         Texture& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
         resourceManager.publish("color", colorTexture);
@@ -109,7 +107,7 @@ void ForwardRenderNode::setupState(const Scene& scene, StaticResourceManager& st
 
             // Create texture
             int samplerIndex = state.textures.size();
-            Texture& baseColorTexture = staticResources.loadTexture("assets/BoomBox/BoomBoxWithAxes_baseColor.png", true, true);
+            Texture& baseColorTexture = staticResources.loadTexture(mesh.material().baseColor, true, true);
             state.textures.push_back(&baseColorTexture);
 
             // Create material
@@ -120,5 +118,15 @@ void ForwardRenderNode::setupState(const Scene& scene, StaticResourceManager& st
 
             state.drawables.push_back(drawable);
         });
+    }
+
+    if (state.drawables.size() > FORWARD_MAX_TRANSFORMS) {
+        LogErrorAndExit("ForwardRenderNode: we need to up the number of max transforms that can be handled in the forward pass! "
+                        "We have %u, the capacity is %u.\n", state.drawables.size(), FORWARD_MAX_TRANSFORMS);
+    }
+
+    if (state.textures.size() > FORWARD_MAX_TEXTURES) {
+        LogErrorAndExit("ForwardRenderNode: we need to up the number of max textures that can be handled in the forward pass! "
+                        "We have %u, the capacity is %u.\n", state.textures.size(), FORWARD_MAX_TEXTURES);
     }
 }
