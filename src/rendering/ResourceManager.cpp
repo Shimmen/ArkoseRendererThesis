@@ -67,6 +67,11 @@ Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb,
     case 3:
         // NOTE: sRGB (without alpha) is often not supported, so we don't support it in ArkoseRenderer
         format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGB8;
+
+        // TODO: I think this is just temporary.. why is that not supported??
+        if (format == Texture::Format::RGB8) {
+            format = Texture::Format::RGBA8;
+        }
         break;
     case 4:
         format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGBA8;

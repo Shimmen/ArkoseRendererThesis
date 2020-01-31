@@ -116,6 +116,8 @@ struct RenderTarget : public Resource {
 
     [[nodiscard]] const std::vector<Attachment>& sortedAttachments() const;
 
+    void forEachColorAttachment(std::function<void(const Attachment&)>) const;
+
 private:
     std::vector<Attachment> m_attachments {};
 };

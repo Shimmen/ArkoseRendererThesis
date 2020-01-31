@@ -141,17 +141,23 @@ Material GltfMesh::material() const
 {
     auto& gltfMaterial = m_model->materials[m_primitive->material];
 
+    auto textureUri = [&](int texIndex, std::string defaultPath) -> std::string {
+        if (texIndex == -1) {
+            return defaultPath;
+        }
+        auto& texture = m_model->textures[texIndex];
+        auto& image = m_model->images[texture.source];
+        if (!image.uri.empty()) {
+            return m_parentModel->directory() + image.uri;
+        } else {
+            return defaultPath;
+        }
+    };
+
     // TODO: Cache this maybe?
     Material material {};
-
-    int texIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
-    auto& texture = m_model->textures[texIndex];
-    auto& image = m_model->images[texture.source];
-    if (!image.uri.empty()) {
-        material.baseColor = m_parentModel->directory() + image.uri;
-    } else {
-        material.baseColor = "assets/test-pattern.png";
-    }
+    material.baseColor = textureUri(gltfMaterial.pbrMetallicRoughness.baseColorTexture.index, "assets/test-pattern.png");
+    material.normalMap = textureUri(gltfMaterial.normalTexture.index, "assets/default-normal.png");
 
     return material;
 }

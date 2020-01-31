@@ -6,6 +6,7 @@
 class Material {
 public:
     std::string baseColor {};
+    std::string normalMap {};
 };
 
 class Transform {
@@ -27,6 +28,13 @@ public:
             return m_localMatrix;
         }
         return m_parent->worldMatrix() * m_localMatrix;
+    }
+
+    mat3 normalMatrix() const
+    {
+        mat3 world3x3 = mat3(worldMatrix());
+        mat3 normalMatrix = transpose(inverse(world3x3));
+        return normalMatrix;
     }
 
     // ..

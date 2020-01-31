@@ -15,6 +15,8 @@ private:
     struct Vertex {
         vec3 position;
         vec2 texCoord;
+        vec3 normal;
+        vec4 tangent;
     };
 
     struct Drawable {

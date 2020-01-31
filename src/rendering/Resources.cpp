@@ -167,6 +167,15 @@ const std::vector<RenderTarget::Attachment>& RenderTarget::sortedAttachments() c
     return m_attachments;
 }
 
+void RenderTarget::forEachColorAttachment(std::function<void(const Attachment&)> callback) const
+{
+    for (const auto& attachment : m_attachments) {
+        if (attachment.type != AttachmentType::Depth) {
+            callback(attachment);
+        }
+    }
+}
+
 Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memoryHint)
     : m_size(size)
     , m_usage(usage)

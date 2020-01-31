@@ -132,6 +132,9 @@ std::vector<const char*> VulkanBackend::requiredInstanceExtensions() const
     // For debug messages etc.
     extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
+    // For dynamic indexing in shaders, see http://chunkstories.xyz/blog/a-note-on-descriptor-indexing/
+    //extensions.emplace_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+
     return extensions;
 }
 
@@ -317,6 +320,9 @@ VkPhysicalDevice VulkanBackend::pickBestPhysicalDevice(VkInstance instance, VkSu
     if (!supportedFeatures.samplerAnisotropy) {
         LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with sampler anisotropy support, exiting.\n");
     }
+    if (!supportedFeatures.shaderSampledImageArrayDynamicIndexing) {// || !supportedFeatures.shaderSampledImageArrayNonUniformIndexing) {
+        LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with support for shaderSampledImageArrayDynamicIndexing, exiting.\n");
+    }
 
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(physicalDevice, &props);
@@ -452,6 +458,7 @@ VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceK
 
     VkPhysicalDeviceFeatures requestedDeviceFeatures = {};
     requestedDeviceFeatures.samplerAnisotropy = VK_TRUE;
+    requestedDeviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
 
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
@@ -1706,7 +1713,8 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     }
     texInfo.currentLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
-    if (update.generateMipmaps()) {
+    auto extent = update.texture().extent();
+    if (update.generateMipmaps() && extent.width() > 1 && extent.height() > 1) {
         generateMipmaps(update.texture(), finalLayout);
     } else {
         if (!transitionImageLayout(texInfo.image, texInfo.format, texInfo.currentLayout, finalLayout)) {
@@ -2288,19 +2296,22 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // TODO: Implement blending!
     VkPipelineColorBlendStateCreateInfo colorBlending = { VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments {};
     if (renderState.blendState().enabled) {
+        // TODO: Implement blending!
         ASSERT_NOT_REACHED();
     } else {
-        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        colorBlendAttachment.blendEnable = VK_FALSE;
-
-        colorBlending.logicOpEnable = VK_FALSE;
-        colorBlending.attachmentCount = 1;
-        colorBlending.pAttachments = &colorBlendAttachment;
+        renderState.renderTarget().forEachColorAttachment([&](const RenderTarget::Attachment& attachment) {
+            VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            colorBlendAttachment.blendEnable = VK_FALSE;
+            colorBlendAttachments.push_back(colorBlendAttachment);
+        });
     }
+    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.attachmentCount = colorBlendAttachments.size();
+    colorBlending.pAttachments = colorBlendAttachments.data();
 
     VkPipelineDepthStencilStateCreateInfo depthStencilState = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     depthStencilState.depthTestEnable = VK_TRUE;

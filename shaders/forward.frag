@@ -5,14 +5,34 @@
 
 layout(location = 0) in vec2 vTexCoord;
 layout(location = 1) in vec3 vPosition;
-layout(location = 2) flat in int vObjectIndex;
+layout(location = 2) in vec3 vNormal;
+layout(location = 3) in mat3 vTbnMatrix;
+layout(location = 10) flat in int vMaterialIndex;
 
-layout(binding = 2) uniform sampler2D uDiffuseSamplers[FORWARD_MAX_TEXTURES];
+layout(binding = 2) uniform MaterialBlock
+{
+    ForwardMaterial materials[FORWARD_MAX_MATERIALS];
+};
+
+layout(binding = 3) uniform sampler2D uSamplers[FORWARD_MAX_TEXTURES];
 
 layout(location = 0) out vec4 oColor;
+layout(location = 1) out vec4 oNormal;
 
 void main()
 {
-    vec3 color = texture(uDiffuseSamplers[vObjectIndex], vTexCoord).rgb;
-    oColor = vec4(color, 1.0);
+    ForwardMaterial material = materials[vMaterialIndex];
+
+    // TODO: We need to enable fully dynamic indexing for this to work, and it doesn't seem to work on my MacBook...
+    material.baseColor = 0;
+    material.normalMap = 1;
+
+    vec3 baseColor = texture(uSamplers[material.baseColor], vTexCoord).rgb;
+
+    vec3 packedNormal = texture(uSamplers[material.normalMap], vTexCoord).rgb;
+    vec3 mappedNormal = normalize(packedNormal * 2.0 - 1.0);
+    vec3 N = normalize(vTbnMatrix * mappedNormal); // TODO: Clean up TBN?
+
+    oColor = vec4(baseColor, 1.0);
+    oNormal = vec4(N * 0.5 + 0.5, 0.0);
 }
