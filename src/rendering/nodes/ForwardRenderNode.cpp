@@ -43,7 +43,7 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
         ShaderBinding perObjectBufferBinding = { 1, ShaderStage::Vertex, &perObjectBuffer };
         ShaderBinding materialBufferBinding = { 2, ShaderStage::Fragment, &materialBuffer };
         ShaderBinding textureSamplerBinding = { 3, ShaderStage::Fragment, state.textures, FORWARD_MAX_TEXTURES };
-        ShaderBindingSet shaderBindingSet { cameraUniformBufferBinding, perObjectBufferBinding, materialBufferBinding, textureSamplerBinding };
+        BindingSet& bindingSet = registry.frame.createBindingSet({ cameraUniformBufferBinding, perObjectBufferBinding, materialBufferBinding, textureSamplerBinding });
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
 
@@ -71,11 +71,13 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
             { RenderTarget::AttachmentType::Color1, &normalTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
+        RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, bindingSet, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& commandList) {
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
+
+            commandList.add<CmdBindSet>(0, bindingSet);
 
             commandList.add<CmdUpdateBuffer>(perObjectBuffer, state.materials.data(), state.materials.size() * sizeof(ForwardMaterial));
 

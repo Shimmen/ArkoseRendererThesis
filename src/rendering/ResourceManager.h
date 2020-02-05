@@ -16,8 +16,6 @@ public:
 
     void setCurrentNode(std::string);
 
-    //[[nodiscard]] ArenaAllocator& allocator() { return m_allocator; }
-
     [[nodiscard]] const RenderTarget& windowRenderTarget();
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
@@ -29,11 +27,12 @@ public:
     [[nodiscard]] Buffer& createBuffer(std::vector<T>&& inData, Buffer::Usage usage, Buffer::MemoryHint);
     [[nodiscard]] Buffer& createBuffer(const std::byte* data, size_t size, Buffer::Usage, Buffer::MemoryHint);
 
-    [[nodiscard]] RenderState& createRenderState(const RenderTarget&, const VertexLayout&, const Shader&, const ShaderBindingSet&, const Viewport&, const BlendState&, const RasterState&);
+    [[nodiscard]] BindingSet& createBindingSet(std::initializer_list<ShaderBinding>);
+
+    [[nodiscard]] RenderState& createRenderState(const RenderTarget&, const VertexLayout&, const Shader&, const BindingSet&, const Viewport&, const BlendState&, const RasterState&);
 
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture&);
-    void publish(const std::string& name, const RenderTarget&);
 
     [[nodiscard]] const Texture* getTexture(const std::string& renderPass, const std::string& name);
     [[nodiscard]] const Buffer* getBuffer(const std::string& renderPass, const std::string& name);
@@ -43,6 +42,7 @@ public:
     [[nodiscard]] const std::vector<Buffer>& buffers() const;
     [[nodiscard]] const std::vector<Texture>& textures() const;
     [[nodiscard]] const std::vector<RenderTarget>& renderTargets() const;
+    [[nodiscard]] const std::vector<BindingSet>& bindingSets() const;
     [[nodiscard]] const std::vector<RenderState>& renderStates() const;
     [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
     [[nodiscard]] const std::vector<TextureUpdateFromFile>& textureUpdates() const;
@@ -53,8 +53,6 @@ protected:
     std::string makeQualifiedName(const std::string& node, const std::string& name);
 
 private:
-    //ArenaAllocator m_allocator;
-
     std::optional<std::string> m_currentNodeName;
     std::unordered_set<NodeDependency> m_nodeDependencies;
 
@@ -62,7 +60,6 @@ private:
 
     std::unordered_map<std::string, const Buffer*> m_nameBufferMap;
     std::unordered_map<std::string, const Texture*> m_nameTextureMap;
-    std::unordered_map<std::string, const RenderTarget*> m_nameRenderTargetMap;
 
     std::vector<BufferUpdate> m_immediateBufferUpdates;
     std::vector<TextureUpdateFromFile> m_immediateTextureUpdates;
@@ -75,6 +72,9 @@ private:
 
     static constexpr int maxNumRenderTargets { 4 };
     CapList<RenderTarget> m_renderTargets { maxNumRenderTargets };
+
+    static constexpr int maxNumShaderBindingSets { 128 };
+    CapList<BindingSet> m_shaderBindingSets { maxNumShaderBindingSets };
 
     static constexpr int maxNumRenderStates { 10 };
     CapList<RenderState> m_renderStates { maxNumRenderStates };

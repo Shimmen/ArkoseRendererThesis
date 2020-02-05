@@ -1031,11 +1031,11 @@ void VulkanBackend::executeRenderGraph(const AppState& appState, const RenderGra
         CommandList cmdList {};
         node.executeForFrame(appState, cmdList, swapchainImageIndex);
 
-        bool insideRenderPass = false;
+        RenderState* activeRenderState = nullptr;
         auto endCurrentRenderPassIfAny = [&]() { // TODO: Maybe we want this to be more explicit for the app? Or maybe we just warn that it does happen?
-            if (insideRenderPass) {
+            if (activeRenderState) {
                 vkCmdEndRenderPass(commandBuffer);
-                insideRenderPass = false;
+                activeRenderState = nullptr;
             }
         };
 
@@ -1051,7 +1051,15 @@ void VulkanBackend::executeRenderGraph(const AppState& appState, const RenderGra
                     executeSetRenderState(commandBuffer, cmd, nullptr);
                 }
 
-                insideRenderPass = true;
+                activeRenderState = &cmd.renderState;
+            }
+
+            else if (command.is<CmdBindSet>()) {
+                if (!activeRenderState) {
+                    LogError("Trying to bind a binding set but there is no active render state!");
+                }
+                VkPipelineLayout layoutForCurrentPipeline = renderStateInfo(*activeRenderState).pipelineLayout;
+                executeBindSet(commandBuffer, command.as<CmdBindSet>(), layoutForCurrentPipeline);
             }
 
             else if (command.is<CmdUpdateBuffer>()) {
@@ -1069,7 +1077,9 @@ void VulkanBackend::executeRenderGraph(const AppState& appState, const RenderGra
             }
 
             else if (command.is<CmdDrawIndexed>()) {
-                ASSERT(insideRenderPass);
+                if (!activeRenderState) {
+                    LogError("Trying to draw but there is no active render state!");
+                }
                 executeDrawIndexed(commandBuffer, command.as<CmdDrawIndexed>());
             }
 
@@ -1168,7 +1178,12 @@ void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const C
 
     RenderStateInfo& stateInfo = renderStateInfo(cmd.renderState);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipeline);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipelineLayout, 0, 1, &stateInfo.descriptorSet, 0, nullptr);
+}
+
+void VulkanBackend::executeBindSet(VkCommandBuffer commandBuffer, const CmdBindSet& cmd, VkPipelineLayout pipelineLayout)
+{
+    auto bindInfo = bindingSetInfo(cmd.bindingSet);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, cmd.setIndex, 1, &bindInfo.descriptorSet, 0, nullptr);
 }
 
 void VulkanBackend::executeUpdateBuffer(VkCommandBuffer commandBuffer, const CmdUpdateBuffer& command)
@@ -2095,6 +2110,244 @@ VulkanBackend::RenderTargetInfo& VulkanBackend::renderTargetInfo(const RenderTar
     return renderTargetInfo;
 }
 
+VulkanBackend::BindingSetInfo& VulkanBackend::bindingSetInfo(const BindingSet& bindingSet)
+{
+    BindingSetInfo& bindingSetInfo = m_bindingSetInfos[bindingSet.id()];
+    return bindingSetInfo;
+}
+
+void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
+{
+    VkDescriptorSetLayout descriptorSetLayout {};
+    {
+        std::vector<VkDescriptorSetLayoutBinding> layoutBindings {};
+        layoutBindings.reserve(bindingSet.shaderBindings().size());
+
+        for (auto& bindingInfo : bindingSet.shaderBindings()) {
+
+            VkDescriptorSetLayoutBinding binding = {};
+            binding.binding = bindingInfo.bindingIndex;
+            binding.descriptorCount = bindingInfo.count;
+
+            switch (bindingInfo.type) {
+            case ShaderBindingType::UniformBuffer:
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                break;
+            case ShaderBindingType::TextureSampler:
+            case ShaderBindingType::TextureSamplerArray:
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                break;
+            }
+
+            switch (bindingInfo.shaderStage) {
+            case ShaderStage::Vertex:
+                binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+                break;
+            case ShaderStage::Fragment:
+                binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+                break;
+            case ShaderStage::Compute:
+                ASSERT_NOT_REACHED();
+                break;
+            }
+
+            binding.pImmutableSamplers = nullptr;
+
+            layoutBindings.push_back(binding);
+        }
+
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        descriptorSetLayoutCreateInfo.bindingCount = layoutBindings.size();
+        descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();
+
+        if (vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create descriptor set layout\n");
+        }
+    }
+
+    VkDescriptorPool descriptorPool {};
+    {
+        // TODO: Maybe in the future we don't want one pool per shader binding state? We could group a lot of stuff together probably..?
+
+        std::unordered_map<ShaderBindingType, size_t> bindingTypeIndex {};
+        std::vector<VkDescriptorPoolSize> descriptorPoolSizes {};
+
+        for (auto& bindingInfo : bindingSet.shaderBindings()) {
+
+            ShaderBindingType type = bindingInfo.type;
+
+            auto entry = bindingTypeIndex.find(type);
+            if (entry == bindingTypeIndex.end()) {
+
+                VkDescriptorPoolSize poolSize = {};
+                poolSize.descriptorCount = bindingInfo.count;
+
+                switch (bindingInfo.type) {
+                case ShaderBindingType::UniformBuffer:
+                    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    break;
+                case ShaderBindingType::TextureSampler:
+                case ShaderBindingType::TextureSamplerArray:
+                    poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                    break;
+                }
+
+                bindingTypeIndex[type] = descriptorPoolSizes.size();
+                descriptorPoolSizes.push_back(poolSize);
+
+            } else {
+
+                size_t index = entry->second;
+                VkDescriptorPoolSize& poolSize = descriptorPoolSizes[index];
+                poolSize.descriptorCount += bindingInfo.count;
+            }
+        }
+
+        VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+        descriptorPoolCreateInfo.poolSizeCount = descriptorPoolSizes.size();
+        descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
+        descriptorPoolCreateInfo.maxSets = 1; // TODO: Handle multiple descriptor sets!
+
+        if (vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create descriptor pool\n");
+        }
+    }
+
+    VkDescriptorSet descriptorSet {};
+    {
+        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
+        descriptorSetAllocateInfo.descriptorSetCount = 1;
+        descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
+
+        if (vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create descriptor set\n");
+        }
+    }
+
+    // Update descriptor set
+    {
+        std::vector<VkWriteDescriptorSet> descriptorSetWrites {};
+        CapList<VkDescriptorBufferInfo> descBufferInfos { 1024 };
+        CapList<VkDescriptorImageInfo> descImageInfos { 1024 };
+
+        for (auto& bindingInfo : bindingSet.shaderBindings()) {
+
+            VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+            write.pTexelBufferView = nullptr;
+
+            write.dstSet = descriptorSet;
+            write.dstBinding = bindingInfo.bindingIndex;
+
+            switch (bindingInfo.type) {
+            case ShaderBindingType::UniformBuffer: {
+
+                ASSERT(bindingInfo.buffer);
+                const BufferInfo& bufInfo = bufferInfo(*bindingInfo.buffer);
+
+                VkDescriptorBufferInfo descBufferInfo {};
+                descBufferInfo.offset = 0;
+                descBufferInfo.range = VK_WHOLE_SIZE;
+                descBufferInfo.buffer = bufInfo.buffer;
+
+                descBufferInfos.push_back(descBufferInfo);
+                write.pBufferInfo = &descBufferInfos.back();
+                write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+
+                write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+
+            case ShaderBindingType::TextureSampler: {
+
+                ASSERT(bindingInfo.textures.size() == 1);
+                ASSERT(bindingInfo.textures[0]);
+
+                const Texture& texture = *bindingInfo.textures[0];
+                const TextureInfo& texInfo = textureInfo(texture);
+
+                VkDescriptorImageInfo descImageInfo {};
+                descImageInfo.sampler = texInfo.sampler;
+                descImageInfo.imageView = texInfo.view;
+
+                //ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                ASSERT(texture.usage() == Texture::Usage::Sampled || texture.usage() == Texture::Usage::All);
+                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //texInfo.currentLayout;
+
+                descImageInfos.push_back(descImageInfo);
+                write.pImageInfo = &descImageInfos.back();
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+                write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+
+            case ShaderBindingType::TextureSamplerArray: {
+
+                size_t numTextures = bindingInfo.textures.size();
+                ASSERT(numTextures > 0);
+
+                for (uint32_t i = 0; i < bindingInfo.count; ++i) {
+
+                    // NOTE: We always have to fill in the count here, but for the unused we just fill with a "default"
+                    const Texture* texture = (i >= numTextures) ? bindingInfo.textures.front() : bindingInfo.textures[i];
+
+                    ASSERT(texture);
+                    const TextureInfo& texInfo = textureInfo(*texture);
+
+                    VkDescriptorImageInfo descImageInfo {};
+                    descImageInfo.sampler = texInfo.sampler;
+                    descImageInfo.imageView = texInfo.view;
+
+                    ASSERT(texture->usage() == Texture::Usage::Sampled || texture->usage() == Texture::Usage::All);
+                    descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+                    descImageInfos.push_back(descImageInfo);
+                }
+
+                // NOTE: This should point at the first VkDescriptorImageInfo
+                write.pImageInfo = &descImageInfos.back() - (bindingInfo.count - 1);
+                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                write.descriptorCount = bindingInfo.count;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+            }
+
+            descriptorSetWrites.push_back(write);
+        }
+
+        vkUpdateDescriptorSets(m_device, descriptorSetWrites.size(), descriptorSetWrites.data(), 0, nullptr);
+    }
+
+    BindingSetInfo info {};
+    info.descriptorPool = descriptorPool;
+    info.descriptorSetLayout = descriptorSetLayout;
+    info.descriptorSet = descriptorSet;
+
+    size_t index = m_bindingSetInfos.add(info);
+    bindingSet.registerBackend(backendBadge(), index);
+}
+
+void VulkanBackend::deleteBindingSet(const BindingSet& bindingSet)
+{
+    if (bindingSet.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created shader binding set\n");
+    }
+
+    BindingSetInfo& setInfo = bindingSetInfo(bindingSet);
+    vkDestroyDescriptorPool(m_device, setInfo.descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(m_device, setInfo.descriptorSetLayout, nullptr);
+
+    m_bindingSetInfos.remove(bindingSet.id());
+    bindingSet.unregisterBackend(backendBadge());
+}
+
 void VulkanBackend::newRenderState(const RenderState& renderState)
 {
     VkVertexInputBindingDescription bindingDescription = {};
@@ -2173,57 +2426,8 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
         }
     }
 
-    //
-    // Create descriptor set layout
-    //
-    VkDescriptorSetLayout descriptorSetLayout {};
-    {
-        const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
-
-        std::vector<VkDescriptorSetLayoutBinding> layoutBindings {};
-        layoutBindings.reserve(bindingSet.shaderBindings().size());
-
-        for (auto& bindingInfo : bindingSet.shaderBindings()) {
-
-            VkDescriptorSetLayoutBinding binding = {};
-            binding.binding = bindingInfo.bindingIndex;
-            binding.descriptorCount = bindingInfo.count;
-
-            switch (bindingInfo.type) {
-            case ShaderBindingType::UniformBuffer:
-                binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                break;
-            case ShaderBindingType::TextureSampler:
-            case ShaderBindingType::TextureSamplerArray:
-                binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                break;
-            }
-
-            switch (bindingInfo.shaderStage) {
-            case ShaderStage::Vertex:
-                binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-                break;
-            case ShaderStage::Fragment:
-                binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-                break;
-            case ShaderStage::Compute:
-                ASSERT_NOT_REACHED();
-                break;
-            }
-
-            binding.pImmutableSamplers = nullptr;
-
-            layoutBindings.push_back(binding);
-        }
-
-        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-        descriptorSetLayoutCreateInfo.bindingCount = layoutBindings.size();
-        descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();
-
-        if (vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
-            LogErrorAndExit("Error trying to create descriptor set layout\n");
-        }
-    }
+    // TODO: We should have multiple here to support that!
+    BindingSetInfo bindingInfo = bindingSetInfo(renderState.bindingSet());
 
     //
     // Create pipeline layout
@@ -2232,7 +2436,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
 
     // TODO: Support multiple descriptor sets!
     pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutCreateInfo.pSetLayouts = &bindingInfo.descriptorSetLayout;
 
     // TODO: Support push constants!
     pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
@@ -2383,188 +2587,12 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
         vkDestroyShaderModule(m_device, stage.module, nullptr);
     }
 
-    //
-    // Create a descriptor pool
-    //
-    VkDescriptorPool descriptorPool {};
-    {
-        // TODO: Maybe in the future we don't want one pool per render state? We could group a lot of stuff together probably.
-
-        std::unordered_map<ShaderBindingType, size_t> bindingTypeIndex {};
-        std::vector<VkDescriptorPoolSize> descriptorPoolSizes {};
-
-        const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
-        for (auto& bindingInfo : bindingSet.shaderBindings()) {
-
-            ShaderBindingType type = bindingInfo.type;
-
-            auto entry = bindingTypeIndex.find(type);
-            if (entry == bindingTypeIndex.end()) {
-
-                VkDescriptorPoolSize poolSize = {};
-                poolSize.descriptorCount = bindingInfo.count;
-
-                switch (bindingInfo.type) {
-                case ShaderBindingType::UniformBuffer:
-                    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                    break;
-                case ShaderBindingType::TextureSampler:
-                case ShaderBindingType::TextureSamplerArray:
-                    poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                    break;
-                }
-
-                bindingTypeIndex[type] = descriptorPoolSizes.size();
-                descriptorPoolSizes.push_back(poolSize);
-
-            } else {
-
-                size_t index = entry->second;
-                VkDescriptorPoolSize& poolSize = descriptorPoolSizes[index];
-                poolSize.descriptorCount += bindingInfo.count;
-            }
-        }
-
-        VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
-        descriptorPoolCreateInfo.poolSizeCount = descriptorPoolSizes.size();
-        descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
-        descriptorPoolCreateInfo.maxSets = 1; // TODO: Handle multiple descriptor sets!
-
-        if (vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-            LogErrorAndExit("Error trying to create descriptor pool\n");
-        }
-    }
-
-    //
-    // Create descriptor set(s)
-    //
-    VkDescriptorSet descriptorSet {};
-    {
-        // TODO: Handle multiple descriptor sets!
-
-        VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-        descriptorSetAllocateInfo.descriptorPool = descriptorPool;
-        descriptorSetAllocateInfo.descriptorSetCount = 1;
-        descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
-
-        if (vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS) {
-            LogErrorAndExit("Error trying to create descriptor set\n");
-        }
-    }
-
-    //
-    // Update descriptor set(s)
-    //
-    {
-        // TODO: Handle multiple descriptor sets!
-
-        std::vector<VkWriteDescriptorSet> descriptorSetWrites {};
-        CapList<VkDescriptorBufferInfo> descBufferInfos { 1024 };
-        CapList<VkDescriptorImageInfo> descImageInfos { 1024 };
-
-        const ShaderBindingSet& bindingSet = renderState.shaderBindingSet();
-        for (auto& bindingInfo : bindingSet.shaderBindings()) {
-
-            VkWriteDescriptorSet write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-            write.pTexelBufferView = nullptr;
-
-            write.dstSet = descriptorSet;
-            write.dstBinding = bindingInfo.bindingIndex;
-
-            switch (bindingInfo.type) {
-            case ShaderBindingType::UniformBuffer: {
-
-                ASSERT(bindingInfo.buffer);
-                const BufferInfo& bufInfo = bufferInfo(*bindingInfo.buffer);
-
-                VkDescriptorBufferInfo descBufferInfo {};
-                descBufferInfo.offset = 0;
-                descBufferInfo.range = VK_WHOLE_SIZE;
-                descBufferInfo.buffer = bufInfo.buffer;
-
-                descBufferInfos.push_back(descBufferInfo);
-                write.pBufferInfo = &descBufferInfos.back();
-                write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-
-                write.descriptorCount = 1;
-                write.dstArrayElement = 0;
-
-                break;
-            }
-
-            case ShaderBindingType::TextureSampler: {
-
-                ASSERT(bindingInfo.textures.size() == 1);
-                ASSERT(bindingInfo.textures[0]);
-
-                const Texture& texture = *bindingInfo.textures[0];
-                const TextureInfo& texInfo = textureInfo(texture);
-
-                VkDescriptorImageInfo descImageInfo {};
-                descImageInfo.sampler = texInfo.sampler;
-                descImageInfo.imageView = texInfo.view;
-
-                //ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                ASSERT(texture.usage() == Texture::Usage::Sampled || texture.usage() == Texture::Usage::All);
-                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //texInfo.currentLayout;
-
-                descImageInfos.push_back(descImageInfo);
-                write.pImageInfo = &descImageInfos.back();
-                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-                write.descriptorCount = 1;
-                write.dstArrayElement = 0;
-
-                break;
-            }
-
-            case ShaderBindingType::TextureSamplerArray: {
-
-                size_t numTextures = bindingInfo.textures.size();
-                ASSERT(numTextures > 0);
-
-                for (uint32_t i = 0; i < bindingInfo.count; ++i) {
-
-                    // NOTE: We always have to fill in the count here, but for the unused we just fill with a "default"
-                    const Texture* texture = (i >= numTextures) ? bindingInfo.textures.front() : bindingInfo.textures[i];
-
-                    ASSERT(texture);
-                    const TextureInfo& texInfo = textureInfo(*texture);
-
-                    VkDescriptorImageInfo descImageInfo {};
-                    descImageInfo.sampler = texInfo.sampler;
-                    descImageInfo.imageView = texInfo.view;
-
-                    ASSERT(texture->usage() == Texture::Usage::Sampled || texture->usage() == Texture::Usage::All);
-                    descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-                    descImageInfos.push_back(descImageInfo);
-                }
-
-                // NOTE: This should point at the first VkDescriptorImageInfo
-                write.pImageInfo = &descImageInfos.back() - (bindingInfo.count - 1);
-                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                write.descriptorCount = bindingInfo.count;
-                write.dstArrayElement = 0;
-
-                break;
-            }
-            }
-
-            descriptorSetWrites.push_back(write);
-        }
-
-        vkUpdateDescriptorSets(m_device, descriptorSetWrites.size(), descriptorSetWrites.data(), 0, nullptr);
-    }
-
     RenderStateInfo renderStateInfo {};
-    renderStateInfo.descriptorSetLayout = descriptorSetLayout;
-    renderStateInfo.descriptorSet = descriptorSet;
-    renderStateInfo.descriptorPool = descriptorPool;
     renderStateInfo.pipelineLayout = pipelineLayout;
     renderStateInfo.pipeline = graphicsPipeline;
 
-    for (auto& bindingInfo : renderState.shaderBindingSet().shaderBindings()) {
+    // TODO: Add all sampled textures here, for ALL shader bindings in the future!
+    for (auto& bindingInfo : renderState.bindingSet().shaderBindings()) {
         if (bindingInfo.type == ShaderBindingType::TextureSampler || bindingInfo.type == ShaderBindingType::TextureSamplerArray) {
             for (auto texture : bindingInfo.textures) {
                 renderStateInfo.sampledTextures.push_back(texture);
@@ -2583,8 +2611,6 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
     }
 
     RenderStateInfo& stateInfo = renderStateInfo(renderState);
-    vkDestroyDescriptorPool(m_device, stateInfo.descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(m_device, stateInfo.descriptorSetLayout, nullptr);
     vkDestroyPipeline(m_device, stateInfo.pipeline, nullptr);
     vkDestroyPipelineLayout(m_device, stateInfo.pipelineLayout, nullptr);
 
@@ -2626,26 +2652,9 @@ void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
 void VulkanBackend::destroyRenderGraph(RenderGraph&)
 {
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
-
-        if (!m_frameResourceManagers[swapchainImageIndex]) {
-            continue;
-        }
-
-        auto& oldManager = *m_frameResourceManagers[swapchainImageIndex];
-
-        for (auto& buffer : oldManager.buffers()) {
-            deleteBuffer(buffer);
-        }
-        for (auto& texture : oldManager.textures()) {
-            deleteTexture(texture);
-        }
-        for (auto& renderTarget : oldManager.renderTargets()) {
-            deleteRenderTarget(renderTarget);
-        }
-        for (auto& renderState : oldManager.renderStates()) {
-            deleteRenderState(renderState);
-        }
+        replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), nullptr);
     }
+    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nullptr);
 }
 
 void VulkanBackend::replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current)
@@ -2662,6 +2671,9 @@ void VulkanBackend::replaceResourcesForResourceManagers(ResourceManager* previou
         }
         for (auto& renderTarget : previous->renderTargets()) {
             deleteRenderTarget(renderTarget);
+        }
+        for (auto& bindingSet : previous->bindingSets()) {
+            deleteBindingSet(bindingSet);
         }
         for (auto& renderState : previous->renderStates()) {
             deleteRenderState(renderState);
@@ -2684,6 +2696,9 @@ void VulkanBackend::replaceResourcesForResourceManagers(ResourceManager* previou
         }
         for (auto& renderTarget : current->renderTargets()) {
             newRenderTarget(renderTarget);
+        }
+        for (auto& bindingSet : current->bindingSets()) {
+            newBindingSet(bindingSet);
         }
         for (auto& renderState : current->renderStates()) {
             newRenderState(renderState);

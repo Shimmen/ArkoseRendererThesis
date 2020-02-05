@@ -231,7 +231,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std:
     }
 }
 
-ShaderBindingSet::ShaderBindingSet(/*Badge<ResourceManager>, std::vector<ShaderBinding> shaderBindings*/ std::initializer_list<ShaderBinding> shaderBindings)
+BindingSet::BindingSet(Badge<ResourceManager>, std::vector<ShaderBinding> shaderBindings)
     : m_shaderBindings(shaderBindings)
 {
     std::sort(m_shaderBindings.begin(), m_shaderBindings.end(), [](const ShaderBinding& left, const ShaderBinding& right) {
@@ -240,12 +240,12 @@ ShaderBindingSet::ShaderBindingSet(/*Badge<ResourceManager>, std::vector<ShaderB
 
     for (int i = 0; i < m_shaderBindings.size() - 1; ++i) {
         if (m_shaderBindings[i].bindingIndex == m_shaderBindings[i + 1].bindingIndex) {
-            LogErrorAndExit("ShaderBindingSet error: duplicate bindings\n");
+            LogErrorAndExit("BindingSet error: duplicate bindings\n");
         }
     }
 }
 
-const std::vector<ShaderBinding>& ShaderBindingSet::shaderBindings() const
+const std::vector<ShaderBinding>& BindingSet::shaderBindings() const
 {
     return m_shaderBindings;
 }

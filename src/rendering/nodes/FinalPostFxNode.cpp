@@ -24,8 +24,7 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
         }
 
         ShaderBinding textureSamplerBinding = { 0, ShaderStage::Fragment, sourceTexture };
-        //ShaderBindingSet& shaderBindingSet = registry.frame.createShaderBindingSet({ textureSamplerBinding });
-        ShaderBindingSet shaderBindingSet = { textureSamplerBinding };
+        BindingSet& bindingSet = registry.frame.createBindingSet({ textureSamplerBinding });
 
         const RenderTarget& windowTarget = registry.frame.windowRenderTarget();
 
@@ -40,11 +39,12 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
         rasterState.backfaceCullingEnabled = true;
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
 
-        RenderState& renderState = registry.frame.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
+        RenderState& renderState = registry.frame.createRenderState(windowTarget, vertexLayout, shader, bindingSet, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& commandList) {
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
+            commandList.add<CmdBindSet>(0, bindingSet);
             commandList.add<CmdDrawArray>(vertexBuffer, 3, DrawMode::Triangles);
         };
     };

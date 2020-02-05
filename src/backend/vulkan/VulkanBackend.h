@@ -35,6 +35,7 @@ private:
     void executeRenderGraph(const AppState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
     void executeRenderGraphNodeBarrier(VkCommandBuffer);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
+    void executeBindSet(VkCommandBuffer, const CmdBindSet&, VkPipelineLayout);
     void executeUpdateBuffer(VkCommandBuffer, const CmdUpdateBuffer&);
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
     void executeDrawArray(VkCommandBuffer, const CmdDrawArray&);
@@ -63,6 +64,9 @@ private:
     void deleteRenderTarget(const RenderTarget&);
     void setupWindowRenderTargets();
     void destroyWindowRenderTargets();
+
+    void newBindingSet(const BindingSet&);
+    void deleteBindingSet(const BindingSet&);
 
     void newRenderState(const RenderState&);
     void deleteRenderState(const RenderState&);
@@ -229,15 +233,16 @@ private:
         std::vector<const Texture*> attachedTextures {};
     };
 
-    struct ShaderBindingInfo {
+    struct BindingSetInfo {
         VkDescriptorPool descriptorPool {};
+        VkDescriptorSetLayout descriptorSetLayout {};
         VkDescriptorSet descriptorSet {};
     };
 
     struct RenderStateInfo {
-        VkDescriptorPool descriptorPool {};
-        VkDescriptorSet descriptorSet {};
-        VkDescriptorSetLayout descriptorSetLayout {};
+        //VkDescriptorPool descriptorPool {};
+        //VkDescriptorSet descriptorSet {};
+        //VkDescriptorSetLayout descriptorSetLayout {};
         VkPipelineLayout pipelineLayout {};
         VkPipeline pipeline {};
 
@@ -248,11 +253,13 @@ private:
     BufferInfo& bufferInfo(const Buffer&);
     TextureInfo& textureInfo(const Texture&);
     RenderTargetInfo& renderTargetInfo(const RenderTarget&);
+    BindingSetInfo& bindingSetInfo(const BindingSet&);
     RenderStateInfo& renderStateInfo(const RenderState&);
 
     PersistentIndexedList<BufferInfo> m_bufferInfos {};
     PersistentIndexedList<TextureInfo> m_textureInfos {};
     PersistentIndexedList<RenderTargetInfo> m_renderTargetInfos {};
+    PersistentIndexedList<BindingSetInfo> m_bindingSetInfos {};
     PersistentIndexedList<RenderStateInfo> m_renderStateInfos {};
 
     Texture m_swapchainDepthTexture {};

@@ -219,8 +219,8 @@ struct ShaderBinding {
     std::vector<const Texture*> textures;
 };
 
-struct ShaderBindingSet {// : public Resource {
-    ShaderBindingSet(/*Badge<ResourceManager>, std::vector<ShaderBinding>*/ std::initializer_list<ShaderBinding>);
+struct BindingSet : public Resource {
+    BindingSet(Badge<ResourceManager>, std::vector<ShaderBinding>);
 
     const std::vector<ShaderBinding>& shaderBindings() const;
 
@@ -232,7 +232,7 @@ struct RenderState : public Resource {
 public:
     RenderState(Badge<ResourceManager>,
         const RenderTarget& renderTarget, VertexLayout vertexLayout,
-        Shader shader, ShaderBindingSet shaderBindingSet,
+        Shader shader, const BindingSet& shaderBindingSet,
         Viewport viewport, BlendState blendState, RasterState rasterState)
         : m_renderTarget(renderTarget)
         , m_vertexLayout(vertexLayout)
@@ -249,7 +249,7 @@ public:
     const VertexLayout& vertexLayout() const { return m_vertexLayout; }
 
     const Shader& shader() const { return m_shader; }
-    const ShaderBindingSet& shaderBindingSet() const { return m_shaderBindingSet; }
+    const BindingSet& bindingSet() const { return m_shaderBindingSet; }
 
     const Viewport& fixedViewport() const { return m_viewport; }
     const BlendState& blendState() const { return m_blendState; }
@@ -260,7 +260,7 @@ private:
     VertexLayout m_vertexLayout;
 
     Shader m_shader;
-    ShaderBindingSet m_shaderBindingSet;
+    const BindingSet& m_shaderBindingSet;
 
     Viewport m_viewport;
     BlendState m_blendState;

@@ -54,6 +54,13 @@ Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer
     return buffer;
 }
 
+BindingSet& ResourceManager::createBindingSet(std::initializer_list<ShaderBinding> shaderBindings)
+{
+    BindingSet set = { {}, shaderBindings };
+    m_shaderBindingSets.push_back(set);
+    return m_shaderBindingSets.back();
+}
+
 Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps)
 {
     if (!fileio::isFileReadable(imagePath)) {
@@ -96,7 +103,7 @@ Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb,
 
 RenderState& ResourceManager::createRenderState(
     const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
-    const Shader& shader, const ShaderBindingSet& shaderBindingSet,
+    const Shader& shader, const BindingSet& shaderBindingSet,
     const Viewport& viewport, const BlendState& blendState, const RasterState& rasterState)
 {
     RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState };
@@ -120,15 +127,6 @@ void ResourceManager::publish(const std::string& name, const Texture& texture)
     auto entry = m_nameTextureMap.find(fullName);
     ASSERT(entry == m_nameTextureMap.end());
     m_nameTextureMap[fullName] = &texture;
-}
-
-void ResourceManager::publish(const std::string& name, const RenderTarget& renderTarget)
-{
-    ASSERT(m_currentNodeName.has_value());
-    std::string fullName = makeQualifiedName(m_currentNodeName.value(), name);
-    auto entry = m_nameRenderTargetMap.find(fullName);
-    ASSERT(entry == m_nameRenderTargetMap.end());
-    m_nameRenderTargetMap[fullName] = &renderTarget;
 }
 
 const Texture* ResourceManager::getTexture(const std::string& renderPass, const std::string& name)
@@ -183,6 +181,11 @@ const std::vector<Texture>& ResourceManager::textures() const
 const std::vector<RenderTarget>& ResourceManager::renderTargets() const
 {
     return m_renderTargets.vector();
+}
+
+const std::vector<BindingSet>& ResourceManager::bindingSets() const
+{
+    return m_shaderBindingSets.vector();
 }
 
 const std::vector<RenderState>& ResourceManager::renderStates() const
