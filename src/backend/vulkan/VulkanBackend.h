@@ -23,6 +23,9 @@ public:
     VulkanBackend(VulkanBackend&) = delete;
     VulkanBackend& operator=(VulkanBackend&) = delete;
 
+    // There might be more elegant ways of giving access. We really don't need everything from here.
+    friend class VulkanCommandList;
+
     ///////////////////////////////////////////////////////////////////////////
     /// Public backend API
 
@@ -31,15 +34,6 @@ public:
 private:
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
-
-    void executeRenderGraph(const AppState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
-    void executeRenderGraphNodeBarrier(VkCommandBuffer);
-    void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
-    void executeBindSet(VkCommandBuffer, const CmdBindSet&, VkPipelineLayout);
-    void executeUpdateBuffer(VkCommandBuffer, const CmdUpdateBuffer&);
-    void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
-    void executeDrawArray(VkCommandBuffer, const CmdDrawArray&);
-    void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
     void reconstructRenderGraphResources(RenderGraph& renderGraph);
     void destroyRenderGraph(RenderGraph&);

@@ -73,19 +73,14 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
 
         RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, bindingSet, viewport, blendState, rasterState);
 
-        return [&](const AppState& appState, CommandList& commandList) {
-            commandList.add<CmdSetRenderState>(renderState);
-            commandList.add<CmdClear>(ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
+        return [&](const AppState& appState, CommandList& cmdList) {
+            cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
+            cmdList.bindSet(bindingSet, 0);
 
-            commandList.add<CmdBindSet>(0, bindingSet);
+            cmdList.updateBuffer(perObjectBuffer, state.materials.data(), state.materials.size() * sizeof(ForwardMaterial));
 
-            commandList.add<CmdUpdateBuffer>(perObjectBuffer, state.materials.data(), state.materials.size() * sizeof(ForwardMaterial));
-
-            int numDrawables = state.drawables.size();
-            //PerForwardObject* perObjectData = registry.frame.allocator().allocate<PerForwardObject>(numDrawables);
-            static std::vector<PerForwardObject> perObjectData {};
-            perObjectData.resize(numDrawables);
-
+            size_t numDrawables = state.drawables.size();
+            std::vector<PerForwardObject> perObjectData { numDrawables };
             for (int i = 0; i < numDrawables; ++i) {
                 auto& drawable = state.drawables[i];
                 perObjectData[i] = {
@@ -94,11 +89,11 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
                     .materialIndex = drawable.materialIndex
                 };
             }
-            commandList.add<CmdUpdateBuffer>(perObjectBuffer, perObjectData.data(), numDrawables * sizeof(PerForwardObject));
+            cmdList.updateBuffer(perObjectBuffer, perObjectData.data(), numDrawables * sizeof(PerForwardObject));
 
             for (int i = 0; i < numDrawables; ++i) {
                 const Drawable& drawable = state.drawables[i];
-                commandList.add<CmdDrawIndexed>(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, DrawMode::Triangles, i);
+                cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, i);
             }
         };
     };

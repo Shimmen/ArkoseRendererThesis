@@ -27,6 +27,21 @@ private:
     mutable uint64_t m_id { NullId };
 };
 
+struct ClearColor {
+    ClearColor(float r, float g, float b, float a = 1.0f)
+        : r(pow(r, 2.2f))
+        , g(pow(g, 2.2f))
+        , b(pow(b, 2.2f))
+        , a(a)
+    {
+    }
+
+    float r { 0.0f };
+    float g { 0.0f };
+    float b { 0.0f };
+    float a { 0.0f };
+};
+
 struct Texture : public Resource {
 
     enum class Format {

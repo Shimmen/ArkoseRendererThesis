@@ -41,11 +41,10 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
 
         RenderState& renderState = registry.frame.createRenderState(windowTarget, vertexLayout, shader, bindingSet, viewport, blendState, rasterState);
 
-        return [&](const AppState& appState, CommandList& commandList) {
-            commandList.add<CmdSetRenderState>(renderState);
-            commandList.add<CmdClear>(ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
-            commandList.add<CmdBindSet>(0, bindingSet);
-            commandList.add<CmdDrawArray>(vertexBuffer, 3, DrawMode::Triangles);
+        return [&](const AppState& appState, CommandList& cmdList) {
+            cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
+            cmdList.bindSet(bindingSet, 0);
+            cmdList.draw(vertexBuffer, 3);
         };
     };
 }
