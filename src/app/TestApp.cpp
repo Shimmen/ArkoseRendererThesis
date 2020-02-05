@@ -8,7 +8,7 @@
 #include "utility/Input.h"
 #include <imgui.h>
 
-void TestApp::setup(StaticResourceManager& staticResources, RenderGraph& graph)
+void TestApp::setup(ResourceManager& staticResources, RenderGraph& graph)
 {
     // Here we can do stuff like CPU work and GPU stuff that is fully or mostly static,
     // e.g. load textures, load meshes, set vertex buffers.
@@ -20,7 +20,7 @@ void TestApp::setup(StaticResourceManager& staticResources, RenderGraph& graph)
 
     // TODO: It would be nice if there was a way to do this without specifying the name if you just want the default anyway..
     graph.addNode(CameraUniformNode::name(), CameraUniformNode::construct(m_camera));
-    graph.addNode(ForwardRenderNode::name(), ForwardRenderNode::construct(m_scene, staticResources));
+    graph.addNode(ForwardRenderNode::name(), ForwardRenderNode::construct(m_scene));
     graph.addNode(FinalPostFxNode::name(), FinalPostFxNode::construct());
 }
 

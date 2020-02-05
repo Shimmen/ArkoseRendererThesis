@@ -13,8 +13,8 @@
 
 class RenderGraphNode {
 public:
-    using CommandSubmissionCallback = std::function<void(const AppState&, CommandList&, FrameAllocator&)>;
-    using NodeConstructorFunction = std::function<CommandSubmissionCallback(ResourceManager&)>;
+    using CommandSubmissionCallback = std::function<void(const AppState&, CommandList&)>;
+    using NodeConstructorFunction = std::function<CommandSubmissionCallback(Registry&)>;
 
     explicit RenderGraphNode(NodeConstructorFunction);
     ~RenderGraphNode() = default;
@@ -24,10 +24,10 @@ public:
     void setFrameMultiplicity(size_t frameMultiplicity);
 
     //! Constructs the node with a resource manager that manages the resources for it.
-    void constructForFrame(ResourceManager&, uint32_t frame);
+    void constructForFrame(Registry&, uint32_t frame);
 
     //! Executes the node and returns the commands that need to be performed.
-    void executeForFrame(const AppState&, CommandList&, FrameAllocator&, uint32_t frame) const;
+    void executeForFrame(const AppState&, CommandList&, uint32_t frame) const;
 
 private:
     //! Call this function to regenerate the node resources.

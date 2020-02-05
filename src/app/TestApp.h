@@ -6,7 +6,7 @@
 
 class TestApp : public App {
 public:
-    void setup(StaticResourceManager&, RenderGraph&) override;
+    void setup(ResourceManager& staticResources, RenderGraph&) override;
     void update(float elapsedTime, float deltaTime) override;
 
 private:

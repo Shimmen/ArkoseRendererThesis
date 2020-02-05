@@ -219,8 +219,8 @@ struct ShaderBinding {
     std::vector<const Texture*> textures;
 };
 
-struct ShaderBindingSet {
-    ShaderBindingSet(std::initializer_list<ShaderBinding>);
+struct ShaderBindingSet {// : public Resource {
+    ShaderBindingSet(/*Badge<ResourceManager>, std::vector<ShaderBinding>*/ std::initializer_list<ShaderBinding>);
 
     const std::vector<ShaderBinding>& shaderBindings() const;
 

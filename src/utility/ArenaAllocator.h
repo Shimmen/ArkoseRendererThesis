@@ -7,15 +7,16 @@
 #include <cstdlib>
 #include <memory>
 
-template<typename ResetClass>
+class ResourceManager;
+
 class ArenaAllocator {
 public:
     explicit ArenaAllocator(size_t);
     ~ArenaAllocator() = default;
 
-    void reset(Badge<ResetClass>);
+    void reset();
 
-    std::byte* allocate(size_t);
+    std::byte* allocateBytes(size_t);
 
     template<typename T>
     T* allocate(size_t count);
@@ -36,53 +37,18 @@ private:
     size_t m_cursor;
 };
 
-template<typename ResetClass>
-ArenaAllocator<ResetClass>::ArenaAllocator(size_t capacity)
-    : m_capacity(capacity)
-    , m_cursor(0u)
-{
-    auto* data = static_cast<std::byte*>(malloc(capacity));
-    ASSERT(data != nullptr);
-    m_memory.reset(data);
-}
-
-template<typename ResetClass>
-void ArenaAllocator<ResetClass>::reset(Badge<ResetClass>)
-{
-    m_cursor = 0;
-}
-
-template<typename ResetClass>
-std::byte* ArenaAllocator<ResetClass>::allocate(size_t size)
-{
-    if (m_cursor + size >= m_capacity) {
-        LogError("FrameAllocator::allocate(): trying to allocate more than the reserved capacity! Up the capacity or allocate less.\n");
-        return nullptr;
-    }
-
-    std::byte* allocated = m_memory.get() + m_cursor;
-    m_cursor += size;
-
-    return allocated;
-}
-
-template<typename ResetClass>
 template<typename T>
-T* ArenaAllocator<ResetClass>::allocate(size_t count)
+T* ArenaAllocator::allocate(size_t count)
 {
-    std::byte* data = allocate(count * sizeof(T));
+    std::byte* data = allocateBytes(count * sizeof(T));
     ASSERT(data != nullptr);
     T* object = reinterpret_cast<T*>(data);
     return object;
 }
 
-template<typename ResetClass>
 template<typename T>
-T& ArenaAllocator<ResetClass>::allocateSingle()
+T& ArenaAllocator::allocateSingle()
 {
     T* data = allocate<T>(1);
     return *data;
 }
-
-// It's important to keep it very clear what resources are to be used when/where/how, so these names I think are important
-using FrameAllocator = ArenaAllocator<class Backend>;

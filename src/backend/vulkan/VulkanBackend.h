@@ -3,7 +3,6 @@
 #include "../Backend.h"
 #include "VulkanQueueInfo.h"
 #include "rendering/App.h"
-#include "rendering/StaticResourceManager.h"
 #include "utility/ArenaAllocator.h"
 #include "utility/PersistentIndexedList.h"
 #include <array>
@@ -36,12 +35,15 @@ private:
     void executeRenderGraph(const AppState&, const RenderGraph&, VkCommandBuffer, uint32_t swapchainImageIndex);
     void executeRenderGraphNodeBarrier(VkCommandBuffer);
     void executeSetRenderState(VkCommandBuffer, const CmdSetRenderState&, const CmdClear*);
+    void executeUpdateBuffer(VkCommandBuffer, const CmdUpdateBuffer&);
     void executeCopyTexture(VkCommandBuffer, const CmdCopyTexture&);
     void executeDrawArray(VkCommandBuffer, const CmdDrawArray&);
     void executeDrawIndexed(VkCommandBuffer, const CmdDrawIndexed&);
 
     void reconstructRenderGraphResources(RenderGraph& renderGraph);
     void destroyRenderGraph(RenderGraph&);
+
+    void replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current);
 
     void createStaticResources();
     void destroyStaticResources();
@@ -102,9 +104,9 @@ private:
 
     bool issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const;
 
-    bool copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const;
+    bool copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size, VkCommandBuffer* = nullptr) const;
     bool setBufferMemoryUsingMapping(VmaAllocation, const void* data, VkDeviceSize size);
-    bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size);
+    bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size, VkCommandBuffer* = nullptr);
 
     VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
@@ -186,11 +188,14 @@ private:
 
     App& m_app;
 
-    std::unique_ptr<StaticResourceManager> m_staticResourceManager {};
+    std::unique_ptr<ResourceManager> m_staticResourceManager {};
+    std::unique_ptr<ResourceManager> m_nodeResourceManager {};
     std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
 
-    static constexpr size_t frameAllocatorSize { 2048 };
-    std::vector<std::unique_ptr<FrameAllocator>> m_frameAllocators {};
+    //static constexpr size_t nodeAllocatorSize { 8196 };
+    //std::unique_ptr<ArenaAllocator> m_nodeAllocator {};
+    //static constexpr size_t frameAllocatorSize { 2048 };
+    //std::vector<std::unique_ptr<ArenaAllocator>> m_frameAllocators {};
 
     VkQueue m_graphicsQueue {};
 
@@ -222,6 +227,11 @@ private:
         VkRenderPass compatibleRenderPass {};
 
         std::vector<const Texture*> attachedTextures {};
+    };
+
+    struct ShaderBindingInfo {
+        VkDescriptorPool descriptorPool {};
+        VkDescriptorSet descriptorSet {};
     };
 
     struct RenderStateInfo {

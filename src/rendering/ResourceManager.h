@@ -4,6 +4,7 @@
 #include "NodeDependency.h"
 #include "ResourceChange.h"
 #include "Resources.h"
+#include "utility/ArenaAllocator.h"
 #include "utility/CapList.h"
 #include "utility/util.h"
 #include <unordered_map>
@@ -11,9 +12,11 @@
 
 class ResourceManager {
 public:
-    explicit ResourceManager(const RenderTarget* windowRenderTarget);
+    explicit ResourceManager(const RenderTarget* windowRenderTarget = nullptr);
 
     void setCurrentNode(std::string);
+
+    //[[nodiscard]] ArenaAllocator& allocator() { return m_allocator; }
 
     [[nodiscard]] const RenderTarget& windowRenderTarget();
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
@@ -50,6 +53,8 @@ protected:
     std::string makeQualifiedName(const std::string& node, const std::string& name);
 
 private:
+    //ArenaAllocator m_allocator;
+
     std::optional<std::string> m_currentNodeName;
     std::unordered_set<NodeDependency> m_nodeDependencies;
 
@@ -73,6 +78,12 @@ private:
 
     static constexpr int maxNumRenderStates { 10 };
     CapList<RenderState> m_renderStates { maxNumRenderStates };
+};
+
+class Registry {
+public:
+    ResourceManager& node;
+    ResourceManager& frame;
 };
 
 template<typename T>

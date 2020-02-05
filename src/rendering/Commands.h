@@ -78,6 +78,20 @@ struct CmdSetRenderState : public FrontendCommand {
     RenderState& renderState;
 };
 
+/*
+struct CmdSetShaderBindingSet : public FrontendCommand {
+
+    CmdSetShaderBindingSet(uint32_t index, ShaderBindingSet& set)
+        : bindingSet(set)
+        , setIndex(index)
+    {
+    }
+
+    ShaderBindingSet& bindingSet;
+    uint32_t setIndex;
+};
+*/
+
 struct CmdUpdateBuffer : public FrontendCommand {
 
     CmdUpdateBuffer(Buffer& buffer, void* source, size_t size)

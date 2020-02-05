@@ -3,6 +3,10 @@
 #include "utility/Badge.h"
 #include "utility/util.h"
 
+enum class BackendFeature {
+    TextureArrayDynamicIndexing
+};
+
 class Backend {
 public:
     Backend() = default;

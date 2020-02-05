@@ -7,11 +7,12 @@ RenderGraph::RenderGraph(size_t frameMultiplicity)
 {
 }
 
-void RenderGraph::constructAllForFrame(ResourceManager& resourceManager, uint32_t frame)
+void RenderGraph::constructAllForFrame(Registry& registry, uint32_t frame)
 {
     for (const auto& [name, node] : m_nodes) {
-        resourceManager.setCurrentNode(name);
-        node->constructForFrame(resourceManager, frame);
+        registry.node.setCurrentNode(name);
+        registry.frame.setCurrentNode(name);
+        node->constructForFrame(registry, frame);
     }
 }
 
@@ -36,7 +37,7 @@ void RenderGraph::addNode(const std::string& name, std::unique_ptr<RenderGraphNo
 void RenderGraph::forEachNodeInResolvedOrder(const ResourceManager& associatedResourceManager, const std::function<void(const RenderGraphNode&)>& callback) const
 {
     // TODO: We also have to make sure that nodes rendering to the screen are last (and in some respective order that makes sense)
-    auto& dependencies = associatedResourceManager.nodeDependencies();
+    //auto& dependencies = associatedResourceManager.nodeDependencies();
 
     // TODO: Actually run the callback in the correctly resolved order!
     // TODO: Actually run the callback in the correctly resolved order!

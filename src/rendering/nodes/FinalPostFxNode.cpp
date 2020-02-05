@@ -9,23 +9,25 @@ std::string FinalPostFxNode::name()
 
 RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
 {
-    return [&](ResourceManager& resourceManager) {
+    return [&](Registry& registry) {
         Shader shader = Shader::createBasic("finalPostFX", "finalPostFx.vert", "finalPostFx.frag");
 
         VertexLayout vertexLayout = VertexLayout { sizeof(vec2), { { 0, VertexAttributeType::Float2, 0 } } };
         std::vector<vec2> fullScreenTriangle { { -1, -3 }, { -1, 1 }, { 3, 1 } };
-        Buffer& vertexBuffer = resourceManager.createBuffer(std::move(fullScreenTriangle), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal);
+        Buffer& vertexBuffer = registry.frame.createBuffer(std::move(fullScreenTriangle), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal);
 
-        const Texture* sourceTexture = resourceManager.getTexture(ForwardRenderNode::name(), "color");
+        const Texture* sourceTexture = registry.frame.getTexture(ForwardRenderNode::name(), "color");
         if (!sourceTexture) {
             LogError("FinalPostFxNode: could not find the input texture 'forward:color', using test texture\n");
-            sourceTexture = &resourceManager.loadTexture2D("assets/test-pattern.png", true, true);
+            //sourceTexture = &registry.node.loadTexture2D("assets/test-pattern.png", true, true);
+            sourceTexture = &registry.frame.loadTexture2D("assets/test-pattern.png", true, true);
         }
 
         ShaderBinding textureSamplerBinding = { 0, ShaderStage::Fragment, sourceTexture };
-        ShaderBindingSet shaderBindingSet { textureSamplerBinding };
+        //ShaderBindingSet& shaderBindingSet = registry.frame.createShaderBindingSet({ textureSamplerBinding });
+        ShaderBindingSet shaderBindingSet = { textureSamplerBinding };
 
-        const RenderTarget& windowTarget = resourceManager.windowRenderTarget();
+        const RenderTarget& windowTarget = registry.frame.windowRenderTarget();
 
         Viewport viewport;
         viewport.extent = windowTarget.extent();
@@ -38,9 +40,9 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
         rasterState.backfaceCullingEnabled = true;
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
 
-        RenderState& renderState = resourceManager.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
+        RenderState& renderState = registry.frame.createRenderState(windowTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
-        return [&](const AppState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
+        return [&](const AppState& appState, CommandList& commandList) {
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
             commandList.add<CmdDrawArray>(vertexBuffer, 3, DrawMode::Triangles);

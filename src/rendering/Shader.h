@@ -3,11 +3,18 @@
 #include <string>
 #include <vector>
 
-enum class ShaderStage {
-    Vertex,
-    Fragment,
-    Compute,
+enum class ShaderStage : uint8_t {
+    Vertex = 0x01,
+    Fragment = 0x02,
+    Compute = 0x04,
 };
+
+inline ShaderStage operator|(ShaderStage lhs, ShaderStage rhs)
+{
+    auto left = static_cast<uint8_t>(lhs);
+    auto right = static_cast<uint8_t>(rhs);
+    return static_cast<ShaderStage>(left | right);
+}
 
 struct ShaderFile {
     ShaderFile(std::string name, ShaderStage);

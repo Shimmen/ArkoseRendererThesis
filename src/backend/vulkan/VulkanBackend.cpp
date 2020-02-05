@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanQueueInfo.h"
+#include "rendering/ResourceManager.h"
 #include "rendering/ShaderManager.h"
 #include "utility/GlobalState.h"
 #include "utility/fileio.h"
@@ -75,16 +76,17 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 
     setupDearImgui();
 
-    m_staticResourceManager = std::make_unique<StaticResourceManager>();
+    //for (size_t i = 0; i < m_numSwapchainImages; ++i) {
+    //    auto allocator = std::make_unique<ArenaAllocator>(frameAllocatorSize);
+    //    m_frameAllocators.push_back(std::move(allocator));
+    //}
+    //m_nodeAllocator = std::make_unique<ArenaAllocator>(nodeAllocatorSize);
+
+    m_staticResourceManager = std::make_unique<ResourceManager>();
     m_renderGraph = std::make_unique<RenderGraph>(m_numSwapchainImages);
     m_app.setup(*m_staticResourceManager, *m_renderGraph);
     createStaticResources();
     reconstructRenderGraphResources(*m_renderGraph);
-
-    for (size_t i = 0; i < m_numSwapchainImages; ++i) {
-        auto allocator = std::make_unique<FrameAllocator>(frameAllocatorSize);
-        m_frameAllocators.push_back(std::move(allocator));
-    }
 }
 
 VulkanBackend::~VulkanBackend()
@@ -320,7 +322,7 @@ VkPhysicalDevice VulkanBackend::pickBestPhysicalDevice(VkInstance instance, VkSu
     if (!supportedFeatures.samplerAnisotropy) {
         LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with sampler anisotropy support, exiting.\n");
     }
-    if (!supportedFeatures.shaderSampledImageArrayDynamicIndexing) {// || !supportedFeatures.shaderSampledImageArrayNonUniformIndexing) {
+    if (!supportedFeatures.shaderSampledImageArrayDynamicIndexing) { // || !supportedFeatures.shaderSampledImageArrayNonUniformIndexing) {
         LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with support for shaderSampledImageArrayDynamicIndexing, exiting.\n");
     }
 
@@ -678,7 +680,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     ASSERT(m_numSwapchainImages > 0);
 
     // TODO: This is clearly stupid..
-    ResourceManager& badgeGiver = m_staticResourceManager->internal(backendBadge());
+    ResourceManager& badgeGiver = *m_staticResourceManager;
 
     TextureInfo depthInfo {};
     depthInfo.format = m_depthImageFormat;
@@ -903,30 +905,26 @@ void VulkanBackend::renderDearImguiFrame(VkCommandBuffer commandBuffer, uint32_t
 
 void VulkanBackend::createStaticResources()
 {
-    ResourceManager& resourceManager = m_staticResourceManager->internal(backendBadge());
-
-    for (auto& buffer : resourceManager.buffers()) {
+    for (auto& buffer : m_staticResourceManager->buffers()) {
         newBuffer(buffer);
     }
-    for (auto& bufferUpdate : resourceManager.bufferUpdates()) {
+    for (auto& bufferUpdate : m_staticResourceManager->bufferUpdates()) {
         updateBuffer(bufferUpdate);
     }
-    for (auto& texture : resourceManager.textures()) {
+    for (auto& texture : m_staticResourceManager->textures()) {
         newTexture(texture);
     }
-    for (auto& textureUpdate : resourceManager.textureUpdates()) {
+    for (auto& textureUpdate : m_staticResourceManager->textureUpdates()) {
         updateTexture(textureUpdate);
     }
 }
 
 void VulkanBackend::destroyStaticResources()
 {
-    ResourceManager& resourceManager = m_staticResourceManager->internal(backendBadge());
-
-    for (auto& buffer : resourceManager.buffers()) {
+    for (auto& buffer : m_staticResourceManager->buffers()) {
         deleteBuffer(buffer);
     }
-    for (auto& texture : resourceManager.textures()) {
+    for (auto& texture : m_staticResourceManager->textures()) {
         deleteTexture(texture);
     }
 }
@@ -1026,13 +1024,12 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
 
 void VulkanBackend::executeRenderGraph(const AppState& appState, const RenderGraph& renderGraph, VkCommandBuffer commandBuffer, uint32_t swapchainImageIndex)
 {
-    FrameAllocator& frameAllocator = *m_frameAllocators[swapchainImageIndex];
-    frameAllocator.reset(backendBadge());
+    ResourceManager& associatedResourceManager = *m_frameResourceManagers[swapchainImageIndex];
+    //associatedResourceManager.allocator().reset(); // reset the frame allocator
 
-    const ResourceManager& associatedResourceManager = *m_frameResourceManagers[swapchainImageIndex];
     renderGraph.forEachNodeInResolvedOrder(associatedResourceManager, [&](const RenderGraphNode& node) {
         CommandList cmdList {};
-        node.executeForFrame(appState, cmdList, frameAllocator, swapchainImageIndex);
+        node.executeForFrame(appState, cmdList, swapchainImageIndex);
 
         bool insideRenderPass = false;
         auto endCurrentRenderPassIfAny = [&]() { // TODO: Maybe we want this to be more explicit for the app? Or maybe we just warn that it does happen?
@@ -1058,9 +1055,7 @@ void VulkanBackend::executeRenderGraph(const AppState& appState, const RenderGra
             }
 
             else if (command.is<CmdUpdateBuffer>()) {
-                auto& cmd = command.as<CmdUpdateBuffer>();
-                auto* bytes = static_cast<std::byte*>(cmd.source);
-                updateBuffer(cmd.buffer, bytes, cmd.size);
+                executeUpdateBuffer(commandBuffer, command.as<CmdUpdateBuffer>());
             }
 
             else if (command.is<CmdClear>()) {
@@ -1174,6 +1169,30 @@ void VulkanBackend::executeSetRenderState(VkCommandBuffer commandBuffer, const C
     RenderStateInfo& stateInfo = renderStateInfo(cmd.renderState);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipelineLayout, 0, 1, &stateInfo.descriptorSet, 0, nullptr);
+}
+
+void VulkanBackend::executeUpdateBuffer(VkCommandBuffer commandBuffer, const CmdUpdateBuffer& command)
+{
+    auto* data = static_cast<std::byte*>(command.source);
+    size_t size = command.size;
+
+    BufferInfo& bufInfo = bufferInfo(command.buffer);
+
+    switch (command.buffer.memoryHint()) {
+    case Buffer::MemoryHint::GpuOptimal:
+        if (!setBufferDataUsingStagingBuffer(bufInfo.buffer, data, size, &commandBuffer)) {
+            LogError("VulkanBackend::executeUpdateBuffer(): could not update the buffer memory through staging buffer.\n");
+        }
+        break;
+    case Buffer::MemoryHint::TransferOptimal:
+        if (!setBufferMemoryUsingMapping(bufInfo.allocation, data, size)) {
+            LogError("VulkanBackend::executeUpdateBuffer(): could not update the buffer memory through mapping.\n");
+        }
+        break;
+    case Buffer::MemoryHint::GpuOnly:
+        LogError("VulkanBackend::executeUpdateBuffer(): can't update buffer with GpuOnly memory hint, ignoring\n");
+        break;
+    }
 }
 
 void VulkanBackend::executeCopyTexture(VkCommandBuffer commandBuffer, const CmdCopyTexture& command)
@@ -2581,56 +2600,27 @@ VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState
 
 void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
 {
-    // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
+    auto nodeResourceManager = std::make_unique<ResourceManager>();
 
     m_frameResourceManagers.resize(m_numSwapchainImages);
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
 
         const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[swapchainImageIndex];
-        auto resourceManager = std::make_unique<ResourceManager>(&windowRenderTargetForFrame);
-        renderGraph.constructAllForFrame(*resourceManager, swapchainImageIndex);
+        auto frameResourceManager = std::make_unique<ResourceManager>(&windowRenderTargetForFrame);
 
-        // Delete old resources
-        if (m_frameResourceManagers[swapchainImageIndex]) {
-            auto& previousManager = *m_frameResourceManagers[swapchainImageIndex];
+        Registry registry {
+            .node = *nodeResourceManager,
+            .frame = *frameResourceManager
+        };
 
-            for (auto& buffer : previousManager.buffers()) {
-                deleteBuffer(buffer);
-            }
-            for (auto& texture : previousManager.textures()) {
-                deleteTexture(texture);
-            }
-            for (auto& renderTarget : previousManager.renderTargets()) {
-                deleteRenderTarget(renderTarget);
-            }
-            for (auto& renderState : previousManager.renderStates()) {
-                deleteRenderState(renderState);
-            }
-        }
+        renderGraph.constructAllForFrame(registry, swapchainImageIndex);
 
-        // Create new resources
-        for (auto& buffer : resourceManager->buffers()) {
-            newBuffer(buffer);
-        }
-        for (auto& bufferUpdate : resourceManager->bufferUpdates()) {
-            updateBuffer(bufferUpdate);
-        }
-        for (auto& texture : resourceManager->textures()) {
-            newTexture(texture);
-        }
-        for (auto& textureUpdate : resourceManager->textureUpdates()) {
-            updateTexture(textureUpdate);
-        }
-        for (auto& renderTarget : resourceManager->renderTargets()) {
-            newRenderTarget(renderTarget);
-        }
-        for (auto& renderState : resourceManager->renderStates()) {
-            newRenderState(renderState);
-        }
-
-        // Replace previous resource manager
-        m_frameResourceManagers[swapchainImageIndex] = std::move(resourceManager);
+        replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), frameResourceManager.get());
+        m_frameResourceManagers[swapchainImageIndex] = std::move(frameResourceManager);
     }
+
+    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nodeResourceManager.get());
+    m_nodeResourceManager = std::move(nodeResourceManager);
 }
 
 void VulkanBackend::destroyRenderGraph(RenderGraph&)
@@ -2654,6 +2644,49 @@ void VulkanBackend::destroyRenderGraph(RenderGraph&)
         }
         for (auto& renderState : oldManager.renderStates()) {
             deleteRenderState(renderState);
+        }
+    }
+}
+
+void VulkanBackend::replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current)
+{
+    // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
+
+    // Delete old resources
+    if (previous) {
+        for (auto& buffer : previous->buffers()) {
+            deleteBuffer(buffer);
+        }
+        for (auto& texture : previous->textures()) {
+            deleteTexture(texture);
+        }
+        for (auto& renderTarget : previous->renderTargets()) {
+            deleteRenderTarget(renderTarget);
+        }
+        for (auto& renderState : previous->renderStates()) {
+            deleteRenderState(renderState);
+        }
+    }
+
+    // Create new resources
+    if (current) {
+        for (auto& buffer : current->buffers()) {
+            newBuffer(buffer);
+        }
+        for (auto& bufferUpdate : current->bufferUpdates()) {
+            updateBuffer(bufferUpdate);
+        }
+        for (auto& texture : current->textures()) {
+            newTexture(texture);
+        }
+        for (auto& textureUpdate : current->textureUpdates()) {
+            updateTexture(textureUpdate);
+        }
+        for (auto& renderTarget : current->renderTargets()) {
+            newRenderTarget(renderTarget);
+        }
+        for (auto& renderState : current->renderStates()) {
+            newRenderState(renderState);
         }
     }
 }
@@ -2702,20 +2735,23 @@ bool VulkanBackend::issueSingleTimeCommand(const std::function<void(VkCommandBuf
     return true;
 }
 
-bool VulkanBackend::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size) const
+bool VulkanBackend::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size, VkCommandBuffer* commandBuffer) const
 {
     VkBufferCopy bufferCopyRegion = {};
     bufferCopyRegion.size = size;
     bufferCopyRegion.srcOffset = 0;
     bufferCopyRegion.dstOffset = 0;
 
-    bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
-        vkCmdCopyBuffer(commandBuffer, source, destination, 1, &bufferCopyRegion);
-    });
-
-    if (!success) {
-        LogError("VulkanBackend::copyBuffer(): error copying buffer, refer to issueSingleTimeCommand errors for more information.\n");
-        return false;
+    if (commandBuffer) {
+        vkCmdCopyBuffer(*commandBuffer, source, destination, 1, &bufferCopyRegion);
+    } else {
+        bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+            vkCmdCopyBuffer(commandBuffer, source, destination, 1, &bufferCopyRegion);
+        });
+        if (!success) {
+            LogError("VulkanBackend::copyBuffer(): error copying buffer, refer to issueSingleTimeCommand errors for more information.\n");
+            return false;
+        }
     }
 
     return true;
@@ -2733,7 +2769,7 @@ bool VulkanBackend::setBufferMemoryUsingMapping(VmaAllocation allocation, const 
     return true;
 }
 
-bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void* data, VkDeviceSize size)
+bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void* data, VkDeviceSize size, VkCommandBuffer* commandBuffer)
 {
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -2758,7 +2794,7 @@ bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void*
         return false;
     }
 
-    if (!copyBuffer(stagingBuffer, buffer, size)) {
+    if (!copyBuffer(stagingBuffer, buffer, size, commandBuffer)) {
         LogError("VulkanBackend::setBufferDataUsingStagingBuffer(): could not copy from staging buffer to buffer.\n");
         return false;
     }

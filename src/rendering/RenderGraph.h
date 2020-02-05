@@ -16,7 +16,7 @@ public:
     NON_COPYABLE(RenderGraph);
     RenderGraph(RenderGraph&&) noexcept = default;
 
-    void constructAllForFrame(ResourceManager&, uint32_t frame);
+    void constructAllForFrame(Registry&, uint32_t frame);
 
     void addNode(const std::string& name, const RenderGraphNode::NodeConstructorFunction&);
     void addNode(const std::string& name, std::unique_ptr<RenderGraphNode>);

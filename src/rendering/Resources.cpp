@@ -231,8 +231,8 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std:
     }
 }
 
-ShaderBindingSet::ShaderBindingSet(std::initializer_list<ShaderBinding> list)
-    : m_shaderBindings(list)
+ShaderBindingSet::ShaderBindingSet(/*Badge<ResourceManager>, std::vector<ShaderBinding> shaderBindings*/ std::initializer_list<ShaderBinding> shaderBindings)
+    : m_shaderBindings(shaderBindings)
 {
     std::sort(m_shaderBindings.begin(), m_shaderBindings.end(), [](const ShaderBinding& left, const ShaderBinding& right) {
         return left.bindingIndex < right.bindingIndex;

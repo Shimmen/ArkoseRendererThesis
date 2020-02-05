@@ -7,14 +7,21 @@ std::string ForwardRenderNode::name()
     return "forward";
 }
 
-RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scene& scene, StaticResourceManager& staticResources)
+RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scene& scene)
 {
-    // NOTE: This is run only once and since we are heavy on lambdas everything will go out of scope...
-    //  So here we use the static resource allocator to make sure we get something that will outlive the lambdas.
-    auto& state = staticResources.allocator().allocateSingle<State>();
-    setupState(scene, staticResources, state);
+    // TODO: Select implementation conditionally depending on what's supported!
+    //return constructSlowImplementation(scene);
+    return constructFastImplementation(scene);
+}
 
-    return [&](ResourceManager& resourceManager) {
+RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImplementation(const Scene& scene)
+{
+    return [&](Registry& registry) {
+        //auto& state = registry.node.allocator().allocateSingle<State>();
+        static State state {};
+        //setupState(scene, registry.node, state);
+        setupState(scene, registry.frame, state);
+
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("forward", "forward.vert", "forward.frag");
 
@@ -27,12 +34,12 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
         };
 
         size_t perObjectBufferSize = state.drawables.size() * sizeof(PerForwardObject);
-        Buffer& perObjectBuffer = resourceManager.createBuffer(perObjectBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        Buffer& perObjectBuffer = registry.frame.createBuffer(perObjectBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
         size_t materialBufferSize = state.materials.size() * sizeof(ForwardMaterial);
-        Buffer& materialBuffer = resourceManager.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        Buffer& materialBuffer = registry.frame.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
-        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStage::Vertex, resourceManager.getBuffer(CameraUniformNode::name(), "buffer") };
+        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStage::Vertex, registry.frame.getBuffer(CameraUniformNode::name(), "buffer") };
         ShaderBinding perObjectBufferBinding = { 1, ShaderStage::Vertex, &perObjectBuffer };
         ShaderBinding materialBufferBinding = { 2, ShaderStage::Fragment, &materialBuffer };
         ShaderBinding textureSamplerBinding = { 3, ShaderStage::Fragment, state.textures, FORWARD_MAX_TEXTURES };
@@ -40,7 +47,7 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
 
-        const RenderTarget& windowTarget = resourceManager.windowRenderTarget();
+        const RenderTarget& windowTarget = registry.frame.windowRenderTarget();
 
         Viewport viewport;
         viewport.extent = windowTarget.extent();
@@ -53,27 +60,30 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
         rasterState.backfaceCullingEnabled = true;
 
-        Texture& colorTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
-        resourceManager.publish("color", colorTexture);
+        Texture& colorTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        registry.frame.publish("color", colorTexture);
 
-        Texture& normalTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
-        resourceManager.publish("normal", normalTexture);
+        Texture& normalTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        registry.frame.publish("normal", normalTexture);
 
-        Texture& depthTexture = resourceManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
-        RenderTarget& renderTarget = resourceManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
+        Texture& depthTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
+        RenderTarget& renderTarget = registry.frame.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
             { RenderTarget::AttachmentType::Color1, &normalTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        RenderState& renderState = resourceManager.createRenderState(renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
+        RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState);
 
-        return [&](const AppState& appState, CommandList& commandList, FrameAllocator& frameAllocator) {
+        return [&](const AppState& appState, CommandList& commandList) {
             commandList.add<CmdSetRenderState>(renderState);
             commandList.add<CmdClear>(ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
 
             commandList.add<CmdUpdateBuffer>(perObjectBuffer, state.materials.data(), state.materials.size() * sizeof(ForwardMaterial));
 
             int numDrawables = state.drawables.size();
-            PerForwardObject* perObjectData = frameAllocator.allocate<PerForwardObject>(numDrawables);
+            //PerForwardObject* perObjectData = registry.frame.allocator().allocate<PerForwardObject>(numDrawables);
+            static std::vector<PerForwardObject> perObjectData {};
+            perObjectData.resize(numDrawables);
+
             for (int i = 0; i < numDrawables; ++i) {
                 auto& drawable = state.drawables[i];
                 perObjectData[i] = {
@@ -82,17 +92,17 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
                     .materialIndex = drawable.materialIndex
                 };
             }
-            commandList.add<CmdUpdateBuffer>(perObjectBuffer, perObjectData, numDrawables * sizeof(PerForwardObject));
+            commandList.add<CmdUpdateBuffer>(perObjectBuffer, perObjectData.data(), numDrawables * sizeof(PerForwardObject));
 
             for (int i = 0; i < numDrawables; ++i) {
-                Drawable& drawable = state.drawables[i];
+                const Drawable& drawable = state.drawables[i];
                 commandList.add<CmdDrawIndexed>(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, DrawMode::Triangles, i);
             }
         };
     };
 }
 
-void ForwardRenderNode::setupState(const Scene& scene, StaticResourceManager& staticResources, State& state)
+void ForwardRenderNode::setupState(const Scene& scene, ResourceManager& staticResources, State& state)
 {
     state.drawables.clear();
     state.materials.clear();
@@ -123,19 +133,19 @@ void ForwardRenderNode::setupState(const Scene& scene, StaticResourceManager& st
             Drawable drawable {};
             drawable.mesh = &mesh;
 
-            drawable.vertexBuffer = &staticResources.createBuffer(Buffer::Usage::Vertex, std::move(vertices));
-            drawable.indexBuffer = &staticResources.createBuffer(Buffer::Usage::Index, mesh.indexData());
+            drawable.vertexBuffer = &staticResources.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal);
+            drawable.indexBuffer = &staticResources.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal);
             drawable.indexCount = mesh.indexCount();
 
             // Create textures
             int baseColorIndex = state.textures.size();
             std::string baseColorPath = mesh.material().baseColor;
-            Texture& baseColorTexture = staticResources.loadTexture(baseColorPath, true, true);
+            Texture& baseColorTexture = staticResources.loadTexture2D(baseColorPath, true, true);
             state.textures.push_back(&baseColorTexture);
 
             int normalMapIndex = state.textures.size();
             std::string normalMapPath = mesh.material().normalMap;
-            Texture& normalMapTexture = staticResources.loadTexture(normalMapPath, false, true);
+            Texture& normalMapTexture = staticResources.loadTexture2D(normalMapPath, false, true);
             state.textures.push_back(&normalMapTexture);
 
             // Create material

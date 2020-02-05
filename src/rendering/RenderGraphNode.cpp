@@ -14,16 +14,16 @@ void RenderGraphNode::setFrameMultiplicity(size_t frameMultiplicity)
     m_frameMultiplicity = frameMultiplicity;
 }
 
-void RenderGraphNode::constructForFrame(ResourceManager& resourceManager, uint32_t frame)
+void RenderGraphNode::constructForFrame(Registry& registry, uint32_t frame)
 {
     ASSERT(m_frameMultiplicity > 0);
     ASSERT(frame >= 0 && frame < m_frameMultiplicity);
-    m_command_submission_callbacks[frame] = m_constructor_function(resourceManager);
+    m_command_submission_callbacks[frame] = m_constructor_function(registry);
 }
 
-void RenderGraphNode::executeForFrame(const AppState& appState, CommandList& commandList, FrameAllocator& frameAllocator, uint32_t frame) const
+void RenderGraphNode::executeForFrame(const AppState& appState, CommandList& commandList, uint32_t frame) const
 {
     ASSERT(m_frameMultiplicity > 0);
     ASSERT(frame >= 0 && frame < m_frameMultiplicity);
-    m_command_submission_callbacks[frame](appState, commandList, frameAllocator);
+    m_command_submission_callbacks[frame](appState, commandList);
 }

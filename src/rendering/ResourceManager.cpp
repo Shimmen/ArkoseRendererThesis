@@ -6,6 +6,7 @@
 #include <stb_image.h>
 
 ResourceManager::ResourceManager(const RenderTarget* windowRenderTarget)
+    //: m_allocator(8196)
     : m_windowRenderTarget(windowRenderTarget)
 {
 }

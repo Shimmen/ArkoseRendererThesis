@@ -2,14 +2,13 @@
 
 #include "../RenderGraphNode.h"
 #include "ForwardData.h"
-#include "rendering/StaticResourceManager.h"
 #include "utility/FpsCamera.h"
 #include "utility/Model.h"
 
 class ForwardRenderNode {
 public:
     static std::string name();
-    static RenderGraphNode::NodeConstructorFunction construct(const Scene&, StaticResourceManager&);
+    static RenderGraphNode::NodeConstructorFunction construct(const Scene&);
 
 private:
     struct Vertex {
@@ -33,5 +32,8 @@ private:
         std::vector<ForwardMaterial> materials {};
     };
 
-    static void setupState(const Scene&, StaticResourceManager&, State&);
+    static void setupState(const Scene&, ResourceManager&, State&);
+
+    static RenderGraphNode::NodeConstructorFunction constructFastImplementation(const Scene&);
+    static RenderGraphNode::NodeConstructorFunction constructSlowImplementation(const Scene&);
 };
