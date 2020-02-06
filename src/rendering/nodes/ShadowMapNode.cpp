@@ -8,7 +8,7 @@ std::string ShadowMapNode::name()
     return "shadow";
 }
 
-RenderGraphNode::NodeConstructorFunction ShadowMapNode::construct(const Scene& scene, const FpsCamera& camera)
+RenderGraphNode::NodeConstructorFunction ShadowMapNode::construct(const Scene& scene)
 {
     return [&](Registry& registry) {
         static std::vector<Drawable> drawables {}; // TODO: Don't use static data like this!
