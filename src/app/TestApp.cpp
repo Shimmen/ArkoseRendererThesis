@@ -17,8 +17,15 @@ void TestApp::setup(ResourceManager& staticResources, RenderGraph& graph)
 
     m_camera.lookAt({ 0, 1, 6 }, { 0, 0.5f, 0 });
 
-    m_model = GltfModel::load("assets/BoomBox/BoomBoxWithAxes.gltf");
-    m_scene = { m_model.get() };
+    m_cube = GltfModel::load("assets/Cube/Cube.gltf");
+    m_cube->transform().setLocalMatrix(
+        mathkit::translate(0, -1.6f, 0) *
+        mathkit::axisAngleMatrix({0,1,0}, 0.3f) *
+        mathkit::scale(3, 1, 3));
+
+    m_boomBox = GltfModel::load("assets/BoomBox/BoomBoxWithAxes.gltf");
+
+    m_scene = { m_boomBox.get(), m_cube.get() };
 
     m_scene.sun().color = { 1, 1, 1 };
     m_scene.sun().intensity = 1.0f;
@@ -42,5 +49,5 @@ void TestApp::update(float elapsedTime, float deltaTime)
     m_camera.update(input, GlobalState::get().windowExtent(), deltaTime);
 
     mat4 matrix = mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(75);
-    m_model->transform().setLocalMatrix(matrix);
+    m_boomBox->transform().setLocalMatrix(matrix);
 }
