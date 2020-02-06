@@ -1,6 +1,8 @@
 #include "SlowForwardRenderNode.h"
 
 #include "CameraUniformNode.h"
+#include "LightData.h"
+#include "ShadowMapNode.h"
 
 std::string SlowForwardRenderNode::name()
 {
@@ -50,17 +52,30 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
         const Buffer* cameraUniformBuffer = registry.frame.getBuffer(CameraUniformNode::name(), "buffer");
         BindingSet& fixedBindingSet = registry.frame.createBindingSet({ { 0, ShaderStage(ShaderStageVertex | ShaderStageFragment), cameraUniformBuffer } });
 
+        const Texture* dirLightShadowMap = registry.frame.getTexture(ShadowMapNode::name(), "directional");
+        Buffer& dirLightUniformBuffer = registry.frame.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        BindingSet& dirLightBindingSet = registry.frame.createBindingSet({ { 0, ShaderStageFragment, dirLightShadowMap }, { 1, ShaderStageFragment, &dirLightUniformBuffer } });
+
         std::vector<const BindingSet*> allBindingSets {};
         allBindingSets.push_back(&fixedBindingSet);
-        for (auto& drawable : state.drawables) {
-            allBindingSets.push_back(drawable.bindingSet);
-        }
+        //for (auto& drawable : state.drawables) { // TODO: We have to provide the layouts in order!!!
+        allBindingSets.push_back(state.drawables[0].bindingSet);
+        //}
+        allBindingSets.push_back(&dirLightBindingSet);
 
         RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
             cmdList.bindSet(fixedBindingSet, 0);
+
+            DirectionalLight dirLight {
+                .colorAndIntensity = { 1, 1, 1, 10.0f },
+                .viewSpaceDirection = scene.camera().viewMatrix() * normalize(vec4(scene.sun().direction, 0.0)),
+                .lightProjectionFromWorld = scene.sun().lightProjection()
+            };
+            cmdList.updateBufferImmediately(dirLightUniformBuffer, &dirLight, sizeof(DirectionalLight));
+            cmdList.bindSet(dirLightBindingSet, 2);
 
             for (const Drawable& drawable : state.drawables) {
 

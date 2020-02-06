@@ -3,6 +3,7 @@
 
 #include "shared/CameraState.h"
 #include "shared/ForwardData.h"
+#include "shared/LightData.h"
 #include "brdf.glsl"
 
 layout(location = 0) in vec2 vTexCoord;
@@ -18,16 +19,46 @@ layout(set = 0, binding = 0) uniform CameraStateBlock
 layout(set = 1, binding = 1) uniform sampler2D uBaseColor;
 layout(set = 1, binding = 2) uniform sampler2D uNormalMap;
 
+layout(set = 2, binding = 0) uniform sampler2D uDirLightShadowMap;
+layout(set = 2, binding = 1) uniform DirLightBlock
+{
+    DirectionalLight dirLight;
+};
+
 layout(location = 0) out vec4 oColor;
 layout(location = 1) out vec4 oNormal;
 
 // TODO: Move to some general location!
-vec3 evaluateDirectionalLight(vec3 V, vec3 N, vec3 baseColor, float roughness, float metallic)
-{
-    vec3 lightColor = 10.0 * vec3(1, 1, 1); // TODO: LIGHT_COLOR_HERE_PLEASE
-    vec3 L = -mat3(camera.viewFromWorld) * normalize(vec3(-1.0, -1.0, 0.0));
 
-    float shadowFactor = 1.0; // TODO: Implement shadows!
+float evaluateShadow(sampler2D shadowMap, mat4 lightProjectionFromView, vec3 viewSpacePos)
+{
+    vec4 posInShadowMap = lightProjectionFromView * vec4(viewSpacePos, 1.0);
+    posInShadowMap.xyz /= posInShadowMap.w;
+    vec2 shadowMapUv = posInShadowMap.xy * 0.5 + 0.5;
+
+    // TODO: Fix this! I think the reason we have to do this here is because we have texture repeat and linear filtering!
+    const float eps = 0.01;
+    if (shadowMapUv.x < eps || shadowMapUv.y < eps || shadowMapUv.x > 1.0-eps || shadowMapUv.y > 1.0-eps) {
+        return 1.0;
+    }
+
+    float mapDepth = texture(shadowMap, shadowMapUv).x;
+
+    // This isn't optimal but it works for now
+    vec2 pixelSize = 1.0 / textureSize(shadowMap, 0);
+    float bias = max(pixelSize.x, pixelSize.y) + 0.006;
+
+    // (remember: 1 is furthest away, 0 is closest!)
+    return (mapDepth < posInShadowMap.z - bias) ? 0.0 : 1.0;
+}
+
+vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseColor, float roughness, float metallic)
+{
+    vec3 lightColor = light.colorAndIntensity.a * light.colorAndIntensity.rgb;
+    vec3 L = -normalize(light.viewSpaceDirection.xyz);
+
+    mat4 lightProjectionFromView = light.lightProjectionFromWorld * camera.worldFromView;
+    float shadowFactor = evaluateShadow(uDirLightShadowMap, lightProjectionFromView, vPosition);
 
     vec3 directLight = lightColor * shadowFactor;
 
@@ -53,8 +84,8 @@ void main()
 
     vec3 color = vec3(0.0);
 
-    // TODO: Evaluate all light that will have an effect on this pixel/tile/cluster
-    color += evaluateDirectionalLight(V, N, baseColor, roughness, metallic);
+    // TODO: Evaluate ALL lights that will have an effect on this pixel/tile/cluster or whatever we go with
+    color += evaluateDirectionalLight(dirLight, V, N, baseColor, roughness, metallic);
 
     oColor = vec4(color, 1.0);
     oNormal = vec4(N * 0.5 + 0.5, 0.0);

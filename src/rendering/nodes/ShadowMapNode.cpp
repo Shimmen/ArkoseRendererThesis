@@ -20,7 +20,7 @@ RenderGraphNode::NodeConstructorFunction ShadowMapNode::construct(const Scene& s
         const SunLight& sunLight = scene.sun();
 
         Texture& shadowMap = registry.frame.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::All);
-        registry.frame.publish("sun", shadowMap);
+        registry.frame.publish("directional", shadowMap);
 
         const RenderTarget& shadowRenderTarget = registry.frame.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
 
@@ -48,9 +48,7 @@ RenderGraphNode::NodeConstructorFunction ShadowMapNode::construct(const Scene& s
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(1, 0, 1), 1.0f);
 
-            mat4 lightOrientation = mathkit::lookAt({ 0, 0, 0 }, sunLight.direction); // (note: currently just centered on the origin)
-            mat4 lightProjection = mathkit::orthographicProjection(sunLight.worldExtent, 1.0f, -sunLight.worldExtent, sunLight.worldExtent);
-            mat4 lightProjectionFromWorld = lightProjection * lightOrientation;
+            mat4 lightProjectionFromWorld = sunLight.lightProjection();
             cmdList.updateBufferImmediately(lightDataBuffer, &lightProjectionFromWorld, sizeof(mat4));
             cmdList.bindSet(lightBindingSet, 0);
 

@@ -4,6 +4,7 @@
 struct CameraState {
     mat4 projectionFromView;
     mat4 viewFromWorld;
+    mat4 worldFromView;
 };
 
 #endif // CAMERA_STATE_H

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FpsCamera.h"
 #include "mathkit.h"
 #include "rendering/Resources.h"
 
@@ -90,6 +91,13 @@ private:
 
 class SunLight {
 public:
+    mat4 lightProjection() const
+    {
+        mat4 lightOrientation = mathkit::lookAt({ 0, 0, 0 }, normalize(direction)); // (note: currently just centered on the origin)
+        mat4 lightProjection = mathkit::orthographicProjection(worldExtent, 1.0f, -worldExtent, worldExtent);
+        return lightProjection * lightOrientation;
+    }
+
     vec3 color;
     float intensity;
 
@@ -129,10 +137,14 @@ public:
         return nextIndex;
     }
 
+    const FpsCamera& camera() const { return m_camera; }
+    FpsCamera& camera() { return m_camera; }
+
     const SunLight& sun() const { return m_sunLight; }
     SunLight& sun() { return m_sunLight; }
 
 private:
     std::vector<Model*> m_models;
+    FpsCamera m_camera;
     SunLight m_sunLight;
 };

@@ -16,6 +16,7 @@ RenderGraphNode::NodeConstructorFunction CameraUniformNode::construct(const FpsC
         return [&](const AppState& appState, CommandList& cmdList) {
             CameraState cameraState {
                 .viewFromWorld = fpsCamera.viewMatrix(),
+                .worldFromView = inverse(fpsCamera.viewMatrix()),
                 .projectionFromView = fpsCamera.projectionMatrix()
             };
             cmdList.updateBufferImmediately(cameraUniformBuffer, &cameraState, sizeof(CameraState));

@@ -9,7 +9,7 @@ layout(set = 0, binding = 0) uniform LightDataBlock
     mat4 lightProjectionFromWorld;
 };
 
-layout(set = 1, binding = 0) uniform ObjectDataBlock
+layout(set = 1, binding = 0) uniform TransformDataBlock
 {
     mat4 transforms[SHADOW_MAX_OCCLUDERS];
 };
