@@ -38,6 +38,9 @@ target_include_directories(ArkoseRenderer PRIVATE shaders/shared)
 target_include_directories(ArkoseRenderer PRIVATE deps/glm-0.9.9.6)
 target_include_directories(ArkoseRenderer PRIVATE deps/nlohmann_json)
 
+# TODO: Look into using https://github.com/Kitware/CMake/blob/master/Modules/FetchContent.cmake
+#  here instead! I tried but there was something weird, possibly with the newer gltf source..
+#  Anyway, probably try sometime again in the future! Would be great to not have git submodules.
 set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
