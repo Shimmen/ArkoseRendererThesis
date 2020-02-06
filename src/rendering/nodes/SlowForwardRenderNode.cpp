@@ -66,7 +66,7 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
         RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
-            cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
+            cmdList.setRenderState(renderState, ClearColor(0.2f, 0.2f, 0.2f), 1.0f);
             cmdList.bindSet(fixedBindingSet, 0);
 
             DirectionalLight dirLight {
@@ -133,12 +133,15 @@ void SlowForwardRenderNode::setupState(const Scene& scene, ResourceManager& reso
             Texture& baseColorTexture = resources.loadTexture2D(baseColorPath, true, true);
             std::string normalMapPath = mesh.material().normalMap;
             Texture& normalMapTexture = resources.loadTexture2D(normalMapPath, false, true);
+            std::string metallicRoughnessPath = mesh.material().metallicRoughness;
+            Texture& metallicRoughnessTexture = resources.loadTexture2D(metallicRoughnessPath, false, true);
 
             // Create binding set
             drawable.bindingSet = &resources.createBindingSet(
                 { { 0, ShaderStageVertex, drawable.objectDataBuffer },
                     { 1, ShaderStageFragment, &baseColorTexture },
-                    { 2, ShaderStageFragment, &normalMapTexture } });
+                    { 2, ShaderStageFragment, &normalMapTexture },
+                    { 3, ShaderStageFragment, &metallicRoughnessTexture } });
 
             state.drawables.push_back(drawable);
         });

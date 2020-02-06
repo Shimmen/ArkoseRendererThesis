@@ -156,8 +156,9 @@ Material GltfMesh::material() const
 
     // TODO: Cache this maybe?
     Material material {};
-    material.baseColor = textureUri(gltfMaterial.pbrMetallicRoughness.baseColorTexture.index, "assets/test-pattern.png");
+    material.baseColor = textureUri(gltfMaterial.pbrMetallicRoughness.baseColorTexture.index, "assets/default-baseColor.png");
     material.normalMap = textureUri(gltfMaterial.normalTexture.index, "assets/default-normal.png");
+    material.metallicRoughness = textureUri(gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, "assets/default-baseColor.png");
 
     return material;
 }

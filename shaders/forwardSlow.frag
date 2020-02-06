@@ -18,6 +18,7 @@ layout(set = 0, binding = 0) uniform CameraStateBlock
 
 layout(set = 1, binding = 1) uniform sampler2D uBaseColor;
 layout(set = 1, binding = 2) uniform sampler2D uNormalMap;
+layout(set = 1, binding = 3) uniform sampler2D uMetallicRoughnessMap;
 
 layout(set = 2, binding = 0) uniform sampler2D uDirLightShadowMap;
 layout(set = 2, binding = 1) uniform DirLightBlock
@@ -72,15 +73,15 @@ void main()
 {
     vec3 baseColor = texture(uBaseColor, vTexCoord).rgb;
 
+    vec4 metallicRoughness = texture(uMetallicRoughnessMap, vTexCoord);
+    float metallic = metallicRoughness.b;
+    float roughness = metallicRoughness.g;
+
     vec3 packedNormal = texture(uNormalMap, vTexCoord).rgb;
     vec3 mappedNormal = normalize(packedNormal * 2.0 - 1.0);
     vec3 N = normalize(vTbnMatrix * mappedNormal);
 
     vec3 V = -normalize(vPosition);
-
-    // TODO!
-    float roughness = 0.8;
-    float metallic = 0.0;
 
     vec3 color = vec3(0.0);
 

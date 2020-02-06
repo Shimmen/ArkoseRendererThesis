@@ -8,6 +8,7 @@ class Material {
 public:
     std::string baseColor {};
     std::string normalMap {};
+    std::string metallicRoughness {};
 };
 
 class Transform {
