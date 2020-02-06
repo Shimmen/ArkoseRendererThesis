@@ -23,7 +23,7 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
             sourceTexture = &registry.frame.loadTexture2D("assets/test-pattern.png", true, true);
         }
 
-        ShaderBinding textureSamplerBinding = { 0, ShaderStage::Fragment, sourceTexture };
+        ShaderBinding textureSamplerBinding = { 0, ShaderStageFragment, sourceTexture };
         BindingSet& bindingSet = registry.frame.createBindingSet({ textureSamplerBinding });
 
         const RenderTarget& windowTarget = registry.frame.windowRenderTarget();

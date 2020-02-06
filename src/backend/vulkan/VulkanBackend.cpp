@@ -1843,17 +1843,12 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 break;
             }
 
-            switch (bindingInfo.shaderStage) {
-            case ShaderStage::Vertex:
-                binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-                break;
-            case ShaderStage::Fragment:
-                binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-                break;
-            case ShaderStage::Compute:
-                ASSERT_NOT_REACHED();
-                break;
-            }
+            if (bindingInfo.shaderStage & ShaderStageVertex)
+                binding.stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
+            if (bindingInfo.shaderStage & ShaderStageFragment)
+                binding.stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+            if (bindingInfo.shaderStage & ShaderStageCompute)
+                binding.stageFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
 
             binding.pImmutableSamplers = nullptr;
 
@@ -2113,15 +2108,15 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
             stageCreateInfo.pName = "main";
 
             VkShaderStageFlagBits stageFlags;
-            switch (file.stage()) {
-            case ShaderStage::Vertex:
+            switch (file.type()) {
+            case ShaderFileType::Vertex:
                 stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
                 break;
-            case ShaderStage::Fragment:
+            case ShaderFileType::Fragment:
                 stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
                 break;
-            case ShaderStage::Compute:
-                ASSERT_NOT_REACHED();
+            case ShaderFileType::Compute:
+                stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
                 break;
             }
             stageCreateInfo.stage = stageFlags;

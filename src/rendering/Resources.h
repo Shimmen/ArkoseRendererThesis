@@ -212,6 +212,12 @@ struct Viewport {
     Extent2D extent;
 };
 
+enum ShaderStage : uint8_t {
+    ShaderStageVertex = 0x01,
+    ShaderStageFragment = 0x02,
+    ShaderStageCompute = 0x04,
+};
+
 enum class ShaderBindingType {
     UniformBuffer,
     TextureSampler,

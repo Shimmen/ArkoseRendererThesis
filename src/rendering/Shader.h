@@ -3,28 +3,21 @@
 #include <string>
 #include <vector>
 
-enum class ShaderStage : uint8_t {
-    Vertex = 0x01,
-    Fragment = 0x02,
-    Compute = 0x04,
+enum class ShaderFileType {
+    Vertex,
+    Fragment,
+    Compute,
 };
 
-inline ShaderStage operator|(ShaderStage lhs, ShaderStage rhs)
-{
-    auto left = static_cast<uint8_t>(lhs);
-    auto right = static_cast<uint8_t>(rhs);
-    return static_cast<ShaderStage>(left | right);
-}
-
 struct ShaderFile {
-    ShaderFile(std::string name, ShaderStage);
+    ShaderFile(std::string name, ShaderFileType);
 
     [[nodiscard]] const std::string& name() const;
-    [[nodiscard]] ShaderStage stage() const;
+    [[nodiscard]] ShaderFileType type() const;
 
 private:
     std::string m_name;
-    ShaderStage m_stage;
+    ShaderFileType m_type;
 };
 
 enum class ShaderType {

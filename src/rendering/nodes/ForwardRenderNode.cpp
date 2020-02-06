@@ -37,10 +37,10 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
         size_t materialBufferSize = state.materials.size() * sizeof(ForwardMaterial);
         Buffer& materialBuffer = registry.frame.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
-        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStage::Vertex, registry.frame.getBuffer(CameraUniformNode::name(), "buffer") };
-        ShaderBinding perObjectBufferBinding = { 1, ShaderStage::Vertex, &perObjectBuffer };
-        ShaderBinding materialBufferBinding = { 2, ShaderStage::Fragment, &materialBuffer };
-        ShaderBinding textureSamplerBinding = { 3, ShaderStage::Fragment, state.textures, FORWARD_MAX_TEXTURES };
+        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStageVertex, registry.frame.getBuffer(CameraUniformNode::name(), "buffer") };
+        ShaderBinding perObjectBufferBinding = { 1, ShaderStageVertex, &perObjectBuffer };
+        ShaderBinding materialBufferBinding = { 2, ShaderStageFragment, &materialBuffer };
+        ShaderBinding textureSamplerBinding = { 3, ShaderStageFragment, state.textures, FORWARD_MAX_TEXTURES };
         BindingSet& bindingSet = registry.frame.createBindingSet({ cameraUniformBufferBinding, perObjectBufferBinding, materialBufferBinding, textureSamplerBinding });
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members

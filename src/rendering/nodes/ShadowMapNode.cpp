@@ -36,10 +36,10 @@ RenderGraphNode::NodeConstructorFunction ShadowMapNode::construct(const Scene& s
         rasterState.backfaceCullingEnabled = true;
 
         Buffer& lightDataBuffer = registry.frame.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        BindingSet& lightBindingSet = registry.frame.createBindingSet({ { 0, ShaderStage::Vertex, &lightDataBuffer } });
+        BindingSet& lightBindingSet = registry.frame.createBindingSet({ { 0, ShaderStageVertex, &lightDataBuffer } });
 
         Buffer& transformDataBuffer = registry.frame.createBuffer(drawables.size() * sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        BindingSet& transformBindingSet = registry.frame.createBindingSet({ { 0, ShaderStage::Vertex, &transformDataBuffer } });
+        BindingSet& transformBindingSet = registry.frame.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
 
         std::vector<const BindingSet*> allBindingSets { &lightBindingSet, &transformBindingSet };
 

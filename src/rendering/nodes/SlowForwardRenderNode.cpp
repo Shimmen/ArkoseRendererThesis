@@ -48,7 +48,7 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
         const Buffer* cameraUniformBuffer = registry.frame.getBuffer(CameraUniformNode::name(), "buffer");
-        BindingSet& fixedBindingSet = registry.frame.createBindingSet({ { 0, ShaderStage::Vertex, cameraUniformBuffer } });
+        BindingSet& fixedBindingSet = registry.frame.createBindingSet({ { 0, ShaderStage(ShaderStageVertex | ShaderStageFragment), cameraUniformBuffer } });
 
         std::vector<const BindingSet*> allBindingSets {};
         allBindingSets.push_back(&fixedBindingSet);
@@ -121,9 +121,9 @@ void SlowForwardRenderNode::setupState(const Scene& scene, ResourceManager& reso
 
             // Create binding set
             drawable.bindingSet = &resources.createBindingSet(
-                { { 0, ShaderStage::Vertex, drawable.objectDataBuffer },
-                    { 1, ShaderStage::Fragment, &baseColorTexture },
-                    { 2, ShaderStage::Fragment, &normalMapTexture } });
+                { { 0, ShaderStageVertex, drawable.objectDataBuffer },
+                    { 1, ShaderStageFragment, &baseColorTexture },
+                    { 2, ShaderStageFragment, &normalMapTexture } });
 
             state.drawables.push_back(drawable);
         });
