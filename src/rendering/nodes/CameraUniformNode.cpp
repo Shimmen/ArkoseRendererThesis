@@ -18,7 +18,7 @@ RenderGraphNode::NodeConstructorFunction CameraUniformNode::construct(const FpsC
                 .viewFromWorld = fpsCamera.viewMatrix(),
                 .projectionFromView = fpsCamera.projectionMatrix()
             };
-            cmdList.updateBuffer(cameraUniformBuffer, &cameraState, sizeof(CameraState));
+            cmdList.updateBufferImmediately(cameraUniformBuffer, &cameraState, sizeof(CameraState));
         };
     };
 }

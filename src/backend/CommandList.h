@@ -4,8 +4,7 @@
 
 class CommandList {
 public:
-    //void executeRenderGraphNodeBarrier(..);
-    virtual void updateBuffer(Buffer&, void*, size_t) = 0; // TODO: How should we make it clear that this will execute immediately
+    virtual void updateBufferImmediately(Buffer&, void*, size_t) = 0;
 
     virtual void setRenderState(const RenderState&, ClearColor, float clearDepth, uint32_t clearStencil = 0) = 0; // TODO: This is a bit weird
 

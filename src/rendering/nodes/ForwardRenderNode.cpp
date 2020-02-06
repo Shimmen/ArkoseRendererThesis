@@ -17,10 +17,8 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scen
 RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImplementation(const Scene& scene)
 {
     return [&](Registry& registry) {
-        //auto& state = registry.node.allocator().allocateSingle<State>();
-        static State state {};
-        //setupState(scene, registry.node, state);
-        setupState(scene, registry.frame, state);
+        static State state {}; // TODO: Don't use static data like this!
+        setupState(scene, registry.frame, state); // TODO: Don't use the frame registry!
 
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("forward", "forward.vert", "forward.frag");
@@ -77,7 +75,7 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
             cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
             cmdList.bindSet(bindingSet, 0);
 
-            cmdList.updateBuffer(perObjectBuffer, state.materials.data(), state.materials.size() * sizeof(ForwardMaterial));
+            cmdList.updateBufferImmediately(perObjectBuffer, state.materials.data(), state.materials.size() * sizeof(ForwardMaterial));
 
             size_t numDrawables = state.drawables.size();
             std::vector<PerForwardObject> perObjectData { numDrawables };
@@ -89,7 +87,7 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
                     .materialIndex = drawable.materialIndex
                 };
             }
-            cmdList.updateBuffer(perObjectBuffer, perObjectData.data(), numDrawables * sizeof(PerForwardObject));
+            cmdList.updateBufferImmediately(perObjectBuffer, perObjectData.data(), numDrawables * sizeof(PerForwardObject));
 
             for (int i = 0; i < numDrawables; ++i) {
                 const Drawable& drawable = state.drawables[i];

@@ -8,24 +8,15 @@ VulkanCommandList::VulkanCommandList(VulkanBackend& backend, VkCommandBuffer com
 {
 }
 
-void VulkanCommandList::updateBuffer(Buffer& buffer, void* data, size_t size)
+void VulkanCommandList::updateBufferImmediately(Buffer& buffer, void* data, size_t size)
 {
-    auto& bufInfo = m_backend.bufferInfo(buffer);
-
-    switch (buffer.memoryHint()) {
-    case Buffer::MemoryHint::GpuOptimal:
-        if (!m_backend.setBufferDataUsingStagingBuffer(bufInfo.buffer, data, size, &m_commandBuffer)) {
-            LogError("updateBuffer(): could not update the buffer memory through staging buffer.\n");
-        }
-        break;
-    case Buffer::MemoryHint::TransferOptimal:
+    if (buffer.memoryHint() == Buffer::MemoryHint::TransferOptimal) {
+        auto& bufInfo = m_backend.bufferInfo(buffer);
         if (!m_backend.setBufferMemoryUsingMapping(bufInfo.allocation, data, size)) {
             LogError("updateBuffer(): could not update the buffer memory through mapping.\n");
         }
-        break;
-    case Buffer::MemoryHint::GpuOnly:
-        LogError("updateBuffer(): can't update buffer with GpuOnly memory hint, ignoring\n");
-        break;
+    } else {
+        LogError("updateBuffer(): can't update buffer with GpuOnly or GpuOptimal memory hint on the command list, ignoring\n");
     }
 }
 

@@ -6,7 +6,7 @@ class VulkanCommandList : public CommandList {
 public:
     explicit VulkanCommandList(VulkanBackend&, VkCommandBuffer);
 
-    void updateBuffer(Buffer& buffer, void* pVoid, size_t size) override;
+    void updateBufferImmediately(Buffer& buffer, void* pVoid, size_t size) override;
 
     void setRenderState(const RenderState&, ClearColor, float clearDepth, uint32_t clearStencil) override;
     void bindSet(BindingSet&, uint32_t index) override;
