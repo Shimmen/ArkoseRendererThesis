@@ -49,6 +49,7 @@ struct Texture : public Resource {
         RGB8,
         RGBA8,
         sRGBA8,
+        RGBA16F,
         Depth32F
     };
 

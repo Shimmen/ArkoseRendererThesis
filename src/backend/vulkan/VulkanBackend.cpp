@@ -1147,6 +1147,9 @@ void VulkanBackend::newTexture(const Texture& texture)
     case Texture::Format::sRGBA8:
         format = VK_FORMAT_R8G8B8A8_SRGB;
         break;
+    case Texture::Format::RGBA16F:
+        format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        break;
     case Texture::Format::Depth32F:
         format = VK_FORMAT_D32_SFLOAT;
         break;
@@ -1377,6 +1380,9 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
         numChannels = 4;
         break;
     case Texture::Format::sRGBA8:
+        numChannels = 4;
+        break;
+    case Texture::Format::RGBA16F:
         numChannels = 4;
         break;
     case Texture::Format::Depth32F:
