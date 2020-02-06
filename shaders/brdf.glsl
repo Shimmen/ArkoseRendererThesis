@@ -27,7 +27,7 @@ float V_SmithGGXCorrelated(float NdotV, float NdotL, float a) {
     float a2 = a * a;
     float GGXL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
     float GGXV = NdotL * sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-    return 0.5 / (GGXV + GGXL);
+    return 0.5 / (GGXV + GGXL + 1e-20);
 }
 
 vec3 specularBRDF(vec3 L, vec3 V, vec3 N, vec3 baseColor, float roughness, float metallic, out vec3 F)
@@ -46,9 +46,9 @@ vec3 specularBRDF(vec3 L, vec3 V, vec3 N, vec3 baseColor, float roughness, float
 
     F = F_Schlick(LdotH, f0);
     float D = D_GGX(NdotH, a);
-    float V_part = V_SmithGGXCorrelated(NdotV, NdotL, a);
+    float V_ = V_SmithGGXCorrelated(NdotV, NdotL, a);
 
-    return F * vec3(D * V_part);
+    return F * D * V_;
 }
 
 vec3 diffuseBRDF()

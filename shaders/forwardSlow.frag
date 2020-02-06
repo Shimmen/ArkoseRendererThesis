@@ -19,6 +19,7 @@ layout(set = 0, binding = 0) uniform CameraStateBlock
 layout(set = 1, binding = 1) uniform sampler2D uBaseColor;
 layout(set = 1, binding = 2) uniform sampler2D uNormalMap;
 layout(set = 1, binding = 3) uniform sampler2D uMetallicRoughnessMap;
+layout(set = 1, binding = 4) uniform sampler2D uEmissive;
 
 layout(set = 2, binding = 0) uniform sampler2D uDirLightShadowMap;
 layout(set = 2, binding = 1) uniform DirLightBlock
@@ -72,6 +73,7 @@ vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseC
 void main()
 {
     vec3 baseColor = texture(uBaseColor, vTexCoord).rgb;
+    vec3 emissive = texture(uEmissive, vTexCoord).rgb;
 
     vec4 metallicRoughness = texture(uMetallicRoughnessMap, vTexCoord);
     float metallic = metallicRoughness.b;
@@ -83,7 +85,7 @@ void main()
 
     vec3 V = -normalize(vPosition);
 
-    vec3 color = vec3(0.0);
+    vec3 color = emissive;
 
     // TODO: Evaluate ALL lights that will have an effect on this pixel/tile/cluster or whatever we go with
     color += evaluateDirectionalLight(dirLight, V, N, baseColor, roughness, metallic);

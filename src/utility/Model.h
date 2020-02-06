@@ -9,6 +9,7 @@ public:
     std::string baseColor {};
     std::string normalMap {};
     std::string metallicRoughness {};
+    std::string emissive {};
 };
 
 class Transform {

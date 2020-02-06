@@ -158,7 +158,8 @@ Material GltfMesh::material() const
     Material material {};
     material.baseColor = textureUri(gltfMaterial.pbrMetallicRoughness.baseColorTexture.index, "assets/default-baseColor.png");
     material.normalMap = textureUri(gltfMaterial.normalTexture.index, "assets/default-normal.png");
-    material.metallicRoughness = textureUri(gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, "assets/default-baseColor.png");
+    material.metallicRoughness = textureUri(gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, "assets/default-black.png");
+    material.emissive = textureUri(gltfMaterial.emissiveTexture.index, "assets/default-black.png");
 
     return material;
 }
