@@ -83,6 +83,46 @@ float Input::scrollDelta() const
     return float(m_currentScollOffset - m_lastScrollOffset);
 }
 
+vec2 Input::leftStick() const
+{
+    if (!glfwJoystickPresent(0) || !glfwJoystickIsGamepad(0)) {
+        return { 0, 0 };
+    }
+
+    GLFWgamepadstate state;
+    glfwGetGamepadState(0, &state);
+
+    float x = state.axes[GLFW_GAMEPAD_AXIS_LEFT_X];
+    float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+    vec2 stick { x, -y };
+
+    if (length(stick) < GAMEPAD_DEADZONE) {
+        return { 0, 0 };
+    } else {
+        return normalize(stick) * ((length(stick) - GAMEPAD_DEADZONE) / (1.0f - GAMEPAD_DEADZONE));
+    }
+}
+
+vec2 Input::rightStick() const
+{
+    if (!glfwJoystickPresent(0) || !glfwJoystickIsGamepad(0)) {
+        return { 0, 0 };
+    }
+
+    GLFWgamepadstate state;
+    glfwGetGamepadState(0, &state);
+
+    float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+    float y = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
+    vec2 stick { x, -y };
+
+    if (length(stick) < GAMEPAD_DEADZONE) {
+        return { 0, 0 };
+    } else {
+        return normalize(stick) * ((length(stick) - GAMEPAD_DEADZONE) / (1.0f - GAMEPAD_DEADZONE));
+    }
+}
+
 void Input::keyEventCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     auto input = static_cast<Input*>(glfwGetWindowUserPointer(window));

@@ -8,6 +8,11 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
 
     vec3 acceleration { 0.0f };
 
+    vec2 controllerMovement = input.leftStick();
+    bool usingController = length(controllerMovement) > 0.0f;
+    acceleration += controllerMovement.x * mathkit::globalRight;
+    acceleration += controllerMovement.y * mathkit::globalForward;
+
     if (input.isKeyDown(GLFW_KEY_W))
         acceleration += mathkit::globalForward;
     if (input.isKeyDown(GLFW_KEY_S))
@@ -23,16 +28,20 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
     if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT))
         acceleration -= mathkit::globalUp;
 
-    if (mathkit::length2(acceleration) > 0.01f && !GlobalState::get().guiIsUsingTheKeyboard()) {
-        acceleration = normalize(acceleration) * (maxSpeed / timeToMaxSpeed) * dt;
+    if (usingController) {
         m_velocity += mathkit::rotateWithQuaternion(acceleration, m_orientation);
     } else {
-        // If no input and movement to acceleration decelerate instead
-        if (length2(m_velocity) < stopThreshold) {
-            m_velocity = vec3(0.0f);
+        if (mathkit::length2(acceleration) > 0.01f && !GlobalState::get().guiIsUsingTheKeyboard()) {
+            acceleration = normalize(acceleration) * (maxSpeed / timeToMaxSpeed) * dt;
+            m_velocity += mathkit::rotateWithQuaternion(acceleration, m_orientation);
         } else {
-            vec3 deaccel = -normalize(m_velocity) * (maxSpeed / timeFromMaxSpeed) * dt;
-            m_velocity += deaccel;
+            // If no input and movement to acceleration decelerate instead
+            if (length2(m_velocity) < stopThreshold) {
+                m_velocity = vec3(0.0f);
+            } else {
+                vec3 deaccel = -normalize(m_velocity) * (maxSpeed / timeFromMaxSpeed) * dt;
+                m_velocity += deaccel;
+            }
         }
     }
 
@@ -48,12 +57,16 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
 
     // Calculate rotation velocity from input
 
+    // Make rotations less sensitive when zoomed in
+    float fovMultiplier = 0.2f + ((m_fieldOfView - minFieldOfView) / (maxFieldOfView - minFieldOfView)) * 0.8f;
+
+    vec2 controllerRotation = 0.3f * input.rightStick();
+    m_pitchYawRoll.x -= controllerRotation.x * fovMultiplier * dt;
+    m_pitchYawRoll.y += controllerRotation.y * fovMultiplier * dt;
+
     if (input.isButtonDown(GLFW_MOUSE_BUTTON_2) && !GlobalState::get().guiIsUsingTheMouse()) {
         // Screen size independent but also aspect ratio dependent!
         vec2 mouseDelta = input.mouseDelta() / float(screenExtent.width());
-
-        // Make rotations less sensitive when zoomed in
-        float fovMultiplier = 0.2f + ((m_fieldOfView - minFieldOfView) / (maxFieldOfView - minFieldOfView)) * 0.8f;
 
         m_pitchYawRoll.x += -mouseDelta.x * rotationMultiplier * fovMultiplier * dt;
         m_pitchYawRoll.y += -mouseDelta.y * rotationMultiplier * fovMultiplier * dt;

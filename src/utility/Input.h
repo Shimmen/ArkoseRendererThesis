@@ -32,6 +32,9 @@ public:
     [[nodiscard]] vec2 mouseDelta() const;
     [[nodiscard]] float scrollDelta() const;
 
+    [[nodiscard]] vec2 leftStick() const;
+    [[nodiscard]] vec2 rightStick() const;
+
 private:
     Input() = default;
     ~Input() = default;
@@ -40,6 +43,8 @@ private:
 
     static constexpr int KEYBOARD_KEY_COUNT { GLFW_KEY_LAST };
     static constexpr int MOUSE_BUTTON_COUNT { GLFW_MOUSE_BUTTON_LAST };
+
+    static constexpr float GAMEPAD_DEADZONE { 0.25f };
 
     bool m_isKeyDown[KEYBOARD_KEY_COUNT] {};
     bool m_wasKeyPressed[KEYBOARD_KEY_COUNT] {};
