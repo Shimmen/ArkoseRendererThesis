@@ -1430,10 +1430,10 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     //  works fine, since it will simply discard/ignore whatever data is in it before.
     VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    if (!transitionImageLayout(texInfo.image, texInfo.format, oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
+    if (!transitionImageLayout(texInfo.image, update.texture().hasDepthFormat(), oldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)) {
         LogError("VulkanBackend::updateTexture(): could not transition the image to transfer layout.\n");
     }
-    if (!copyBufferToImage(stagingBuffer, texInfo.image, width, height)) {
+    if (!copyBufferToImage(stagingBuffer, texInfo.image, width, height, update.texture().hasDepthFormat())) {
         LogError("VulkanBackend::updateTexture(): could not copy the staging buffer to the image.\n");
     }
 
@@ -1455,7 +1455,7 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     if (update.generateMipmaps() && extent.width() > 1 && extent.height() > 1) {
         generateMipmaps(update.texture(), finalLayout);
     } else {
-        if (!transitionImageLayout(texInfo.image, texInfo.format, texInfo.currentLayout, finalLayout)) {
+        if (!transitionImageLayout(texInfo.image, update.texture().hasDepthFormat(), texInfo.currentLayout, finalLayout)) {
             LogError("VulkanBackend::updateTexture(): could not transition the image to the final image layout.\n");
         }
     }
@@ -2596,7 +2596,7 @@ VkImageView VulkanBackend::createImageView2D(VkImage image, VkFormat format, VkI
     return imageView;
 }
 
-bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* currentCommandBuffer) const
+bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* currentCommandBuffer) const
 {
     VkImageMemoryBarrier imageBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     imageBarrier.oldLayout = oldLayout;
@@ -2605,7 +2605,7 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
     imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
     imageBarrier.image = image;
-    imageBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageBarrier.subresourceRange.aspectMask = isDepthFormat ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     imageBarrier.subresourceRange.baseMipLevel = 0;
     imageBarrier.subresourceRange.levelCount = 1;
     imageBarrier.subresourceRange.baseArrayLayer = 0;
@@ -2635,6 +2635,16 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
         // Wait for all color attachment writes ...
         sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
         imageBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        // ... before allowing any shaders to read the memory
+        destinationStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    } else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+
+        // Wait for all color attachment writes ...
+        sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
         // ... before allowing any shaders to read the memory
         destinationStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -2675,7 +2685,7 @@ bool VulkanBackend::transitionImageLayout(VkImage image, VkFormat format, VkImag
     return true;
 }
 
-bool VulkanBackend::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) const
+bool VulkanBackend::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height, bool isDepthImage) const
 {
     VkBufferImageCopy region = {};
     region.bufferOffset = 0;
@@ -2687,7 +2697,7 @@ bool VulkanBackend::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t w
     region.imageOffset = VkOffset3D { 0, 0, 0 };
     region.imageExtent = VkExtent3D { width, height, 1 };
 
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.aspectMask = isDepthImage ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.mipLevel = 0;
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;

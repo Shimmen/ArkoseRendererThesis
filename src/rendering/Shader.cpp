@@ -32,6 +32,12 @@ ShaderStage ShaderFile::stage() const
     return m_stage;
 }
 
+Shader Shader::createVertexOnly(std::string name, std::string vertexName)
+{
+    ShaderFile vertexFile { std::move(vertexName), ShaderStage::Vertex };
+    return Shader(std::move(name), { vertexFile }, ShaderType::Raster);
+}
+
 Shader Shader::createBasic(std::string name, std::string vertexName, std::string fragmentName)
 {
     ShaderFile vertexFile { std::move(vertexName), ShaderStage::Vertex };

@@ -109,8 +109,8 @@ private:
     VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
     VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
 
-    bool transitionImageLayout(VkImage, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
-    bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height) const;
+    bool transitionImageLayout(VkImage, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
+    bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height, bool isDepthImage) const;
 
     ///////////////////////////////////////////////////////////////////////////
     /// Utilities for setting up the backend

@@ -18,6 +18,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/FinalPostFxNode.cpp
         src/rendering/nodes/ForwardRenderNode.cpp
         src/rendering/nodes/SlowForwardRenderNode.cpp
+        src/rendering/nodes/ShadowMapNode.cpp
         src/utility/ArenaAllocator.cpp
         src/utility/GlobalState.cpp
         src/utility/GltfModel.cpp

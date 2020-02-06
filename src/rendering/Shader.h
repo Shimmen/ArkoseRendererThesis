@@ -34,6 +34,7 @@ enum class ShaderType {
 
 struct Shader {
 
+    static Shader createVertexOnly(std::string name, std::string vertexName);
     static Shader createBasic(std::string name, std::string vertexName, std::string fragmentName);
     static Shader createCompute(std::string name, std::string computeName);
 

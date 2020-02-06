@@ -107,6 +107,13 @@ inline mat4 infinitePerspective(float fieldOfViewY, float aspectRatio, float zNe
     return matrix;
 }
 
+inline mat4 orthographicProjection(float size, float aspectRatio, float zNear, float zFar)
+{
+    float half = size / 2.0f;
+    mat4 matrix = glm::orthoRH_ZO(-half * aspectRatio, half * aspectRatio, half, -half, zNear, zFar);
+    return matrix;
+}
+
 inline vec3 rotateWithQuaternion(vec3 vector, quat rotation)
 {
     return glm::rotate(rotation, vector);

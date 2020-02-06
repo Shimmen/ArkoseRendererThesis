@@ -88,6 +88,16 @@ private:
     Transform m_transform {};
 };
 
+class SunLight {
+public:
+    vec3 color;
+    float intensity;
+
+    vec3 direction;
+    Extent2D shadowMapSize;
+    float worldExtent;
+};
+
 class Scene {
 public:
     Scene(std::initializer_list<Model*> models)
@@ -108,6 +118,21 @@ public:
         return m_models[index];
     }
 
+    int forEachDrawable(std::function<void(int, const Mesh&)> callback) const
+    {
+        int nextIndex = 0;
+        for (auto& model : m_models) {
+            model->forEachMesh([&](const Mesh& mesh) {
+                callback(nextIndex++, mesh);
+            });
+        }
+        return nextIndex;
+    }
+
+    const SunLight& sun() const { return m_sunLight; }
+    SunLight& sun() { return m_sunLight; }
+
 private:
     std::vector<Model*> m_models;
+    SunLight m_sunLight;
 };

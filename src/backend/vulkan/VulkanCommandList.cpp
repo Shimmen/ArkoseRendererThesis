@@ -60,7 +60,7 @@ void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColo
         for (const Texture* texture : stateInfo.sampledTextures) {
             auto& texInfo = m_backend.textureInfo(*texture);
             if (texInfo.currentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-                m_backend.transitionImageLayout(texInfo.image, texInfo.format, texInfo.currentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &m_commandBuffer);
+                m_backend.transitionImageLayout(texInfo.image, texture->hasDepthFormat(), texInfo.currentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &m_commandBuffer);
             }
             texInfo.currentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
