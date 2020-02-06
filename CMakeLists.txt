@@ -3,6 +3,8 @@ project(ArkoseRenderer)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+
 add_executable(ArkoseRenderer
         src/app/TestApp.cpp
         src/main.cpp
@@ -43,12 +45,6 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glfw-3.3)
 target_link_libraries(ArkoseRenderer glfw)
 
-set(SHADERC_SKIP_TESTS CACHE BOOL TRUE)
-set(EFFCEE_BUILD_TESTING CACHE BOOL FALSE FORCE)
-add_subdirectory(deps/shaderc)
-target_include_directories(ArkoseRenderer PUBLIC ${shaderc_SOURCE_DIR}/libshaderc_util/include)
-target_link_libraries(ArkoseRenderer shaderc)
-
 add_subdirectory(deps/stb_image)
 target_link_libraries(ArkoseRenderer stb_image)
 
@@ -56,8 +52,10 @@ add_subdirectory(deps/tiny_gltf)
 target_link_libraries(ArkoseRenderer tiny_gltf)
 
 find_package(Vulkan REQUIRED)
-target_include_directories(ArkoseRenderer PRIVATE Vulkan::Vulkan)
 target_link_libraries(ArkoseRenderer Vulkan::Vulkan)
+
+find_package(VulkanSDK REQUIRED)
+target_link_libraries(ArkoseRenderer ${shaderc_combined_LIB})
 
 add_subdirectory(deps/vulkan_memory_allocator)
 target_link_libraries(ArkoseRenderer vulkan_memory_allocator)
