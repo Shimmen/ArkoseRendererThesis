@@ -69,7 +69,7 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
             { RenderTarget::AttachmentType::Color1, &normalTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, bindingSet, viewport, blendState, rasterState);
+        RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);

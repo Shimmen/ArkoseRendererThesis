@@ -103,10 +103,10 @@ Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb,
 
 RenderState& ResourceManager::createRenderState(
     const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
-    const Shader& shader, const BindingSet& shaderBindingSet,
+    const Shader& shader, std::vector<const BindingSet*> shaderBindingSets,
     const Viewport& viewport, const BlendState& blendState, const RasterState& rasterState)
 {
-    RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSet, viewport, blendState, rasterState };
+    RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSets, viewport, blendState, rasterState };
     m_renderStates.push_back(renderState);
     return m_renderStates.back();
 }

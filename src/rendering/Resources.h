@@ -247,12 +247,12 @@ struct RenderState : public Resource {
 public:
     RenderState(Badge<ResourceManager>,
         const RenderTarget& renderTarget, VertexLayout vertexLayout,
-        Shader shader, const BindingSet& shaderBindingSet,
+        Shader shader, const std::vector<const BindingSet*>& shaderBindingSets,
         Viewport viewport, BlendState blendState, RasterState rasterState)
         : m_renderTarget(renderTarget)
         , m_vertexLayout(vertexLayout)
         , m_shader(shader)
-        , m_shaderBindingSet(shaderBindingSet)
+        , m_shaderBindingSets(shaderBindingSets)
         , m_viewport(viewport)
         , m_blendState(blendState)
         , m_rasterState(rasterState)
@@ -264,7 +264,7 @@ public:
     const VertexLayout& vertexLayout() const { return m_vertexLayout; }
 
     const Shader& shader() const { return m_shader; }
-    const BindingSet& bindingSet() const { return m_shaderBindingSet; }
+    const std::vector<const BindingSet*>& bindingSets() const { return m_shaderBindingSets; }
 
     const Viewport& fixedViewport() const { return m_viewport; }
     const BlendState& blendState() const { return m_blendState; }
@@ -275,7 +275,7 @@ private:
     VertexLayout m_vertexLayout;
 
     Shader m_shader;
-    const BindingSet& m_shaderBindingSet;
+    std::vector<const BindingSet*> m_shaderBindingSets;
 
     Viewport m_viewport;
     BlendState m_blendState;

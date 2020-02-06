@@ -39,7 +39,7 @@ RenderGraphNode::NodeConstructorFunction FinalPostFxNode::construct()
         rasterState.backfaceCullingEnabled = true;
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
 
-        RenderState& renderState = registry.frame.createRenderState(windowTarget, vertexLayout, shader, bindingSet, viewport, blendState, rasterState);
+        RenderState& renderState = registry.frame.createRenderState(windowTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);

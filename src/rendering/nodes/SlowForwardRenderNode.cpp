@@ -47,18 +47,22 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
             { RenderTarget::AttachmentType::Color1, &normalTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        // TODO: Actually have *ALL* things for the call!
-        //  Or really, we just want the set of unique DESCRIPTOR LAYOUTS.
-        BindingSet& allBindingSets = *state.drawables.front().bindingSet;
+        const Buffer* cameraUniformBuffer = registry.frame.getBuffer(CameraUniformNode::name(), "buffer");
+        BindingSet& fixedBindingSet = registry.frame.createBindingSet({ { 0, ShaderStage::Vertex, cameraUniformBuffer } });
+
+        std::vector<const BindingSet*> allBindingSets {};
+        allBindingSets.push_back(&fixedBindingSet);
+        for (auto& drawable : state.drawables) {
+            allBindingSets.push_back(drawable.bindingSet);
+        }
 
         RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
-            cmdList.setRenderState(renderState, ClearColor(0.5f, 0.5f, 0.5f), 1.0f);
+            cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
+            cmdList.bindSet(fixedBindingSet, 0);
 
-            //for (const Drawable& drawable : state.drawables) {
-            for (int i = 0; i < 1/*state.drawables.size()*/; ++i) {
-                const Drawable& drawable = state.drawables[i];
+            for (const Drawable& drawable : state.drawables) {
 
                 // TODO: Hmm, it still looks very much like it happens in line with the other commands..
                 PerForwardObject objectData {
@@ -67,7 +71,7 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
                 };
                 cmdList.updateBufferImmediately(*drawable.objectDataBuffer, &objectData, sizeof(PerForwardObject));
 
-                cmdList.bindSet(*drawable.bindingSet, 0);
+                cmdList.bindSet(*drawable.bindingSet, 1);
                 cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount);
             }
         };
@@ -117,10 +121,9 @@ void SlowForwardRenderNode::setupState(const Scene& scene, ResourceManager& reso
 
             // Create binding set
             drawable.bindingSet = &resources.createBindingSet(
-                { { 0, ShaderStage::Vertex, resources.getBuffer(CameraUniformNode::name(), "buffer") },
-                    { 1, ShaderStage::Vertex, drawable.objectDataBuffer },
-                    { 2, ShaderStage::Fragment, &baseColorTexture },
-                    { 3, ShaderStage::Fragment, &normalMapTexture } });
+                { { 0, ShaderStage::Vertex, drawable.objectDataBuffer },
+                    { 1, ShaderStage::Fragment, &baseColorTexture },
+                    { 2, ShaderStage::Fragment, &normalMapTexture } });
 
             state.drawables.push_back(drawable);
         });

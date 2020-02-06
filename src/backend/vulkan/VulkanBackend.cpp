@@ -2130,17 +2130,22 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
         }
     }
 
-    // TODO: We should have multiple here to support that!
-    BindingSetInfo bindingInfo = bindingSetInfo(renderState.bindingSet());
-
     //
     // Create pipeline layout
     //
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 
-    // TODO: Support multiple descriptor sets!
-    pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &bindingInfo.descriptorSetLayout;
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts {};
+    for (auto& set : renderState.bindingSets()) {
+        // TODO: Maybe we should also separate the layouts from the binding infos? Here we might have 100 binding infos all of the same layout,
+        //  but since they are the same concept in the backend they will have different layout objects so it will count them all here..
+        //  This could in theory be supported by the backend as is if it figures out what binding sets have the same layouts and reuse them! I think.
+        BindingSetInfo bindingInfo = bindingSetInfo(*set);
+        descriptorSetLayouts.push_back(bindingInfo.descriptorSetLayout);
+    }
+
+    pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
+    pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
 
     // TODO: Support push constants!
     pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
@@ -2295,9 +2300,8 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     renderStateInfo.pipelineLayout = pipelineLayout;
     renderStateInfo.pipeline = graphicsPipeline;
 
-    // TODO: Add all sampled textures here, for ALL shader bindings in the future!
-    for (auto& bindingInfo : renderState.bindingSet().shaderBindings()) {
-        if (bindingInfo.type == ShaderBindingType::TextureSampler || bindingInfo.type == ShaderBindingType::TextureSamplerArray) {
+    for (auto& set : renderState.bindingSets()) {
+        for (auto& bindingInfo : set->shaderBindings()) {
             for (auto texture : bindingInfo.textures) {
                 renderStateInfo.sampledTextures.push_back(texture);
             }

@@ -13,8 +13,7 @@ layout(set = 0, binding = 0) uniform CameraStateBlock
     CameraState camera;
 };
 
-// TODO: Implement using multiple sets! One for the camera/static stuff and one for this object data & textures.
-layout(set = 0, binding = 1) uniform ObjectDataBlock
+layout(set = 1, binding = 0) uniform ObjectDataBlock
 {
     PerForwardObject object;
 };
