@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 add_executable(ArkoseRenderer
-        src/app/TestApp.cpp
+        src/apps/TestApp.cpp
         src/main.cpp
         src/backend/vulkan/VulkanBackend.cpp
         src/backend/vulkan/VulkanCommandList.cpp

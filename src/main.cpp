@@ -1,6 +1,6 @@
-#include "backend/Backend.h"
 #include "backend/vulkan/VulkanBackend.h"
 #include "rendering/App.h"
+#include "rendering/Backend.h"
 #include "rendering/ShaderManager.h"
 #include "utility/Input.h"
 #include "utility/logging.h"
@@ -8,7 +8,7 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include "app/TestApp.h"
+#include "apps/TestApp.h"
 
 enum class BackendType {
     Vulkan
