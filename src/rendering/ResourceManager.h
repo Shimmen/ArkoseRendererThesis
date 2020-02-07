@@ -82,7 +82,7 @@ private:
 
 class Registry {
 public:
-    ResourceManager& node;
+    //ResourceManager& node;
     ResourceManager& frame;
 };
 

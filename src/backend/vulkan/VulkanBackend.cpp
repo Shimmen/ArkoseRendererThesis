@@ -672,7 +672,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     ASSERT(m_numSwapchainImages > 0);
 
     // TODO: This is clearly stupid..
-    ResourceManager& badgeGiver = *m_nodeResourceManager;
+    ResourceManager badgeGiver {};
 
     TextureInfo depthInfo {};
     depthInfo.format = m_depthImageFormat;
@@ -2300,8 +2300,6 @@ VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState
 
 void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
 {
-    auto nodeResourceManager = std::make_unique<ResourceManager>();
-
     m_frameResourceManagers.resize(m_numSwapchainImages);
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
 
@@ -2309,7 +2307,7 @@ void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
         auto frameResourceManager = std::make_unique<ResourceManager>(&windowRenderTargetForFrame);
 
         Registry registry {
-            .node = *nodeResourceManager,
+            //.node = *nodeResourceManager, // hmm
             .frame = *frameResourceManager
         };
 
@@ -2318,9 +2316,6 @@ void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
         replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), frameResourceManager.get());
         m_frameResourceManagers[swapchainImageIndex] = std::move(frameResourceManager);
     }
-
-    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nodeResourceManager.get());
-    m_nodeResourceManager = std::move(nodeResourceManager);
 }
 
 void VulkanBackend::destroyRenderGraph(RenderGraph&)
@@ -2328,7 +2323,6 @@ void VulkanBackend::destroyRenderGraph(RenderGraph&)
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
         replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), nullptr);
     }
-    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nullptr);
 }
 
 void VulkanBackend::replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current)

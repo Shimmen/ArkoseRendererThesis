@@ -10,7 +10,7 @@ RenderGraph::RenderGraph(size_t frameMultiplicity)
 void RenderGraph::constructAllForFrame(Registry& registry, uint32_t frame)
 {
     for (const auto& [name, node] : m_nodes) {
-        registry.node.setCurrentNode(name);
+        //registry.node.setCurrentNode(name);
         registry.frame.setCurrentNode(name);
         node->constructForFrame(registry, frame);
     }

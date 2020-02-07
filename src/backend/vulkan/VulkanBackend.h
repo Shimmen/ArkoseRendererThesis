@@ -183,13 +183,7 @@ private:
 
     App& m_app;
 
-    std::unique_ptr<ResourceManager> m_nodeResourceManager {};
     std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
-
-    //static constexpr size_t nodeAllocatorSize { 8196 };
-    //std::unique_ptr<ArenaAllocator> m_nodeAllocator {};
-    //static constexpr size_t frameAllocatorSize { 2048 };
-    //std::vector<std::unique_ptr<ArenaAllocator>> m_frameAllocators {};
 
     VkQueue m_graphicsQueue {};
 
