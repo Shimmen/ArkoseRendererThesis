@@ -77,16 +77,8 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 
     setupDearImgui();
 
-    //for (size_t i = 0; i < m_numSwapchainImages; ++i) {
-    //    auto allocator = std::make_unique<ArenaAllocator>(frameAllocatorSize);
-    //    m_frameAllocators.push_back(std::move(allocator));
-    //}
-    //m_nodeAllocator = std::make_unique<ArenaAllocator>(nodeAllocatorSize);
-
-    m_staticResourceManager = std::make_unique<ResourceManager>();
     m_renderGraph = std::make_unique<RenderGraph>(m_numSwapchainImages);
-    m_app.setup(*m_staticResourceManager, *m_renderGraph);
-    createStaticResources();
+    m_app.setup(*m_renderGraph);
     reconstructRenderGraphResources(*m_renderGraph);
 }
 
@@ -100,7 +92,6 @@ VulkanBackend::~VulkanBackend()
     vkFreeCommandBuffers(m_device, m_renderGraphFrameCommandPool, m_frameCommandBuffers.size(), m_frameCommandBuffers.data());
 
     destroyRenderGraph(*m_renderGraph);
-    destroyStaticResources();
 
     destroySwapchain();
 
@@ -681,7 +672,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     ASSERT(m_numSwapchainImages > 0);
 
     // TODO: This is clearly stupid..
-    ResourceManager& badgeGiver = *m_staticResourceManager;
+    ResourceManager& badgeGiver = *m_nodeResourceManager;
 
     TextureInfo depthInfo {};
     depthInfo.format = m_depthImageFormat;
@@ -902,32 +893,6 @@ void VulkanBackend::renderDearImguiFrame(VkCommandBuffer commandBuffer, uint32_t
     vkCmdBeginRenderPass(commandBuffer, &passBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
     vkCmdEndRenderPass(commandBuffer);
-}
-
-void VulkanBackend::createStaticResources()
-{
-    for (auto& buffer : m_staticResourceManager->buffers()) {
-        newBuffer(buffer);
-    }
-    for (auto& bufferUpdate : m_staticResourceManager->bufferUpdates()) {
-        updateBuffer(bufferUpdate);
-    }
-    for (auto& texture : m_staticResourceManager->textures()) {
-        newTexture(texture);
-    }
-    for (auto& textureUpdate : m_staticResourceManager->textureUpdates()) {
-        updateTexture(textureUpdate);
-    }
-}
-
-void VulkanBackend::destroyStaticResources()
-{
-    for (auto& buffer : m_staticResourceManager->buffers()) {
-        deleteBuffer(buffer);
-    }
-    for (auto& texture : m_staticResourceManager->textures()) {
-        deleteTexture(texture);
-    }
 }
 
 bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)

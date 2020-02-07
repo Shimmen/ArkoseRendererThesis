@@ -40,9 +40,6 @@ private:
 
     void replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current);
 
-    void createStaticResources();
-    void destroyStaticResources();
-
     void newBuffer(const Buffer&);
     void deleteBuffer(const Buffer&);
     void updateBuffer(const BufferUpdate&);
@@ -186,7 +183,6 @@ private:
 
     App& m_app;
 
-    std::unique_ptr<ResourceManager> m_staticResourceManager {};
     std::unique_ptr<ResourceManager> m_nodeResourceManager {};
     std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
 
