@@ -179,8 +179,8 @@ VkDebugUtilsMessengerCreateInfoEXT VulkanBackend::debugMessengerCreateInfo() con
 {
     VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo = { VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
 
-    debugMessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    debugMessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    debugMessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT; // NOLINT(hicpp-signed-bitwise)
+    debugMessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT; // NOLINT(hicpp-signed-bitwise)
     debugMessengerCreateInfo.pfnUserCallback = debugMessageCallback;
     debugMessengerCreateInfo.pUserData = nullptr;
 
@@ -397,10 +397,10 @@ VkInstance VulkanBackend::createInstance(VkDebugUtilsMessengerCreateInfoEXT* deb
 {
     VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     appInfo.pApplicationName = "ArkoseRenderer";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0); // NOLINT(hicpp-signed-bitwise)
     appInfo.pEngineName = "ArkoseRendererEngine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_1;
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0); // NOLINT(hicpp-signed-bitwise)
+    appInfo.apiVersion = VK_API_VERSION_1_1; // NOLINT(hicpp-signed-bitwise)
 
     VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pNext = debugMessengerCreateInfo;
@@ -947,8 +947,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
         VkResult presentResult = vkQueuePresentKHR(m_presentQueue, &presentInfo);
 
         if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || s_unhandledWindowResize) {
-            Extent2D newWindowExtent = recreateSwapchain();
-            appState = appState.updateWindowExtent(newWindowExtent);
+            recreateSwapchain();
             reconstructRenderGraphResources(*m_renderGraph);
         } else if (presentResult != VK_SUCCESS) {
             LogError("VulkanBackend::executeFrame(): could not present swapchain (frame %u).\n", m_currentFrameIndex);
@@ -967,7 +966,7 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    m_app.update(elapsedTime, deltaTime);
+    m_app.update(float(elapsedTime), float(deltaTime));
 
     VkCommandBufferBeginInfo commandBufferBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     commandBufferBeginInfo.flags = 0u;
@@ -1342,11 +1341,7 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
         numChannels = 3;
         break;
     case Texture::Format::RGBA8:
-        numChannels = 4;
-        break;
     case Texture::Format::sRGBA8:
-        numChannels = 4;
-        break;
     case Texture::Format::RGBA16F:
         numChannels = 4;
         break;
@@ -2202,7 +2197,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     } else {
         renderState.renderTarget().forEachColorAttachment([&](const RenderTarget::Attachment& attachment) {
             VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT; // NOLINT(hicpp-signed-bitwise)
             colorBlendAttachment.blendEnable = VK_FALSE;
             colorBlendAttachments.push_back(colorBlendAttachment);
         });

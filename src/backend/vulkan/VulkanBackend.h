@@ -74,7 +74,7 @@ private:
 
     void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
     void destroySwapchain();
-    [[nodiscard]] Extent2D recreateSwapchain();
+    Extent2D recreateSwapchain();
 
     void createWindowRenderTargetFrontend();
 
