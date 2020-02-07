@@ -17,9 +17,7 @@ void TestApp::setup(RenderGraph& graph)
 
     m_cube = GltfModel::load("assets/Cube/Cube.gltf");
     m_cube->transform().setLocalMatrix(
-        mathkit::translate(0, -1.6f, 0) *
-        mathkit::axisAngleMatrix({0,1,0}, 0.3f) *
-        mathkit::scale(3, 1, 3));
+        mathkit::translate(0, -1.6f, 0) * mathkit::axisAngleMatrix({ 0, 1, 0 }, 0.3f) * mathkit::scale(3, 1, 3));
 
     m_boomBox = GltfModel::load("assets/BoomBox/BoomBoxWithAxes.gltf");
 
@@ -28,7 +26,7 @@ void TestApp::setup(RenderGraph& graph)
     m_scene.camera().lookAt({ 0, 1, 6 }, { 0, 0.5f, 0 });
 
     m_scene.sun().color = { 1, 1, 1 };
-    m_scene.sun().intensity = 1.0f;
+    m_scene.sun().intensity = 10.0f;
     m_scene.sun().direction = normalize(vec3(-1.0f, -1.0f, 0.0f));
     m_scene.sun().shadowMapSize = { 2048, 2048 };
     m_scene.sun().worldExtent = 6.0f;
@@ -43,7 +41,12 @@ void TestApp::setup(RenderGraph& graph)
 
 void TestApp::update(float elapsedTime, float deltaTime)
 {
-    ImGui::ShowDemoWindow();
+    ImGui::Begin("TestApp");
+    {
+        ImGui::ColorEdit3("Sun color", value_ptr(m_scene.sun().color));
+        ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 20.0f);
+    }
+    ImGui::End();
 
     const Input& input = Input::instance();
     m_scene.camera().update(input, GlobalState::get().windowExtent(), deltaTime);

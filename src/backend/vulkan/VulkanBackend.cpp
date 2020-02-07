@@ -895,7 +895,7 @@ void VulkanBackend::renderDearImguiFrame(VkCommandBuffer commandBuffer, uint32_t
     vkCmdEndRenderPass(commandBuffer);
 }
 
-bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
+bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime, bool renderGui)
 {
     uint32_t currentFrameMod = m_currentFrameIndex % maxFramesInFlight;
 
@@ -929,7 +929,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     textureInfo(currentColorTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     textureInfo(m_swapchainDepthTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    drawFrame(appState, elapsedTime, deltaTime, swapchainImageIndex);
+    drawFrame(appState, elapsedTime, deltaTime, renderGui, swapchainImageIndex);
 
     submitQueue(swapchainImageIndex, &m_imageAvailableSemaphores[currentFrameMod], &m_renderFinishedSemaphores[currentFrameMod], &m_inFlightFrameFences[currentFrameMod]);
 
@@ -958,7 +958,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime)
     return true;
 }
 
-void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex)
+void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, double deltaTime, bool renderGui, uint32_t swapchainImageIndex)
 {
     ASSERT(m_renderGraph);
 
@@ -985,8 +985,12 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
         cmdList.endNode({});
     });
 
-    ImGui::Render();
-    renderDearImguiFrame(commandBuffer, swapchainImageIndex);
+    if (renderGui) {
+        ImGui::Render();
+        renderDearImguiFrame(commandBuffer, swapchainImageIndex);
+    } else {
+        ImGui::EndFrame();
+    }
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         LogError("VulkanBackend::executeRenderGraph(): error ending command buffer command!\n");

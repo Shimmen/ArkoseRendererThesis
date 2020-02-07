@@ -82,6 +82,8 @@ int main()
         auto app = std::make_unique<TestApp>();
         auto backend = createBackend(backendType, window, *app);
 
+        bool renderGui = true;
+
         ShaderManager::instance().startFileWatching(250);
         LogInfo("ArkoseRenderer: main loop begin.\n");
 
@@ -92,13 +94,17 @@ int main()
             Input::preEventPoll();
             glfwPollEvents();
 
+            if (Input::instance().wasKeyPressed(GLFW_KEY_G)) {
+                renderGui = !renderGui;
+            }
+
             double elapsedTime = glfwGetTime();
             double deltaTime = elapsedTime - lastTime;
             lastTime = elapsedTime;
 
             bool frameExecuted = false;
             while (!frameExecuted) {
-                frameExecuted = backend->executeFrame(elapsedTime, deltaTime);
+                frameExecuted = backend->executeFrame(elapsedTime, deltaTime, renderGui);
             }
         }
 

@@ -1,4 +1,5 @@
 #include "SlowForwardRenderNode.h"
+#include <imgui.h>
 
 #include "CameraUniformNode.h"
 #include "LightData.h"
@@ -70,7 +71,7 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
             cmdList.bindSet(fixedBindingSet, 0);
 
             DirectionalLight dirLight {
-                .colorAndIntensity = { 1, 1, 1, 10.0f },
+                .colorAndIntensity = { scene.sun().color, scene.sun().intensity },
                 .viewSpaceDirection = scene.camera().viewMatrix() * normalize(vec4(scene.sun().direction, 0.0)),
                 .lightProjectionFromWorld = scene.sun().lightProjection()
             };
@@ -141,10 +142,10 @@ void SlowForwardRenderNode::setupState(const Scene& scene, ResourceManager& reso
             // Create binding set
             drawable.bindingSet = &resources.createBindingSet(
                 { { 0, ShaderStageVertex, drawable.objectDataBuffer },
-                  { 1, ShaderStageFragment, &baseColorTexture },
-                  { 2, ShaderStageFragment, &normalMapTexture },
-                  { 3, ShaderStageFragment, &metallicRoughnessTexture },
-                  { 4, ShaderStageFragment, &emissiveTexture }});
+                    { 1, ShaderStageFragment, &baseColorTexture },
+                    { 2, ShaderStageFragment, &normalMapTexture },
+                    { 3, ShaderStageFragment, &metallicRoughnessTexture },
+                    { 4, ShaderStageFragment, &emissiveTexture } });
 
             state.drawables.push_back(drawable);
         });

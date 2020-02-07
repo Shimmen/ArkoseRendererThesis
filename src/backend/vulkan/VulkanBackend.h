@@ -29,7 +29,7 @@ public:
     ///////////////////////////////////////////////////////////////////////////
     /// Public backend API
 
-    bool executeFrame(double elapsedTime, double deltaTime) override;
+    bool executeFrame(double elapsedTime, double deltaTime, bool renderGui) override;
 
 private:
     ///////////////////////////////////////////////////////////////////////////
@@ -65,7 +65,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Drawing
 
-    void drawFrame(const AppState&, double elapsedTime, double deltaTime, uint32_t swapchainImageIndex);
+    void drawFrame(const AppState&, double elapsedTime, double deltaTime, bool renderGui, uint32_t swapchainImageIndex);
 
     ///////////////////////////////////////////////////////////////////////////
     /// Swapchain management
