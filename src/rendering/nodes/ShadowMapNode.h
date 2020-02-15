@@ -7,7 +7,7 @@
 class ShadowMapNode {
 public:
     static std::string name();
-    static NEWBasicRenderGraphNode::ConstructorFunction construct(const Scene&);
+    static RenderGraphBasicNode::ConstructorFunction construct(const Scene&);
 
 private:
     struct Drawable {

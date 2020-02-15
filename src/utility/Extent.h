@@ -1,6 +1,7 @@
 #pragma once
 
 #include "utility/util.h"
+#include <cstdint>
 
 struct Extent2D {
     Extent2D()

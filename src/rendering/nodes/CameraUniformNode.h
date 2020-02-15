@@ -6,5 +6,5 @@
 class CameraUniformNode {
 public:
     static std::string name();
-    static NEWBasicRenderGraphNode::ConstructorFunction construct(const FpsCamera&);
+    static RenderGraphBasicNode::ConstructorFunction construct(const FpsCamera&);
 };

@@ -7,14 +7,14 @@ std::string ForwardRenderNode::name()
     return "forward";
 }
 
-NEWBasicRenderGraphNode::ConstructorFunction ForwardRenderNode::construct(const Scene& scene)
+RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::construct(const Scene& scene)
 {
     // TODO: Select implementation conditionally depending on what's supported!
     //return constructSlowImplementation(scene);
     return constructFastImplementation(scene);
 }
 
-NEWBasicRenderGraphNode::ConstructorFunction ForwardRenderNode::constructFastImplementation(const Scene& scene)
+RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplementation(const Scene& scene)
 {
     return [&](ResourceManager& frameManager) {
         static State state {}; // TODO: Don't use static data like this!

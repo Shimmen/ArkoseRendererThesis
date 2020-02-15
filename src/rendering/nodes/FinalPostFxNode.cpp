@@ -7,7 +7,7 @@ std::string FinalPostFxNode::name()
     return "final";
 }
 
-NEWBasicRenderGraphNode::ConstructorFunction FinalPostFxNode::construct()
+RenderGraphBasicNode::ConstructorFunction FinalPostFxNode::construct()
 {
     return [&](ResourceManager& frameManager) {
         Shader shader = Shader::createBasic("finalPostFX", "finalPostFx.vert", "finalPostFx.frag");

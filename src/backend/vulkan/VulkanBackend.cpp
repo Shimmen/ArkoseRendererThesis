@@ -77,7 +77,7 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 
     setupDearImgui();
 
-    m_renderGraph = std::make_unique<NEWRenderGraph>();
+    m_renderGraph = std::make_unique<RenderGraph>();
     m_app.setup(*m_renderGraph);
     reconstructRenderGraphResources(*m_renderGraph);
 }
@@ -980,7 +980,7 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
     ResourceManager& associatedResourceManager = *m_frameResourceManagers[swapchainImageIndex];
     VulkanCommandList cmdList { *this, commandBuffer };
 
-    m_renderGraph->forEachNodeInResolvedOrder(associatedResourceManager, [&](const NEWRenderGraphNode::ExecuteCallback& nodeExecuteCallback) {
+    m_renderGraph->forEachNodeInResolvedOrder(associatedResourceManager, [&](const RenderGraphNode::ExecuteCallback& nodeExecuteCallback) {
         nodeExecuteCallback(appState, cmdList);
         cmdList.endNode({});
     });
@@ -2297,7 +2297,7 @@ VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState
     return renderStateInfo;
 }
 
-void VulkanBackend::reconstructRenderGraphResources(NEWRenderGraph& renderGraph)
+void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
 {
     m_frameResourceManagers.resize(m_numSwapchainImages);
 

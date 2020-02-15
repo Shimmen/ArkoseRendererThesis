@@ -8,6 +8,6 @@ public:
     App() = default;
     virtual ~App() = default;
 
-    virtual void setup(NEWRenderGraph&) = 0;
+    virtual void setup(RenderGraph&) = 0;
     virtual void update(float elapsedTime, float deltaTime) = 0;
 };

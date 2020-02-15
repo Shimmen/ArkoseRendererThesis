@@ -8,7 +8,7 @@
 class ForwardRenderNode {
 public:
     static std::string name();
-    static NEWBasicRenderGraphNode::ConstructorFunction construct(const Scene&);
+    static RenderGraphBasicNode::ConstructorFunction construct(const Scene&);
 
 private:
     struct Vertex {
@@ -34,5 +34,5 @@ private:
 
     static void setupState(const Scene&, ResourceManager&, State&);
 
-    static NEWBasicRenderGraphNode::ConstructorFunction constructFastImplementation(const Scene&);
+    static RenderGraphBasicNode::ConstructorFunction constructFastImplementation(const Scene&);
 };

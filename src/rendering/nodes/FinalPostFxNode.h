@@ -5,5 +5,5 @@
 class FinalPostFxNode {
 public:
     static std::string name();
-    static NEWBasicRenderGraphNode::ConstructorFunction construct();
+    static RenderGraphBasicNode::ConstructorFunction construct();
 };

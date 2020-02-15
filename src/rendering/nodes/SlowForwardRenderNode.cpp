@@ -10,7 +10,7 @@ std::string SlowForwardRenderNode::name()
     return "forward";
 }
 
-NEWBasicRenderGraphNode::ConstructorFunction SlowForwardRenderNode::construct(const Scene& scene)
+RenderGraphBasicNode::ConstructorFunction SlowForwardRenderNode::construct(const Scene& scene)
 {
     return [&](ResourceManager& frameManager) {
         static State state {}; // TODO: Don't use static data like this!
