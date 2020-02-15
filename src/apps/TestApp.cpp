@@ -10,7 +10,7 @@
 #include "utility/Input.h"
 #include <imgui.h>
 
-void TestApp::setup(RenderGraph& graph)
+void TestApp::setup(NEWRenderGraph& graph)
 {
     // Here we can do stuff like CPU work and GPU stuff that is fully or mostly static,
     // e.g. load textures, load meshes, set vertex buffers.

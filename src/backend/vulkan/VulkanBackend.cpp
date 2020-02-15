@@ -77,7 +77,7 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 
     setupDearImgui();
 
-    m_renderGraph = std::make_unique<RenderGraph>(m_numSwapchainImages);
+    m_renderGraph = std::make_unique<NEWRenderGraph>();
     m_app.setup(*m_renderGraph);
     reconstructRenderGraphResources(*m_renderGraph);
 }
@@ -91,7 +91,7 @@ VulkanBackend::~VulkanBackend()
 
     vkFreeCommandBuffers(m_device, m_renderGraphFrameCommandPool, m_frameCommandBuffers.size(), m_frameCommandBuffers.data());
 
-    destroyRenderGraph(*m_renderGraph);
+    destroyRenderGraphResources();
 
     destroySwapchain();
 
@@ -980,8 +980,8 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
     ResourceManager& associatedResourceManager = *m_frameResourceManagers[swapchainImageIndex];
     VulkanCommandList cmdList { *this, commandBuffer };
 
-    m_renderGraph->forEachNodeInResolvedOrder(associatedResourceManager, [&](const RenderGraphNode& node) {
-        node.executeForFrame(appState, cmdList, swapchainImageIndex);
+    m_renderGraph->forEachNodeInResolvedOrder(associatedResourceManager, [&](const NEWRenderGraphNode::ExecuteCallback& nodeExecuteCallback) {
+        nodeExecuteCallback(appState, cmdList);
         cmdList.endNode({});
     });
 
@@ -2297,31 +2297,40 @@ VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState
     return renderStateInfo;
 }
 
-void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
+void VulkanBackend::reconstructRenderGraphResources(NEWRenderGraph& renderGraph)
 {
     m_frameResourceManagers.resize(m_numSwapchainImages);
+
+    std::vector<std::unique_ptr<ResourceManager>> newResourceManagers {};
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
-
         const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[swapchainImageIndex];
-        auto frameResourceManager = std::make_unique<ResourceManager>(&windowRenderTargetForFrame);
-
-        Registry registry {
-            //.node = *nodeResourceManager, // hmm
-            .frame = *frameResourceManager
-        };
-
-        renderGraph.constructAllForFrame(registry, swapchainImageIndex);
-
-        replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), frameResourceManager.get());
-        m_frameResourceManagers[swapchainImageIndex] = std::move(frameResourceManager);
+        newResourceManagers.push_back(std::make_unique<ResourceManager>(&windowRenderTargetForFrame));
     }
+
+    auto nodeResourceManager = std::make_unique<ResourceManager>();
+
+    // TODO: This is stupid
+    std::vector<ResourceManager*> managerPointers {};
+    for (auto& mng : newResourceManagers) {
+        managerPointers.emplace_back(mng.get());
+    }
+
+    renderGraph.constructAll(*nodeResourceManager, managerPointers);
+
+    for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
+        replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), newResourceManagers[swapchainImageIndex].get());
+        m_frameResourceManagers[swapchainImageIndex] = std::move(newResourceManagers[swapchainImageIndex]);
+    }
+    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nodeResourceManager.get());
+    m_nodeResourceManager = std::move(nodeResourceManager);
 }
 
-void VulkanBackend::destroyRenderGraph(RenderGraph&)
+void VulkanBackend::destroyRenderGraphResources()
 {
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
         replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), nullptr);
     }
+    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nullptr);
 }
 
 void VulkanBackend::replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current)

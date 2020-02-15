@@ -10,11 +10,11 @@ std::string SlowForwardRenderNode::name()
     return "forward";
 }
 
-RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const Scene& scene)
+NEWBasicRenderGraphNode::ConstructorFunction SlowForwardRenderNode::construct(const Scene& scene)
 {
-    return [&](Registry& registry) {
+    return [&](ResourceManager& frameManager) {
         static State state {}; // TODO: Don't use static data like this!
-        setupState(scene, registry.frame, state); // TODO: Don't use the frame registry!
+        setupState(scene, frameManager, state); // TODO: Don't use the frame registry!
 
         Shader shader = Shader::createBasic("forwardSlow", "forwardSlow.vert", "forwardSlow.frag");
 
@@ -26,7 +26,7 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
                 { 3, VertexAttributeType ::Float4, offsetof(Vertex, tangent) } }
         };
 
-        const RenderTarget& windowTarget = registry.frame.windowRenderTarget();
+        const RenderTarget& windowTarget = frameManager.windowRenderTarget();
 
         Viewport viewport;
         viewport.extent = windowTarget.extent();
@@ -39,23 +39,23 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
         rasterState.backfaceCullingEnabled = true;
 
-        Texture& colorTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::RGBA16F, Texture::Usage::All);
-        registry.frame.publish("color", colorTexture);
+        Texture& colorTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA16F, Texture::Usage::All);
+        frameManager.publish("color", colorTexture);
 
-        Texture& normalTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
-        registry.frame.publish("normal", normalTexture);
+        Texture& normalTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        frameManager.publish("normal", normalTexture);
 
-        Texture& depthTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
-        RenderTarget& renderTarget = registry.frame.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
+        Texture& depthTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
+        RenderTarget& renderTarget = frameManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
             { RenderTarget::AttachmentType::Color1, &normalTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        const Buffer* cameraUniformBuffer = registry.frame.getBuffer(CameraUniformNode::name(), "buffer");
-        BindingSet& fixedBindingSet = registry.frame.createBindingSet({ { 0, ShaderStage(ShaderStageVertex | ShaderStageFragment), cameraUniformBuffer } });
+        const Buffer* cameraUniformBuffer = frameManager.getBuffer(CameraUniformNode::name(), "buffer");
+        BindingSet& fixedBindingSet = frameManager.createBindingSet({ { 0, ShaderStage(ShaderStageVertex | ShaderStageFragment), cameraUniformBuffer } });
 
-        const Texture* dirLightShadowMap = registry.frame.getTexture(ShadowMapNode::name(), "directional");
-        Buffer& dirLightUniformBuffer = registry.frame.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        BindingSet& dirLightBindingSet = registry.frame.createBindingSet({ { 0, ShaderStageFragment, dirLightShadowMap }, { 1, ShaderStageFragment, &dirLightUniformBuffer } });
+        const Texture* dirLightShadowMap = frameManager.getTexture(ShadowMapNode::name(), "directional");
+        Buffer& dirLightUniformBuffer = frameManager.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        BindingSet& dirLightBindingSet = frameManager.createBindingSet({ { 0, ShaderStageFragment, dirLightShadowMap }, { 1, ShaderStageFragment, &dirLightUniformBuffer } });
 
         std::vector<const BindingSet*> allBindingSets {};
         allBindingSets.push_back(&fixedBindingSet);
@@ -64,7 +64,7 @@ RenderGraphNode::NodeConstructorFunction SlowForwardRenderNode::construct(const 
         //}
         allBindingSets.push_back(&dirLightBindingSet);
 
-        RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
+        RenderState& renderState = frameManager.createRenderState(renderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(0.2f, 0.2f, 0.2f), 1.0f);

@@ -8,21 +8,21 @@ std::string ShadowMapNode::name()
     return "shadow";
 }
 
-RenderGraphNode::NodeConstructorFunction ShadowMapNode::construct(const Scene& scene)
+NEWBasicRenderGraphNode::ConstructorFunction ShadowMapNode::construct(const Scene& scene)
 {
-    return [&](Registry& registry) {
+    return [&](ResourceManager& frameManager) {
         static std::vector<Drawable> drawables {}; // TODO: Don't use static data like this!
-        setupDrawables(scene, registry.frame, drawables); // TODO: Don't use the frame registry!
+        setupDrawables(scene, frameManager, drawables); // TODO: Don't use the frame registry!
 
         Shader shader = Shader::createVertexOnly("shadowSun", "shadowSun.vert");
         VertexLayout vertexLayout = VertexLayout { sizeof(vec3), { { 0, VertexAttributeType::Float3, 0 } } };
 
         const SunLight& sunLight = scene.sun();
 
-        Texture& shadowMap = registry.frame.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::All);
-        registry.frame.publish("directional", shadowMap);
+        Texture& shadowMap = frameManager.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::All);
+        frameManager.publish("directional", shadowMap);
 
-        const RenderTarget& shadowRenderTarget = registry.frame.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
+        const RenderTarget& shadowRenderTarget = frameManager.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
 
         Viewport viewport;
         viewport.extent = shadowRenderTarget.extent();
@@ -35,15 +35,15 @@ RenderGraphNode::NodeConstructorFunction ShadowMapNode::construct(const Scene& s
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
         rasterState.backfaceCullingEnabled = true;
 
-        Buffer& lightDataBuffer = registry.frame.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        BindingSet& lightBindingSet = registry.frame.createBindingSet({ { 0, ShaderStageVertex, &lightDataBuffer } });
+        Buffer& lightDataBuffer = frameManager.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        BindingSet& lightBindingSet = frameManager.createBindingSet({ { 0, ShaderStageVertex, &lightDataBuffer } });
 
-        Buffer& transformDataBuffer = registry.frame.createBuffer(drawables.size() * sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        BindingSet& transformBindingSet = registry.frame.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
+        Buffer& transformDataBuffer = frameManager.createBuffer(drawables.size() * sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        BindingSet& transformBindingSet = frameManager.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
 
         std::vector<const BindingSet*> allBindingSets { &lightBindingSet, &transformBindingSet };
 
-        RenderState& renderState = registry.frame.createRenderState(shadowRenderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
+        RenderState& renderState = frameManager.createRenderState(shadowRenderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(1, 0, 1), 1.0f);

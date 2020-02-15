@@ -6,7 +6,7 @@
 
 class TestApp : public App {
 public:
-    void setup(RenderGraph&) override;
+    void setup(NEWRenderGraph&) override;
     void update(float elapsedTime, float deltaTime) override;
 
 private:

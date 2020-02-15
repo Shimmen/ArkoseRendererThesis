@@ -7,18 +7,18 @@ std::string ForwardRenderNode::name()
     return "forward";
 }
 
-RenderGraphNode::NodeConstructorFunction ForwardRenderNode::construct(const Scene& scene)
+NEWBasicRenderGraphNode::ConstructorFunction ForwardRenderNode::construct(const Scene& scene)
 {
     // TODO: Select implementation conditionally depending on what's supported!
     //return constructSlowImplementation(scene);
     return constructFastImplementation(scene);
 }
 
-RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImplementation(const Scene& scene)
+NEWBasicRenderGraphNode::ConstructorFunction ForwardRenderNode::constructFastImplementation(const Scene& scene)
 {
-    return [&](Registry& registry) {
+    return [&](ResourceManager& frameManager) {
         static State state {}; // TODO: Don't use static data like this!
-        setupState(scene, registry.frame, state); // TODO: Don't use the frame registry!
+        setupState(scene, frameManager, state); // TODO: Don't use the frame registry!
 
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("forward", "forward.vert", "forward.frag");
@@ -32,20 +32,20 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
         };
 
         size_t perObjectBufferSize = state.drawables.size() * sizeof(PerForwardObject);
-        Buffer& perObjectBuffer = registry.frame.createBuffer(perObjectBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        Buffer& perObjectBuffer = frameManager.createBuffer(perObjectBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
         size_t materialBufferSize = state.materials.size() * sizeof(ForwardMaterial);
-        Buffer& materialBuffer = registry.frame.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        Buffer& materialBuffer = frameManager.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
-        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStageVertex, registry.frame.getBuffer(CameraUniformNode::name(), "buffer") };
+        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStageVertex, frameManager.getBuffer(CameraUniformNode::name(), "buffer") };
         ShaderBinding perObjectBufferBinding = { 1, ShaderStageVertex, &perObjectBuffer };
         ShaderBinding materialBufferBinding = { 2, ShaderStageFragment, &materialBuffer };
         ShaderBinding textureSamplerBinding = { 3, ShaderStageFragment, state.textures, FORWARD_MAX_TEXTURES };
-        BindingSet& bindingSet = registry.frame.createBindingSet({ cameraUniformBufferBinding, perObjectBufferBinding, materialBufferBinding, textureSamplerBinding });
+        BindingSet& bindingSet = frameManager.createBindingSet({ cameraUniformBufferBinding, perObjectBufferBinding, materialBufferBinding, textureSamplerBinding });
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
 
-        const RenderTarget& windowTarget = registry.frame.windowRenderTarget();
+        const RenderTarget& windowTarget = frameManager.windowRenderTarget();
 
         Viewport viewport;
         viewport.extent = windowTarget.extent();
@@ -58,18 +58,18 @@ RenderGraphNode::NodeConstructorFunction ForwardRenderNode::constructFastImpleme
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
         rasterState.backfaceCullingEnabled = true;
 
-        Texture& colorTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
-        registry.frame.publish("color", colorTexture);
+        Texture& colorTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        frameManager.publish("color", colorTexture);
 
-        Texture& normalTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
-        registry.frame.publish("normal", normalTexture);
+        Texture& normalTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        frameManager.publish("normal", normalTexture);
 
-        Texture& depthTexture = registry.frame.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
-        RenderTarget& renderTarget = registry.frame.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
+        Texture& depthTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
+        RenderTarget& renderTarget = frameManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
             { RenderTarget::AttachmentType::Color1, &normalTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        RenderState& renderState = registry.frame.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
+        RenderState& renderState = frameManager.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);

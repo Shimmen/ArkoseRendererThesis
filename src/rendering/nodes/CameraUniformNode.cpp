@@ -7,11 +7,11 @@ std::string CameraUniformNode::name()
     return "camera-uniform";
 }
 
-RenderGraphNode::NodeConstructorFunction CameraUniformNode::construct(const FpsCamera& fpsCamera)
+NEWBasicRenderGraphNode::ConstructorFunction CameraUniformNode::construct(const FpsCamera& fpsCamera)
 {
-    return [&](Registry& registry) {
-        Buffer& cameraUniformBuffer = registry.frame.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        registry.frame.publish("buffer", cameraUniformBuffer);
+    return [&](ResourceManager& frameManager) {
+        Buffer& cameraUniformBuffer = frameManager.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        frameManager.publish("buffer", cameraUniformBuffer);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             CameraState cameraState {

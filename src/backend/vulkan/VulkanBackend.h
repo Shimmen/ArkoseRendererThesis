@@ -35,8 +35,8 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
-    void reconstructRenderGraphResources(RenderGraph& renderGraph);
-    void destroyRenderGraph(RenderGraph&);
+    void reconstructRenderGraphResources(NEWRenderGraph& renderGraph);
+    void destroyRenderGraphResources(); // TODO: This is a weird function now..
 
     void replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current);
 
@@ -183,6 +183,7 @@ private:
 
     App& m_app;
 
+    std::unique_ptr<ResourceManager> m_nodeResourceManager {};
     std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
 
     VkQueue m_graphicsQueue {};
@@ -192,7 +193,8 @@ private:
 
     std::vector<VkCommandBuffer> m_frameCommandBuffers {};
 
-    std::unique_ptr<RenderGraph> m_renderGraph {};
+    //std::unique_ptr<RenderGraph> m_renderGraph {};
+    std::unique_ptr<NEWRenderGraph> m_renderGraph {};
 
     struct BufferInfo {
         VkBuffer buffer {};
