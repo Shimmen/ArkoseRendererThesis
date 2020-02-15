@@ -48,3 +48,58 @@ void RenderGraph::forEachNodeInResolvedOrder(const ResourceManager& associatedRe
         callback(*node);
     }
 }
+
+void NEWRenderGraph::addNode(const std::string& name, const NEWBasicRenderGraphNode::ConstructorFunction& constructorFunction)
+{
+    // All nodes should be added before construction!
+    ASSERT(m_frameContexts.empty());
+
+    auto node = std::make_unique<NEWBasicRenderGraphNode>(name, constructorFunction);
+    m_allNodes.emplace_back(std::move(node));
+}
+
+void NEWRenderGraph::addNode(std::unique_ptr<NEWRenderGraphNode>&& node)
+{
+    m_allNodes.emplace_back(std::move(node));
+}
+
+void NEWRenderGraph::constructAll(ResourceManager& nodeManager, std::vector<ResourceManager*> frameManagers)
+{
+    m_frameContexts.clear();
+
+    // TODO: For debugability it would be nice if the frame resources were constructed right after the node resources, for each node
+
+    for (auto& node : m_allNodes) {
+        nodeManager.setCurrentNode(node->name());
+        node->constructNode(nodeManager);
+    }
+
+    for (auto& frameManager : frameManagers) {
+        FrameContext frameCtx {};
+
+        for (auto& node : m_allNodes) {
+            frameManager->setCurrentNode(node->name());
+            auto executeCallback = node->constructFrame(*frameManager);
+            frameCtx.nodeContexts.push_back({ .node = node.get(),
+                .executeCallback = executeCallback });
+        }
+
+        m_frameContexts[frameManager] = frameCtx;
+    }
+
+    nodeManager.setCurrentNode("-");
+    for (auto& frameManager : frameManagers) {
+        frameManager->setCurrentNode("-");
+    }
+}
+
+void NEWRenderGraph::forEachNodeInResolvedOrder(const ResourceManager& frameManager, std::function<void(const NEWRenderGraphNode::ExecuteCallback&)> callback) const
+{
+    auto entry = m_frameContexts.find(&frameManager);
+    ASSERT(entry != m_frameContexts.end());
+
+    const FrameContext& frameContext = entry->second;
+    for (auto& [_, execCallback] : frameContext.nodeContexts) {
+        callback(execCallback);
+    }
+}

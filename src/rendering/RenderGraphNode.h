@@ -38,3 +38,35 @@ private:
     //! The number of swapchain images / frames that this node needs to "manage"
     uint32_t m_frameMultiplicity { 0 };
 };
+
+class NEWRenderGraphNode {
+public:
+    explicit NEWRenderGraphNode(std::string name);
+    virtual ~NEWRenderGraphNode() = default;
+
+    using ExecuteCallback = std::function<void(const AppState&, CommandList&)>;
+
+    [[nodiscard]] const std::string& name() const;
+
+    //! This is not const since we need to write to members here that are shared for the whole node.
+    virtual void constructNode(ResourceManager&) = 0;
+
+    //! This is const, since changing or writing to any members would probably break stuff
+    //! since this is called n times, one for each frame at reconstruction.
+    virtual ExecuteCallback constructFrame(ResourceManager&) const = 0;
+
+private:
+    std::string m_name;
+};
+
+class NEWBasicRenderGraphNode final : public NEWRenderGraphNode {
+public:
+    using ConstructorFunction = std::function<ExecuteCallback(ResourceManager&)>;
+    NEWBasicRenderGraphNode(std::string name, ConstructorFunction);
+
+    void constructNode(ResourceManager&) override;
+    ExecuteCallback constructFrame(ResourceManager&) const override;
+
+private:
+    ConstructorFunction m_constructorFunction;
+};
