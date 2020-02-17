@@ -4,7 +4,7 @@
 // Assert & similar
 
 #ifdef NDEBUG
-#define ASSERT(x) (x)
+#define ASSERT(x) (void)(x)
 #else
 // TODO: Use own assert so we don't have to include <cassert>!
 #include <cassert>

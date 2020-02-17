@@ -59,5 +59,5 @@ inline void LogError(const char* format, ...)
         fflush(stderr);
         va_end(vaList);
     }
-    ASSERT(false);
+    exit(123);
 }
