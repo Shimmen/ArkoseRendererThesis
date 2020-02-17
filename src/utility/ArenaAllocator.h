@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <memory>
 
-class ResourceManager;
+class Registry;
 
 class ArenaAllocator {
 public:

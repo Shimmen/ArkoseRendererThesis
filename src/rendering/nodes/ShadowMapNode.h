@@ -17,5 +17,5 @@ private:
         uint32_t indexCount;
     };
 
-    static void setupDrawables(const Scene&, ResourceManager&, std::vector<Drawable>&);
+    static void setupDrawables(const Scene&, Registry&, std::vector<Drawable>&);
 };

@@ -10,9 +10,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
-class ResourceManager {
+class Registry {
 public:
-    explicit ResourceManager(const RenderTarget* windowRenderTarget = nullptr);
+    explicit Registry(const RenderTarget* windowRenderTarget = nullptr);
 
     void setCurrentNode(std::string);
 
@@ -47,7 +47,7 @@ public:
     [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
     [[nodiscard]] const std::vector<TextureUpdateFromFile>& textureUpdates() const;
 
-    [[nodiscard]] Badge<ResourceManager> exchangeBadges(Badge<Backend>) const;
+    [[nodiscard]] Badge<Registry> exchangeBadges(Badge<Backend>) const;
 
 protected:
     std::string makeQualifiedName(const std::string& node, const std::string& name);
@@ -80,14 +80,8 @@ private:
     CapList<RenderState> m_renderStates { maxNumRenderStates };
 };
 
-class Registry {
-public:
-    //ResourceManager& node;
-    ResourceManager& frame;
-};
-
 template<typename T>
-[[nodiscard]] Buffer& ResourceManager::createBuffer(std::vector<T>&& inData, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
+[[nodiscard]] Buffer& Registry::createBuffer(std::vector<T>&& inData, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
     size_t dataSize = inData.size() * sizeof(T);
     auto* binaryData = reinterpret_cast<const std::byte*>(inData.data());

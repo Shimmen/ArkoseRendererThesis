@@ -38,7 +38,7 @@ private:
     void reconstructRenderGraphResources(RenderGraph& renderGraph);
     void destroyRenderGraphResources(); // TODO: This is a weird function now..
 
-    void replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current);
+    void replaceResourcesForRegistry(Registry* previous, Registry* current);
 
     void newBuffer(const Buffer&);
     void deleteBuffer(const Buffer&);
@@ -183,8 +183,8 @@ private:
 
     App& m_app;
 
-    std::unique_ptr<ResourceManager> m_nodeResourceManager {};
-    std::vector<std::unique_ptr<ResourceManager>> m_frameResourceManagers {};
+    std::unique_ptr<Registry> m_nodeRegistry {};
+    std::vector<std::unique_ptr<Registry>> m_frameRegistries {};
 
     VkQueue m_graphicsQueue {};
 

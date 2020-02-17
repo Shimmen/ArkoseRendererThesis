@@ -32,7 +32,7 @@ private:
         std::vector<ForwardMaterial> materials {};
     };
 
-    static void setupState(const Scene&, ResourceManager&, State&);
+    static void setupState(const Scene&, Registry&, State&);
 
     static RenderGraphBasicNode::ConstructorFunction constructFastImplementation(const Scene&);
 };

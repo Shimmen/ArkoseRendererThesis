@@ -31,5 +31,5 @@ private:
         std::vector<Drawable> drawables {};
     };
 
-    static void setupState(const Scene&, ResourceManager&, State&);
+    static void setupState(const Scene&, Registry&, State&);
 };

@@ -5,7 +5,7 @@
 
 /// Defines a list with a fixed capacity. It's pretty much like std::array but it doesn't have the capacity as a template argument.
 /// A use case for this is when you want vector like semantics but need the data to never move, so addresses can be kept. This is
-/// important for the ResourceManager class, where you add resources as you want, the manager owns the resources, and it hands out
+/// important for the Registry class, where you add resources as you want, the manager owns the resources, and it hands out
 /// addresses to the callers.
 template<typename T>
 class CapList {

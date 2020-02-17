@@ -5,7 +5,7 @@
 
 #include "VulkanCommandList.h"
 #include "VulkanQueueInfo.h"
-#include "rendering/ResourceManager.h"
+#include "rendering/Registry.h"
 #include "rendering/ShaderManager.h"
 #include "utility/GlobalState.h"
 #include "utility/fileio.h"
@@ -672,7 +672,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     ASSERT(m_numSwapchainImages > 0);
 
     // TODO: This is clearly stupid..
-    ResourceManager badgeGiver {};
+    Registry badgeGiver {};
 
     TextureInfo depthInfo {};
     depthInfo.format = m_depthImageFormat;
@@ -977,10 +977,10 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
         LogError("VulkanBackend::executeRenderGraph(): error beginning command buffer command!\n");
     }
 
-    ResourceManager& associatedResourceManager = *m_frameResourceManagers[swapchainImageIndex];
+    Registry& associatedRegistry = *m_frameRegistries[swapchainImageIndex];
     VulkanCommandList cmdList { *this, commandBuffer };
 
-    m_renderGraph->forEachNodeInResolvedOrder(associatedResourceManager, [&](const RenderGraphNode::ExecuteCallback& nodeExecuteCallback) {
+    m_renderGraph->forEachNodeInResolvedOrder(associatedRegistry, [&](const RenderGraphNode::ExecuteCallback& nodeExecuteCallback) {
         nodeExecuteCallback(appState, cmdList);
         cmdList.endNode({});
     });
@@ -2302,43 +2302,43 @@ void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
     uint32_t numFrameManagers = m_numSwapchainImages;
 
     // Create new resource managers
-    auto nodeResourceManager = std::make_unique<ResourceManager>();
-    std::vector<std::unique_ptr<ResourceManager>> frameResourceManagers {};
+    auto nodeRegistry = std::make_unique<Registry>();
+    std::vector<std::unique_ptr<Registry>> frameRegistries {};
     for (uint32_t i = 0; i < numFrameManagers; ++i) {
         const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[i];
-        frameResourceManagers.push_back(std::make_unique<ResourceManager>(&windowRenderTargetForFrame));
+        frameRegistries.push_back(std::make_unique<Registry>(&windowRenderTargetForFrame));
     }
 
     // TODO: Fix me, this is stupid..
-    std::vector<ResourceManager*> managerPointers {};
-    managerPointers.reserve(frameResourceManagers.size());
-    for (auto& mng : frameResourceManagers) {
-        managerPointers.emplace_back(mng.get());
+    std::vector<Registry*> regPointers {};
+    regPointers.reserve(frameRegistries.size());
+    for (auto& mng : frameRegistries) {
+        regPointers.emplace_back(mng.get());
     }
 
-    renderGraph.constructAll(*nodeResourceManager, managerPointers);
+    renderGraph.constructAll(*nodeRegistry, regPointers);
 
     // First create & replace node resources
-    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nodeResourceManager.get());
-    m_nodeResourceManager = std::move(nodeResourceManager);
+    replaceResourcesForRegistry(m_nodeRegistry.get(), nodeRegistry.get());
+    m_nodeRegistry = std::move(nodeRegistry);
 
     // Then create & replace frame resources
-    m_frameResourceManagers.resize(numFrameManagers);
+    m_frameRegistries.resize(numFrameManagers);
     for (uint32_t i = 0; i < numFrameManagers; ++i) {
-        replaceResourcesForResourceManagers(m_frameResourceManagers[i].get(), frameResourceManagers[i].get());
-        m_frameResourceManagers[i] = std::move(frameResourceManagers[i]);
+        replaceResourcesForRegistry(m_frameRegistries[i].get(), frameRegistries[i].get());
+        m_frameRegistries[i] = std::move(frameRegistries[i]);
     }
 }
 
 void VulkanBackend::destroyRenderGraphResources()
 {
     for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
-        replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), nullptr);
+        replaceResourcesForRegistry(m_frameRegistries[swapchainImageIndex].get(), nullptr);
     }
-    replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nullptr);
+    replaceResourcesForRegistry(m_nodeRegistry.get(), nullptr);
 }
 
-void VulkanBackend::replaceResourcesForResourceManagers(ResourceManager* previous, ResourceManager* current)
+void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* current)
 {
     // TODO: Implement some kind of smart resource diff where we only delete and create resources that actually change.
 

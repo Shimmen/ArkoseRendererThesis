@@ -30,7 +30,7 @@ void Resource::registerBackend(Badge<Backend>, uint64_t id) const
     m_id = id;
 }
 
-Texture::Texture(Badge<ResourceManager>, Extent2D extent, Format format, Usage usage, MinFilter minFilter, MagFilter magFilter, Mipmap mipmap)
+Texture::Texture(Badge<Registry>, Extent2D extent, Format format, Usage usage, MinFilter minFilter, MagFilter magFilter, Mipmap mipmap)
     : m_extent(extent)
     , m_format(format)
     , m_usage(usage)
@@ -56,14 +56,14 @@ uint32_t Texture::mipLevels() const
     }
 }
 
-RenderTarget::RenderTarget(Badge<ResourceManager>, Texture& colorTexture)
+RenderTarget::RenderTarget(Badge<Registry>, Texture& colorTexture)
     : m_attachments {}
 {
     Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
     m_attachments.push_back(colorAttachment);
 }
 
-RenderTarget::RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments)
+RenderTarget::RenderTarget(Badge<Registry>, std::initializer_list<Attachment> attachments)
     : m_attachments {}
 {
     // TODO: This is all very messy and could probably be cleaned up a fair bit!
@@ -176,7 +176,7 @@ void RenderTarget::forEachColorAttachment(std::function<void(const Attachment&)>
     }
 }
 
-Buffer::Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint memoryHint)
+Buffer::Buffer(Badge<Registry>, size_t size, Usage usage, MemoryHint memoryHint)
     : m_size(size)
     , m_usage(usage)
     , m_memoryHint(memoryHint)
@@ -231,7 +231,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std:
     }
 }
 
-BindingSet::BindingSet(Badge<ResourceManager>, std::vector<ShaderBinding> shaderBindings)
+BindingSet::BindingSet(Badge<Registry>, std::vector<ShaderBinding> shaderBindings)
     : m_shaderBindings(shaderBindings)
 {
     std::sort(m_shaderBindings.begin(), m_shaderBindings.end(), [](const ShaderBinding& left, const ShaderBinding& right) {

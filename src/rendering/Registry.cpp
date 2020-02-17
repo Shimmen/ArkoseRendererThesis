@@ -1,41 +1,41 @@
-#include "ResourceManager.h"
+#include "Registry.h"
 
 #include "utility/fileio.h"
 #include "utility/logging.h"
 #include "utility/util.h"
 #include <stb_image.h>
 
-ResourceManager::ResourceManager(const RenderTarget* windowRenderTarget)
+Registry::Registry(const RenderTarget* windowRenderTarget)
     : m_windowRenderTarget(windowRenderTarget)
 {
 }
 
-void ResourceManager::setCurrentNode(std::string node)
+void Registry::setCurrentNode(std::string node)
 {
     m_currentNodeName = std::move(node);
 }
 
-const RenderTarget& ResourceManager::windowRenderTarget()
+const RenderTarget& Registry::windowRenderTarget()
 {
     ASSERT(m_windowRenderTarget);
     return *m_windowRenderTarget;
 }
 
-RenderTarget& ResourceManager::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)
+RenderTarget& Registry::createRenderTarget(std::initializer_list<RenderTarget::Attachment> attachments)
 {
     RenderTarget renderTarget { {}, attachments };
     m_renderTargets.push_back(renderTarget);
     return m_renderTargets.back();
 }
 
-Texture& ResourceManager::createTexture2D(Extent2D extent, Texture::Format format, Texture::Usage usage)
+Texture& Registry::createTexture2D(Extent2D extent, Texture::Format format, Texture::Usage usage)
 {
     Texture texture { {}, extent, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, Texture::Mipmap::None };
     m_textures.push_back(texture);
     return m_textures.back();
 }
 
-Buffer& ResourceManager::createBuffer(size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
+Buffer& Registry::createBuffer(size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
     ASSERT(size > 0);
     Buffer buffer = { {}, size, usage, memoryHint };
@@ -43,7 +43,7 @@ Buffer& ResourceManager::createBuffer(size_t size, Buffer::Usage usage, Buffer::
     return m_buffers.back();
 }
 
-Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
+Buffer& Registry::createBuffer(const std::byte* data, size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
     Buffer& buffer = createBuffer(size, usage, memoryHint);
 
@@ -53,14 +53,14 @@ Buffer& ResourceManager::createBuffer(const std::byte* data, size_t size, Buffer
     return buffer;
 }
 
-BindingSet& ResourceManager::createBindingSet(std::initializer_list<ShaderBinding> shaderBindings)
+BindingSet& Registry::createBindingSet(std::initializer_list<ShaderBinding> shaderBindings)
 {
     BindingSet set = { {}, shaderBindings };
     m_shaderBindingSets.push_back(set);
     return m_shaderBindingSets.back();
 }
 
-Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps)
+Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps)
 {
     if (!fileio::isFileReadable(imagePath)) {
         LogErrorAndExit("Could not read image at path '%s'.\n", imagePath.c_str());
@@ -100,7 +100,7 @@ Texture& ResourceManager::loadTexture2D(const std::string& imagePath, bool srgb,
     return texture;
 }
 
-RenderState& ResourceManager::createRenderState(
+RenderState& Registry::createRenderState(
     const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
     const Shader& shader, std::vector<const BindingSet*> shaderBindingSets,
     const Viewport& viewport, const BlendState& blendState, const RasterState& rasterState)
@@ -110,7 +110,7 @@ RenderState& ResourceManager::createRenderState(
     return m_renderStates.back();
 }
 
-void ResourceManager::publish(const std::string& name, const Buffer& buffer)
+void Registry::publish(const std::string& name, const Buffer& buffer)
 {
     ASSERT(m_currentNodeName.has_value());
     std::string fullName = makeQualifiedName(m_currentNodeName.value(), name);
@@ -119,7 +119,7 @@ void ResourceManager::publish(const std::string& name, const Buffer& buffer)
     m_nameBufferMap[fullName] = &buffer;
 }
 
-void ResourceManager::publish(const std::string& name, const Texture& texture)
+void Registry::publish(const std::string& name, const Texture& texture)
 {
     ASSERT(m_currentNodeName.has_value());
     std::string fullName = makeQualifiedName(m_currentNodeName.value(), name);
@@ -128,7 +128,7 @@ void ResourceManager::publish(const std::string& name, const Texture& texture)
     m_nameTextureMap[fullName] = &texture;
 }
 
-const Texture* ResourceManager::getTexture(const std::string& renderPass, const std::string& name)
+const Texture* Registry::getTexture(const std::string& renderPass, const std::string& name)
 {
     std::string fullName = makeQualifiedName(renderPass, name);
     auto entry = m_nameTextureMap.find(fullName);
@@ -145,7 +145,7 @@ const Texture* ResourceManager::getTexture(const std::string& renderPass, const 
     return texture;
 }
 
-const Buffer* ResourceManager::getBuffer(const std::string& renderPass, const std::string& name)
+const Buffer* Registry::getBuffer(const std::string& renderPass, const std::string& name)
 {
     std::string fullName = makeQualifiedName(renderPass, name);
     auto entry = m_nameBufferMap.find(fullName);
@@ -162,52 +162,52 @@ const Buffer* ResourceManager::getBuffer(const std::string& renderPass, const st
     return buffer;
 }
 
-const std::unordered_set<NodeDependency>& ResourceManager::nodeDependencies() const
+const std::unordered_set<NodeDependency>& Registry::nodeDependencies() const
 {
     return m_nodeDependencies;
 }
 
-const std::vector<Buffer>& ResourceManager::buffers() const
+const std::vector<Buffer>& Registry::buffers() const
 {
     return m_buffers.vector();
 }
 
-const std::vector<Texture>& ResourceManager::textures() const
+const std::vector<Texture>& Registry::textures() const
 {
     return m_textures.vector();
 }
 
-const std::vector<RenderTarget>& ResourceManager::renderTargets() const
+const std::vector<RenderTarget>& Registry::renderTargets() const
 {
     return m_renderTargets.vector();
 }
 
-const std::vector<BindingSet>& ResourceManager::bindingSets() const
+const std::vector<BindingSet>& Registry::bindingSets() const
 {
     return m_shaderBindingSets.vector();
 }
 
-const std::vector<RenderState>& ResourceManager::renderStates() const
+const std::vector<RenderState>& Registry::renderStates() const
 {
     return m_renderStates.vector();
 }
 
-const std::vector<BufferUpdate>& ResourceManager::bufferUpdates() const
+const std::vector<BufferUpdate>& Registry::bufferUpdates() const
 {
     return m_immediateBufferUpdates;
 }
 
-const std::vector<TextureUpdateFromFile>& ResourceManager::textureUpdates() const
+const std::vector<TextureUpdateFromFile>& Registry::textureUpdates() const
 {
     return m_immediateTextureUpdates;
 }
 
-Badge<ResourceManager> ResourceManager::exchangeBadges(Badge<Backend>) const
+Badge<Registry> Registry::exchangeBadges(Badge<Backend>) const
 {
     return {};
 }
 
-std::string ResourceManager::makeQualifiedName(const std::string& node, const std::string& name)
+std::string Registry::makeQualifiedName(const std::string& node, const std::string& name)
 {
     return node + ':' + name;
 }

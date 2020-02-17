@@ -16,9 +16,9 @@ RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::construct(const Sce
 
 RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplementation(const Scene& scene)
 {
-    return [&](ResourceManager& frameManager) {
+    return [&](Registry& reg) {
         static State state {}; // TODO: Don't use static data like this!
-        setupState(scene, frameManager, state); // TODO: Don't use the frame registry!
+        setupState(scene, reg, state); // TODO: Don't use the frame registry!
 
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
         Shader shader = Shader::createBasic("forward", "forward.vert", "forward.frag");
@@ -32,20 +32,20 @@ RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplem
         };
 
         size_t perObjectBufferSize = state.drawables.size() * sizeof(PerForwardObject);
-        Buffer& perObjectBuffer = frameManager.createBuffer(perObjectBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        Buffer& perObjectBuffer = reg.createBuffer(perObjectBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
         size_t materialBufferSize = state.materials.size() * sizeof(ForwardMaterial);
-        Buffer& materialBuffer = frameManager.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        Buffer& materialBuffer = reg.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
-        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStageVertex, frameManager.getBuffer(CameraUniformNode::name(), "buffer") };
+        ShaderBinding cameraUniformBufferBinding = { 0, ShaderStageVertex, reg.getBuffer(CameraUniformNode::name(), "buffer") };
         ShaderBinding perObjectBufferBinding = { 1, ShaderStageVertex, &perObjectBuffer };
         ShaderBinding materialBufferBinding = { 2, ShaderStageFragment, &materialBuffer };
         ShaderBinding textureSamplerBinding = { 3, ShaderStageFragment, state.textures, FORWARD_MAX_TEXTURES };
-        BindingSet& bindingSet = frameManager.createBindingSet({ cameraUniformBufferBinding, perObjectBufferBinding, materialBufferBinding, textureSamplerBinding });
+        BindingSet& bindingSet = reg.createBindingSet({ cameraUniformBufferBinding, perObjectBufferBinding, materialBufferBinding, textureSamplerBinding });
 
         // TODO: Create some builder class for these type of numerous (and often defaulted anyway) RenderState members
 
-        const RenderTarget& windowTarget = frameManager.windowRenderTarget();
+        const RenderTarget& windowTarget = reg.windowRenderTarget();
 
         Viewport viewport;
         viewport.extent = windowTarget.extent();
@@ -58,18 +58,18 @@ RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplem
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
         rasterState.backfaceCullingEnabled = true;
 
-        Texture& colorTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
-        frameManager.publish("color", colorTexture);
+        Texture& colorTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        reg.publish("color", colorTexture);
 
-        Texture& normalTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
-        frameManager.publish("normal", normalTexture);
+        Texture& normalTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::All);
+        reg.publish("normal", normalTexture);
 
-        Texture& depthTexture = frameManager.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
-        RenderTarget& renderTarget = frameManager.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
+        Texture& depthTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
+        RenderTarget& renderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
             { RenderTarget::AttachmentType::Color1, &normalTexture },
             { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-        RenderState& renderState = frameManager.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
+        RenderState& renderState = reg.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);
@@ -97,7 +97,7 @@ RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplem
     };
 }
 
-void ForwardRenderNode::setupState(const Scene& scene, ResourceManager& staticResources, State& state)
+void ForwardRenderNode::setupState(const Scene& scene, Registry& staticResources, State& state)
 {
     state.drawables.clear();
     state.materials.clear();

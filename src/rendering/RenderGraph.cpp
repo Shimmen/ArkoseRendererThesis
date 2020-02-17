@@ -16,7 +16,7 @@ void RenderGraph::addNode(std::unique_ptr<RenderGraphNode>&& node)
     m_allNodes.emplace_back(std::move(node));
 }
 
-void RenderGraph::constructAll(ResourceManager& nodeManager, std::vector<ResourceManager*> frameManagers)
+void RenderGraph::constructAll(Registry& nodeManager, std::vector<Registry*> frameManagers)
 {
     m_frameContexts.clear();
 
@@ -46,7 +46,7 @@ void RenderGraph::constructAll(ResourceManager& nodeManager, std::vector<Resourc
     }
 }
 
-void RenderGraph::forEachNodeInResolvedOrder(const ResourceManager& frameManager, std::function<void(const RenderGraphNode::ExecuteCallback&)> callback) const
+void RenderGraph::forEachNodeInResolvedOrder(const Registry& frameManager, std::function<void(const RenderGraphNode::ExecuteCallback&)> callback) const
 {
     auto entry = m_frameContexts.find(&frameManager);
     ASSERT(entry != m_frameContexts.end());

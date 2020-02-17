@@ -10,19 +10,19 @@ std::string ShadowMapNode::name()
 
 RenderGraphBasicNode::ConstructorFunction ShadowMapNode::construct(const Scene& scene)
 {
-    return [&](ResourceManager& frameManager) {
+    return [&](Registry& reg) {
         static std::vector<Drawable> drawables {}; // TODO: Don't use static data like this!
-        setupDrawables(scene, frameManager, drawables); // TODO: Don't use the frame registry!
+        setupDrawables(scene, reg, drawables); // TODO: Don't use the frame registry!
 
         Shader shader = Shader::createVertexOnly("shadowSun", "shadowSun.vert");
         VertexLayout vertexLayout = VertexLayout { sizeof(vec3), { { 0, VertexAttributeType::Float3, 0 } } };
 
         const SunLight& sunLight = scene.sun();
 
-        Texture& shadowMap = frameManager.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::All);
-        frameManager.publish("directional", shadowMap);
+        Texture& shadowMap = reg.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::All);
+        reg.publish("directional", shadowMap);
 
-        const RenderTarget& shadowRenderTarget = frameManager.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
+        const RenderTarget& shadowRenderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
 
         Viewport viewport;
         viewport.extent = shadowRenderTarget.extent();
@@ -35,15 +35,15 @@ RenderGraphBasicNode::ConstructorFunction ShadowMapNode::construct(const Scene& 
         rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
         rasterState.backfaceCullingEnabled = true;
 
-        Buffer& lightDataBuffer = frameManager.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        BindingSet& lightBindingSet = frameManager.createBindingSet({ { 0, ShaderStageVertex, &lightDataBuffer } });
+        Buffer& lightDataBuffer = reg.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        BindingSet& lightBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, &lightDataBuffer } });
 
-        Buffer& transformDataBuffer = frameManager.createBuffer(drawables.size() * sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        BindingSet& transformBindingSet = frameManager.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
+        Buffer& transformDataBuffer = reg.createBuffer(drawables.size() * sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        BindingSet& transformBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
 
         std::vector<const BindingSet*> allBindingSets { &lightBindingSet, &transformBindingSet };
 
-        RenderState& renderState = frameManager.createRenderState(shadowRenderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
+        RenderState& renderState = reg.createRenderState(shadowRenderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             cmdList.setRenderState(renderState, ClearColor(1, 0, 1), 1.0f);
@@ -67,7 +67,7 @@ RenderGraphBasicNode::ConstructorFunction ShadowMapNode::construct(const Scene& 
     };
 }
 
-void ShadowMapNode::setupDrawables(const Scene& scene, ResourceManager& resources, std::vector<Drawable>& drawables)
+void ShadowMapNode::setupDrawables(const Scene& scene, Registry& resources, std::vector<Drawable>& drawables)
 {
     drawables.clear();
 

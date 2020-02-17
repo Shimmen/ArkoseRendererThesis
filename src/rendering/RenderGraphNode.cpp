@@ -18,12 +18,12 @@ RenderGraphBasicNode::RenderGraphBasicNode(std::string name, ConstructorFunction
 {
 }
 
-void RenderGraphBasicNode::constructNode(ResourceManager&)
+void RenderGraphBasicNode::constructNode(Registry&)
 {
     // Intentionally empty. If you want to have node resource, create a custom RenderGraphNode subclass.
 }
 
-RenderGraphBasicNode::ExecuteCallback RenderGraphBasicNode::constructFrame(ResourceManager& frameManager) const
+RenderGraphBasicNode::ExecuteCallback RenderGraphBasicNode::constructFrame(Registry& frameManager) const
 {
     return m_constructorFunction(frameManager);
 }

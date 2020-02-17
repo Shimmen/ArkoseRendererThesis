@@ -9,9 +9,9 @@ std::string CameraUniformNode::name()
 
 RenderGraphBasicNode::ConstructorFunction CameraUniformNode::construct(const FpsCamera& fpsCamera)
 {
-    return [&](ResourceManager& frameManager) {
-        Buffer& cameraUniformBuffer = frameManager.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        frameManager.publish("buffer", cameraUniformBuffer);
+    return [&](Registry& reg) {
+        Buffer& cameraUniformBuffer = reg.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+        reg.publish("buffer", cameraUniformBuffer);
 
         return [&](const AppState& appState, CommandList& cmdList) {
             CameraState cameraState {

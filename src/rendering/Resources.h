@@ -12,7 +12,7 @@
 #include <vector>
 
 class Backend;
-class ResourceManager;
+class Registry;
 
 struct Resource {
 public:
@@ -77,7 +77,7 @@ struct Texture : public Resource {
 
     Texture() = default;
     Texture(const Texture&) = default;
-    Texture(Badge<ResourceManager>, Extent2D, Format, Usage, MinFilter, MagFilter, Mipmap);
+    Texture(Badge<Registry>, Extent2D, Format, Usage, MinFilter, MagFilter, Mipmap);
 
     [[nodiscard]] const Extent2D& extent() const { return m_extent; }
     [[nodiscard]] Format format() const { return m_format; }
@@ -120,8 +120,8 @@ struct RenderTarget : public Resource {
 
     RenderTarget() = default;
     RenderTarget(const RenderTarget&) = default;
-    explicit RenderTarget(Badge<ResourceManager>, Texture& colorTexture);
-    explicit RenderTarget(Badge<ResourceManager>, std::initializer_list<Attachment> attachments);
+    explicit RenderTarget(Badge<Registry>, Texture& colorTexture);
+    explicit RenderTarget(Badge<Registry>, std::initializer_list<Attachment> attachments);
 
     [[nodiscard]] const Extent2D& extent() const;
     [[nodiscard]] size_t colorAttachmentCount() const;
@@ -157,7 +157,7 @@ struct Buffer : public Resource {
 
     Buffer() = default;
     Buffer(const Buffer&) = default;
-    Buffer(Badge<ResourceManager>, size_t size, Usage usage, MemoryHint);
+    Buffer(Badge<Registry>, size_t size, Usage usage, MemoryHint);
 
     size_t size() const { return m_size; }
     Usage usage() const { return m_usage; }
@@ -242,7 +242,7 @@ struct ShaderBinding {
 };
 
 struct BindingSet : public Resource {
-    BindingSet(Badge<ResourceManager>, std::vector<ShaderBinding>);
+    BindingSet(Badge<Registry>, std::vector<ShaderBinding>);
 
     const std::vector<ShaderBinding>& shaderBindings() const;
 
@@ -252,7 +252,7 @@ private:
 
 struct RenderState : public Resource {
 public:
-    RenderState(Badge<ResourceManager>,
+    RenderState(Badge<Registry>,
         const RenderTarget& renderTarget, VertexLayout vertexLayout,
         Shader shader, const std::vector<const BindingSet*>& shaderBindingSets,
         Viewport viewport, BlendState blendState, RasterState rasterState)

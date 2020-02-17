@@ -12,7 +12,7 @@ add_executable(ArkoseRenderer
         src/backend/vulkan/VulkanCommandList.cpp
         src/rendering/Shader.cpp
         src/rendering/ShaderManager.cpp
-        src/rendering/ResourceManager.cpp
+        src/rendering/Registry.cpp
         src/rendering/Resources.cpp
         src/rendering/RenderGraphNode.cpp
         src/rendering/RenderGraph.cpp
