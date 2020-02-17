@@ -2,8 +2,10 @@
 
 #include "../RenderGraphNode.h"
 
-class FinalPostFxNode {
+class FinalPostFxNode final : public RenderGraphNode {
 public:
+    FinalPostFxNode();
+
     static std::string name();
-    static RenderGraphBasicNode::ConstructorFunction construct();
+    ExecuteCallback constructFrame(Registry&) const override;
 };

@@ -18,11 +18,11 @@ public:
     [[nodiscard]] const std::string& name() const;
 
     //! This is not const since we need to write to members here that are shared for the whole node.
-    virtual void constructNode(Registry&) = 0;
+    virtual void constructNode(Registry&) {};
 
     //! This is const, since changing or writing to any members would probably break stuff
     //! since this is called n times, one for each frame at reconstruction.
-    virtual ExecuteCallback constructFrame(Registry&) const = 0;
+    virtual ExecuteCallback constructFrame(Registry&) const { return RenderGraphNode::ExecuteCallback(); };
 
 private:
     std::string m_name;
