@@ -1570,7 +1570,7 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     std::vector<VkAttachmentReference> colorAttachmentRefs {};
     std::optional<VkAttachmentReference> depthAttachmentRef {};
 
-    for (auto& [type, texture] : renderTarget.sortedAttachments()) {
+    for (auto& [type, texture, loadOp, storeOp] : renderTarget.sortedAttachments()) {
 
         // If the attachments are sorted properly (i.e. depth very last) then this should never happen!
         // This is important for the VkAttachmentReference attachment index later in this loop.
@@ -1578,43 +1578,57 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
 
         const TextureInfo& texInfo = textureInfo(*texture);
 
-        // TODO: Handle multisampling, clearing, storing, and stencil stuff!
         VkAttachmentDescription attachment = {};
         attachment.format = texInfo.format;
+
+        // TODO: Handle multisampling and stencil stuff!
         attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-        VkImageLayout finalLayout;
-        if (type == RenderTarget::AttachmentType::Depth) {
-            finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        } else {
-            finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        switch (loadOp) {
+        case LoadOp::Load:
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+
+            // TODO/FIXME: For LOAD_OP_LOAD we actually need to provide a valid initialLayout! Using texInfo.currentLayout
+            //  won't work since we only use the layout at the time of creating this render pass, and not what it is in
+            //  runtime. Not sure what the best way of doing this is. What about always using explicit transitions before
+            //  binding this render target, and then here have the same initialLayout and finalLayout so nothing(?) happens.
+            //  Could maybe work, but we have to figure out if it's actually a noop if initial & final are equal!
+            attachment.initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //texInfo.currentLayout;
+            ASSERT_NOT_REACHED();
+            break;
+        case LoadOp::Clear:
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            break;
         }
 
-        // TODO/FIXME: This works for now since we have VK_ATTACHMENT_LOAD_OP_CLEAR above, but in the future,
-        //  when we don't clear every time this will need to be changed. Using texInfo.currentLayout also won't
-        //  work since we only use the layout at the time of creating this render pass, and not what it is in
-        //  runtime. Not sure what the best way of doing this is. Maybe always using explicit transitions, and
-        //  here just specifying the same initialLayout and finalLayout so nothing(?) happens. Maybe..
-        attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; //texInfo.currentLayout;
-        attachment.finalLayout = finalLayout;
+        switch (storeOp) {
+        case StoreOp::Store:
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            break;
+        case StoreOp::Ignore:
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            break;
+        }
+
+        if (type == RenderTarget::AttachmentType::Depth) {
+            attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        } else {
+            attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
 
         uint32_t attachmentIndex = allAttachments.size();
         allAttachments.push_back(attachment);
         allAttachmentImageViews.push_back(texInfo.view);
 
+        VkAttachmentReference attachmentRef = {};
+        attachmentRef.attachment = attachmentIndex;
+        attachmentRef.layout = attachment.finalLayout;
         if (type == RenderTarget::AttachmentType::Depth) {
-            VkAttachmentReference attachmentRef = {};
-            attachmentRef.attachment = attachmentIndex;
-            attachmentRef.layout = finalLayout;
             depthAttachmentRef = attachmentRef;
         } else {
-            VkAttachmentReference attachmentRef = {};
-            attachmentRef.attachment = attachmentIndex;
-            attachmentRef.layout = finalLayout;
             colorAttachmentRefs.push_back(attachmentRef);
         }
     }
@@ -1657,8 +1671,8 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     RenderTargetInfo renderTargetInfo {};
     renderTargetInfo.compatibleRenderPass = renderPass;
     renderTargetInfo.framebuffer = framebuffer;
-    for (auto& [_, texture] : renderTarget.sortedAttachments()) {
-        renderTargetInfo.attachedTextures.push_back(texture);
+    for (auto& attachment : renderTarget.sortedAttachments()) {
+        renderTargetInfo.attachedTextures.push_back(attachment.texture);
     }
 
     size_t index = m_renderTargetInfos.add(renderTargetInfo);

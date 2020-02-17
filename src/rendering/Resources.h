@@ -109,6 +109,16 @@ private:
     Mipmap m_mipmap;
 };
 
+enum class LoadOp {
+    Clear,
+    Load,
+};
+
+enum class StoreOp {
+    Ignore,
+    Store,
+};
+
 struct RenderTarget : public Resource {
 
     enum class AttachmentType : unsigned int {
@@ -120,13 +130,15 @@ struct RenderTarget : public Resource {
     };
 
     struct Attachment {
-        AttachmentType type;
-        Texture* texture;
+        AttachmentType type { AttachmentType::Color0 };
+        Texture* texture { nullptr };
+        LoadOp loadOp { LoadOp::Clear };
+        StoreOp storeOp { StoreOp::Store };
     };
 
     RenderTarget() = default;
     RenderTarget(const RenderTarget&) = default;
-    explicit RenderTarget(Badge<Registry>, Texture& colorTexture);
+    explicit RenderTarget(Badge<Registry>, Texture& colorTexture, LoadOp = LoadOp::Clear, StoreOp = StoreOp::Store);
     explicit RenderTarget(Badge<Registry>, std::initializer_list<Attachment> attachments);
 
     [[nodiscard]] const Extent2D& extent() const;

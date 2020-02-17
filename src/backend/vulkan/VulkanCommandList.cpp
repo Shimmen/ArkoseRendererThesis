@@ -33,9 +33,9 @@ void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColo
 
     std::vector<VkClearValue> clearValues {};
     {
-        for (auto& [type, _] : renderTarget.sortedAttachments()) {
+        for (auto& attachment : renderTarget.sortedAttachments()) {
             VkClearValue value = {};
-            if (type == RenderTarget::AttachmentType::Depth) {
+            if (attachment.type == RenderTarget::AttachmentType::Depth) {
                 value.depthStencil = { clearDepth, clearStencil };
             } else {
                 value.color = { { clearColor.r, clearColor.g, clearColor.b, clearColor.a } };

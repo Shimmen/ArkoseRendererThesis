@@ -56,10 +56,15 @@ uint32_t Texture::mipLevels() const
     }
 }
 
-RenderTarget::RenderTarget(Badge<Registry>, Texture& colorTexture)
+RenderTarget::RenderTarget(Badge<Registry>, Texture& colorTexture, LoadOp loadOp, StoreOp storeOp)
     : m_attachments {}
 {
-    Attachment colorAttachment = { .type = AttachmentType::Color0, .texture = &colorTexture };
+    Attachment colorAttachment = {
+        .type = AttachmentType::Color0,
+        .texture = &colorTexture,
+        .loadOp = loadOp,
+        .storeOp = storeOp
+    };
     m_attachments.push_back(colorAttachment);
 }
 
@@ -76,8 +81,9 @@ RenderTarget::RenderTarget(Badge<Registry>, std::initializer_list<Attachment> at
         LogErrorAndExit("RenderTarget error: tried to create with less than one attachments!\n");
     }
 
-    for (auto& [_, texture] : m_attachments) {
-        if (texture->usage() != Texture::Usage::Attachment && texture->usage() != Texture::Usage::All) {
+    for (auto& attachment : m_attachments) {
+        const Texture& texture = *attachment.texture;
+        if (texture.usage() != Texture::Usage::Attachment && texture.usage() != Texture::Usage::All) {
             LogErrorAndExit("RenderTarget error: tried to create with texture that can't be used as attachment\n");
         }
     }
@@ -154,7 +160,7 @@ bool RenderTarget::hasDepthAttachment() const
 
 const Texture* RenderTarget::attachment(AttachmentType requestedType) const
 {
-    for (const auto& [type, texture] : m_attachments) {
+    for (const auto& [type, texture, _, __] : m_attachments) {
         if (type == requestedType) {
             return texture;
         }
