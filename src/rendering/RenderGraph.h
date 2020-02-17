@@ -19,6 +19,13 @@ public:
     void addNode(const std::string& name, const RenderGraphBasicNode::ConstructorFunction&);
     void addNode(std::unique_ptr<RenderGraphNode>&&);
 
+    template<typename NodeType, typename... Args>
+    void addNode(Args&&... args)
+    {
+        auto nodePtr = std::make_unique<NodeType>(std::forward<Args>(args)...);
+        addNode(std::move(nodePtr));
+    }
+
     //! Construct all nodes & set up a per-frame context for each resource manager frameManagers
     void constructAll(Registry& nodeManager, std::vector<Registry*> frameManagers);
 
