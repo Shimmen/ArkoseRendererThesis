@@ -7,19 +7,23 @@ std::string CameraUniformNode::name()
     return "camera-uniform";
 }
 
-RenderGraphBasicNode::ConstructorFunction CameraUniformNode::construct(const FpsCamera& fpsCamera)
+CameraUniformNode::CameraUniformNode(const FpsCamera& fpsCamera)
+    : RenderGraphNode(CameraUniformNode::name())
+    , m_fpsCamera(&fpsCamera)
 {
-    return [&](Registry& reg) {
-        Buffer& cameraUniformBuffer = reg.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-        reg.publish("buffer", cameraUniformBuffer);
+}
 
-        return [&](const AppState& appState, CommandList& cmdList) {
-            CameraState cameraState {
-                .viewFromWorld = fpsCamera.viewMatrix(),
-                .worldFromView = inverse(fpsCamera.viewMatrix()),
-                .projectionFromView = fpsCamera.projectionMatrix()
-            };
-            cmdList.updateBufferImmediately(cameraUniformBuffer, &cameraState, sizeof(CameraState));
+CameraUniformNode::ExecuteCallback CameraUniformNode::constructFrame(Registry& reg) const
+{
+    Buffer& cameraUniformBuffer = reg.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+    reg.publish("buffer", cameraUniformBuffer);
+
+    return [&](const AppState& appState, CommandList& cmdList) {
+        CameraState cameraState {
+            .viewFromWorld = m_fpsCamera->viewMatrix(),
+            .worldFromView = inverse(m_fpsCamera->viewMatrix()),
+            .projectionFromView = m_fpsCamera->projectionMatrix()
         };
+        cmdList.updateBufferImmediately(cameraUniformBuffer, &cameraState, sizeof(CameraState));
     };
 }
