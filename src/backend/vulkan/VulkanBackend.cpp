@@ -980,10 +980,12 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
     Registry& associatedRegistry = *m_frameRegistries[swapchainImageIndex];
     VulkanCommandList cmdList { *this, commandBuffer };
 
+    ImGui::Begin("Nodes");
     m_renderGraph->forEachNodeInResolvedOrder(associatedRegistry, [&](const RenderGraphNode::ExecuteCallback& nodeExecuteCallback) {
         nodeExecuteCallback(appState, cmdList);
         cmdList.endNode({});
     });
+    ImGui::End();
 
     if (renderGui) {
         ImGui::Render();

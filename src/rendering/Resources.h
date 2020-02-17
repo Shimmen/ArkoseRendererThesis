@@ -27,6 +27,13 @@ private:
 };
 
 struct ClearColor {
+    ClearColor(float rgb[3], float a = 1.0f)
+        : r(pow(rgb[0], 2.2f))
+        , g(pow(rgb[1], 2.2f))
+        , b(pow(rgb[2], 2.2f))
+        , a(a)
+    {
+    }
     ClearColor(float r, float g, float b, float a = 1.0f)
         : r(pow(r, 2.2f))
         , g(pow(g, 2.2f))

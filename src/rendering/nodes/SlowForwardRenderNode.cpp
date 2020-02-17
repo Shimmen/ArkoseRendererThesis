@@ -116,7 +116,12 @@ RenderGraphBasicNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Regi
     RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        cmdList.setRenderState(renderState, ClearColor(0.2f, 0.2f, 0.2f), 1.0f);
+        static float clearRgb[3] = { 0.58f, 0.69f, 0.73f };
+        if (ImGui::CollapsingHeader("Forward")) {
+            ImGui::ColorPicker3("Clear color", clearRgb);
+        }
+
+        cmdList.setRenderState(renderState, ClearColor(clearRgb), 1.0f);
         cmdList.bindSet(fixedBindingSet, 0);
 
         DirectionalLight dirLight {
