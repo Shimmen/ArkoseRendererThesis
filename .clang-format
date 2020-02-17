@@ -2,3 +2,4 @@
 BasedOnStyle: WebKit
 Language: Cpp
 SpaceAfterTemplateKeyword: false
+AlignAfterOpenBracket: Align

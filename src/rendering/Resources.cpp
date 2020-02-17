@@ -91,8 +91,8 @@ RenderTarget::RenderTarget(Badge<Registry>, std::initializer_list<Attachment> at
     for (auto& attachment : m_attachments) {
         if (attachment.texture->extent() != firstExtent) {
             LogErrorAndExit("RenderTarget error: tried to create with attachments of different sizes: (%ix%i) vs (%ix%i)\n",
-                attachment.texture->extent().width(), attachment.texture->extent().height(),
-                firstExtent.width(), firstExtent.height());
+                            attachment.texture->extent().width(), attachment.texture->extent().height(),
+                            firstExtent.width(), firstExtent.height());
         }
     }
 

@@ -30,9 +30,9 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     glfwGetWindowSize(window, &width, &height);
     GlobalState::getMutable(backendBadge()).updateWindowExtent({ width, height });
     glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int width, int height) {
-        GlobalState::getMutable(backendBadge()).updateWindowExtent({ width, height });
-        s_unhandledWindowResize = true;
-    }));
+                                       GlobalState::getMutable(backendBadge()).updateWindowExtent({ width, height });
+                                       s_unhandledWindowResize = true;
+                                   }));
 
     // TODO: Make the creation & deletion of this conditional! We might not always wont this (for performance)
     VkDebugUtilsMessengerCreateInfoEXT dbgMessengerCreateInfo = debugMessengerCreateInfo();
@@ -168,8 +168,8 @@ bool VulkanBackend::checkValidationLayerSupport(const std::vector<const char*>& 
     return fullSupport;
 }
 
-VkBool32 VulkanBackend::debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
+VkBool32 VulkanBackend::debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                             const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
 {
     LogError("VulkanBackend::debugMessageCallback(): %s\n", pCallbackData->pMessage);
     return VK_FALSE;
@@ -684,7 +684,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         m_textureInfos.remove(m_swapchainDepthTexture.id());
     }
     m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F,
-        Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
+                                      Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
     size_t depthIndex = m_textureInfos.add(depthInfo);
     m_swapchainDepthTexture.registerBackend(backendBadge(), depthIndex);
 
@@ -703,7 +703,7 @@ void VulkanBackend::createWindowRenderTargetFrontend()
             m_textureInfos.remove(m_swapchainColorTextures[i].id());
         }
         m_swapchainColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown,
-            Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
+                                              Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
         size_t colorIndex = m_textureInfos.add(colorInfo);
         m_swapchainColorTextures[i].registerBackend(backendBadge(), colorIndex);
 
@@ -1289,9 +1289,9 @@ void VulkanBackend::newTexture(const Texture& texture)
 
         bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
             vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
-                0, nullptr,
-                0, nullptr,
-                1, &imageBarrier);
+                                 0, nullptr,
+                                 0, nullptr,
+                                 1, &imageBarrier);
         });
         if (!success) {
             LogErrorAndExit("VulkanBackend::newTexture():could not transition image to the preferred layout.\n");
@@ -1475,10 +1475,10 @@ void VulkanBackend::generateMipmaps(const Texture& texture, VkImageLayout finalL
             initialBarrier.subresourceRange.levelCount = texture.mipLevels() - 1;
 
             vkCmdPipelineBarrier(commandBuffer,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                0, nullptr,
-                0, nullptr,
-                1, &initialBarrier);
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                                 0, nullptr,
+                                 0, nullptr,
+                                 1, &initialBarrier);
         }
 
         for (uint32_t i = 1; i < mipLevels; ++i) {
@@ -1497,10 +1497,10 @@ void VulkanBackend::generateMipmaps(const Texture& texture, VkImageLayout finalL
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
             vkCmdPipelineBarrier(commandBuffer,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                0, nullptr,
-                0, nullptr,
-                1, &barrier);
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                                 0, nullptr,
+                                 0, nullptr,
+                                 1, &barrier);
 
             VkImageBlit blit = {};
             blit.srcOffsets[0] = { 0, 0, 0 };
@@ -1517,10 +1517,10 @@ void VulkanBackend::generateMipmaps(const Texture& texture, VkImageLayout finalL
             blit.dstSubresource.layerCount = 1;
 
             vkCmdBlitImage(commandBuffer,
-                image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1, &blit,
-                VK_FILTER_LINEAR);
+                           image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1, &blit,
+                           VK_FILTER_LINEAR);
 
             barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             barrier.newLayout = finalLayout;
@@ -1528,10 +1528,10 @@ void VulkanBackend::generateMipmaps(const Texture& texture, VkImageLayout finalL
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
             vkCmdPipelineBarrier(commandBuffer,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage, 0,
-                0, nullptr,
-                0, nullptr,
-                1, &barrier);
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage, 0,
+                                 0, nullptr,
+                                 0, nullptr,
+                                 1, &barrier);
 
             mipWidth = nextWidth;
             mipHeight = nextHeight;
@@ -1544,10 +1544,10 @@ void VulkanBackend::generateMipmaps(const Texture& texture, VkImageLayout finalL
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
         vkCmdPipelineBarrier(commandBuffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, dstStage, 0,
+                             0, nullptr,
+                             0, nullptr,
+                             1, &barrier);
     });
 
     if (!success) {
@@ -2639,15 +2639,15 @@ bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkI
 
     if (currentCommandBuffer) {
         vkCmdPipelineBarrier(*currentCommandBuffer, sourceStage, destinationStage, 0,
-            0, nullptr,
-            0, nullptr,
-            1, &imageBarrier);
+                             0, nullptr,
+                             0, nullptr,
+                             1, &imageBarrier);
     } else {
         bool success = issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
             vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0,
-                0, nullptr,
-                0, nullptr,
-                1, &imageBarrier);
+                                 0, nullptr,
+                                 0, nullptr,
+                                 1, &imageBarrier);
         });
         if (!success) {
             LogError("VulkanBackend::transitionImageLayout(): error transitioning layout, refer to issueSingleTimeCommand errors for more information.\n");

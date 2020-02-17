@@ -26,9 +26,9 @@ RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplem
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),
             { { 0, VertexAttributeType::Float3, offsetof(Vertex, position) },
-                { 1, VertexAttributeType::Float2, offsetof(Vertex, texCoord) },
-                { 2, VertexAttributeType ::Float3, offsetof(Vertex, normal) },
-                { 3, VertexAttributeType ::Float4, offsetof(Vertex, tangent) } }
+              { 1, VertexAttributeType::Float2, offsetof(Vertex, texCoord) },
+              { 2, VertexAttributeType ::Float3, offsetof(Vertex, normal) },
+              { 3, VertexAttributeType ::Float4, offsetof(Vertex, tangent) } }
         };
 
         size_t perObjectBufferSize = state.drawables.size() * sizeof(PerForwardObject);
@@ -66,8 +66,8 @@ RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplem
 
         Texture& depthTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::All);
         RenderTarget& renderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
-            { RenderTarget::AttachmentType::Color1, &normalTexture },
-            { RenderTarget::AttachmentType::Depth, &depthTexture } });
+                                                              { RenderTarget::AttachmentType::Color1, &normalTexture },
+                                                              { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
         RenderState& renderState = reg.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
 
@@ -119,9 +119,9 @@ void ForwardRenderNode::setupState(const Scene& scene, Registry& staticResources
 
                 for (int i = 0; i < posData.size(); ++i) {
                     vertices.push_back({ .position = posData[i],
-                        .texCoord = texData[i],
-                        .normal = normalData[i],
-                        .tangent = tangentData[i] });
+                                         .texCoord = texData[i],
+                                         .normal = normalData[i],
+                                         .tangent = tangentData[i] });
                 }
             }
 
@@ -158,12 +158,12 @@ void ForwardRenderNode::setupState(const Scene& scene, Registry& staticResources
     if (state.drawables.size() > FORWARD_MAX_DRAWABLES) {
         LogErrorAndExit("ForwardRenderNode: we need to up the number of max drawables that can be handled in the forward pass! "
                         "We have %u, the capacity is %u.\n",
-            state.drawables.size(), FORWARD_MAX_DRAWABLES);
+                        state.drawables.size(), FORWARD_MAX_DRAWABLES);
     }
 
     if (state.textures.size() > FORWARD_MAX_TEXTURES) {
         LogErrorAndExit("ForwardRenderNode: we need to up the number of max textures that can be handled in the forward pass! "
                         "We have %u, the capacity is %u.\n",
-            state.textures.size(), FORWARD_MAX_TEXTURES);
+                        state.textures.size(), FORWARD_MAX_TEXTURES);
     }
 }

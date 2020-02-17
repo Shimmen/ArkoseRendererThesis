@@ -34,7 +34,7 @@ void RenderGraph::constructAll(Registry& nodeManager, std::vector<Registry*> fra
             frameManager->setCurrentNode(node->name());
             auto executeCallback = node->constructFrame(*frameManager);
             frameCtx.nodeContexts.push_back({ .node = node.get(),
-                .executeCallback = executeCallback });
+                                              .executeCallback = executeCallback });
         }
 
         m_frameContexts[frameManager] = frameCtx;

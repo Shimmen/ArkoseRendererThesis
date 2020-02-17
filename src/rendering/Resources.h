@@ -252,9 +252,9 @@ private:
 struct RenderState : public Resource {
 public:
     RenderState(Badge<Registry>,
-        const RenderTarget& renderTarget, VertexLayout vertexLayout,
-        Shader shader, const std::vector<const BindingSet*>& shaderBindingSets,
-        Viewport viewport, BlendState blendState, RasterState rasterState)
+                const RenderTarget& renderTarget, VertexLayout vertexLayout,
+                Shader shader, const std::vector<const BindingSet*>& shaderBindingSets,
+                Viewport viewport, BlendState blendState, RasterState rasterState)
         : m_renderTarget(renderTarget)
         , m_vertexLayout(vertexLayout)
         , m_shader(shader)
