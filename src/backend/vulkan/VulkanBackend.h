@@ -17,7 +17,7 @@ constexpr bool vulkanDebugMode = true;
 class VulkanBackend final : public Backend {
 public:
     VulkanBackend(GLFWwindow*, App&);
-    ~VulkanBackend();
+    ~VulkanBackend() final;
 
     VulkanBackend(VulkanBackend&&) = delete;
     VulkanBackend(VulkanBackend&) = delete;

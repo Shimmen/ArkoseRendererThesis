@@ -2299,30 +2299,35 @@ VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState
 
 void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
 {
-    m_frameResourceManagers.resize(m_numSwapchainImages);
+    uint32_t numFrameManagers = m_numSwapchainImages;
 
-    std::vector<std::unique_ptr<ResourceManager>> newResourceManagers {};
-    for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
-        const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[swapchainImageIndex];
-        newResourceManagers.push_back(std::make_unique<ResourceManager>(&windowRenderTargetForFrame));
+    // Create new resource managers
+    auto nodeResourceManager = std::make_unique<ResourceManager>();
+    std::vector<std::unique_ptr<ResourceManager>> frameResourceManagers {};
+    for (uint32_t i = 0; i < numFrameManagers; ++i) {
+        const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[i];
+        frameResourceManagers.push_back(std::make_unique<ResourceManager>(&windowRenderTargetForFrame));
     }
 
-    auto nodeResourceManager = std::make_unique<ResourceManager>();
-
-    // TODO: This is stupid
+    // TODO: Fix me, this is stupid..
     std::vector<ResourceManager*> managerPointers {};
-    for (auto& mng : newResourceManagers) {
+    managerPointers.reserve(frameResourceManagers.size());
+    for (auto& mng : frameResourceManagers) {
         managerPointers.emplace_back(mng.get());
     }
 
     renderGraph.constructAll(*nodeResourceManager, managerPointers);
 
-    for (uint32_t swapchainImageIndex = 0; swapchainImageIndex < m_numSwapchainImages; ++swapchainImageIndex) {
-        replaceResourcesForResourceManagers(m_frameResourceManagers[swapchainImageIndex].get(), newResourceManagers[swapchainImageIndex].get());
-        m_frameResourceManagers[swapchainImageIndex] = std::move(newResourceManagers[swapchainImageIndex]);
-    }
+    // First create & replace node resources
     replaceResourcesForResourceManagers(m_nodeResourceManager.get(), nodeResourceManager.get());
     m_nodeResourceManager = std::move(nodeResourceManager);
+
+    // Then create & replace frame resources
+    m_frameResourceManagers.resize(numFrameManagers);
+    for (uint32_t i = 0; i < numFrameManagers; ++i) {
+        replaceResourcesForResourceManagers(m_frameResourceManagers[i].get(), frameResourceManagers[i].get());
+        m_frameResourceManagers[i] = std::move(frameResourceManagers[i]);
+    }
 }
 
 void VulkanBackend::destroyRenderGraphResources()
