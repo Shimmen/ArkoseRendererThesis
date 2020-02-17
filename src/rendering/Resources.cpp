@@ -249,3 +249,61 @@ const std::vector<ShaderBinding>& BindingSet::shaderBindings() const
 {
     return m_shaderBindings;
 }
+
+RenderStateBuilder::RenderStateBuilder(const RenderTarget& renderTarget, const Shader& shader, const VertexLayout& vertexLayout)
+    : renderTarget(renderTarget)
+    , vertexLayout(vertexLayout)
+    , shader(shader)
+{
+}
+
+Viewport RenderStateBuilder::viewport() const
+{
+    if (m_viewport.has_value()) {
+        return m_viewport.value();
+    }
+
+    Viewport view {
+        .x = 0.0f,
+        .y = 0.0f,
+        .extent = renderTarget.extent()
+    };
+    return view;
+}
+
+BlendState RenderStateBuilder::blendState() const
+{
+    if (m_blendState.has_value()) {
+        return m_blendState.value();
+    }
+
+    BlendState state {
+        .enabled = false
+    };
+    return state;
+}
+
+RasterState RenderStateBuilder::rasterState() const
+{
+    if (m_rasterState.has_value()) {
+        return m_rasterState.value();
+    }
+
+    RasterState state {
+        .backfaceCullingEnabled = true,
+        .frontFace = TriangleWindingOrder::CounterClockwise,
+        .polygonMode = PolygonMode::Filled
+    };
+    return state;
+}
+
+RenderStateBuilder& RenderStateBuilder::addBindingSet(const BindingSet& bindingSet)
+{
+    m_bindingSets.emplace_back(&bindingSet);
+    return *this;
+}
+
+const std::vector<const BindingSet*>& RenderStateBuilder::bindingSets() const
+{
+    return m_bindingSets;
+}

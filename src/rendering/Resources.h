@@ -287,3 +287,25 @@ private:
     BlendState m_blendState;
     RasterState m_rasterState;
 };
+
+class RenderStateBuilder {
+public:
+    RenderStateBuilder(const RenderTarget&, const Shader&, const VertexLayout&);
+
+    const RenderTarget& renderTarget;
+    const VertexLayout& vertexLayout;
+    const Shader& shader;
+
+    [[nodiscard]] Viewport viewport() const;
+    [[nodiscard]] BlendState blendState() const;
+    [[nodiscard]] RasterState rasterState() const;
+
+    RenderStateBuilder& addBindingSet(const BindingSet&);
+    [[nodiscard]] const std::vector<const BindingSet*>& bindingSets() const;
+
+private:
+    std::optional<Viewport> m_viewport {};
+    std::optional<BlendState> m_blendState {};
+    std::optional<RasterState> m_rasterState {};
+    std::vector<const BindingSet*> m_bindingSets {};
+};

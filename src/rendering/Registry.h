@@ -28,6 +28,7 @@ public:
 
     [[nodiscard]] BindingSet& createBindingSet(std::initializer_list<ShaderBinding>);
 
+    [[nodiscard]] RenderState& createRenderState(const RenderStateBuilder&);
     [[nodiscard]] RenderState& createRenderState(const RenderTarget&, const VertexLayout&, const Shader&, std::vector<const BindingSet*>, const Viewport&, const BlendState&, const RasterState&);
 
     void publish(const std::string& name, const Buffer&);

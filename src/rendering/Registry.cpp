@@ -100,6 +100,12 @@ Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool g
     return texture;
 }
 
+RenderState& Registry::createRenderState(const RenderStateBuilder& builder)
+{
+    return createRenderState(builder.renderTarget, builder.vertexLayout, builder.shader,
+                             builder.bindingSets(), builder.viewport(), builder.blendState(), builder.rasterState());
+}
+
 RenderState& Registry::createRenderState(
     const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
     const Shader& shader, std::vector<const BindingSet*> shaderBindingSets,

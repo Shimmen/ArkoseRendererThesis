@@ -36,9 +36,9 @@ void SlowForwardRenderNode::constructNode(Registry& nodeReg)
 
                 for (int i = 0; i < posData.size(); ++i) {
                     vertices.push_back({ .position = posData[i],
-                        .texCoord = texData[i],
-                        .normal = normalData[i],
-                        .tangent = tangentData[i] });
+                                         .texCoord = texData[i],
+                                         .normal = normalData[i],
+                                         .tangent = tangentData[i] });
                 }
             }
 
@@ -64,10 +64,10 @@ void SlowForwardRenderNode::constructNode(Registry& nodeReg)
             // Create binding set
             drawable.bindingSet = &nodeReg.createBindingSet(
                 { { 0, ShaderStageVertex, drawable.objectDataBuffer },
-                    { 1, ShaderStageFragment, &baseColorTexture },
-                    { 2, ShaderStageFragment, &normalMapTexture },
-                    { 3, ShaderStageFragment, &metallicRoughnessTexture },
-                    { 4, ShaderStageFragment, &emissiveTexture } });
+                  { 1, ShaderStageFragment, &baseColorTexture },
+                  { 2, ShaderStageFragment, &normalMapTexture },
+                  { 3, ShaderStageFragment, &metallicRoughnessTexture },
+                  { 4, ShaderStageFragment, &emissiveTexture } });
 
             m_drawables.push_back(drawable);
         });
@@ -76,28 +76,7 @@ void SlowForwardRenderNode::constructNode(Registry& nodeReg)
 
 RenderGraphBasicNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry& reg) const
 {
-    Shader shader = Shader::createBasic("forwardSlow", "forwardSlow.vert", "forwardSlow.frag");
-
-    VertexLayout vertexLayout = VertexLayout {
-        sizeof(Vertex),
-        { { 0, VertexAttributeType::Float3, offsetof(Vertex, position) },
-          { 1, VertexAttributeType::Float2, offsetof(Vertex, texCoord) },
-          { 2, VertexAttributeType ::Float3, offsetof(Vertex, normal) },
-          { 3, VertexAttributeType ::Float4, offsetof(Vertex, tangent) } }
-    };
-
     const RenderTarget& windowTarget = reg.windowRenderTarget();
-
-    Viewport viewport;
-    viewport.extent = windowTarget.extent();
-
-    BlendState blendState;
-    blendState.enabled = false;
-
-    RasterState rasterState;
-    rasterState.polygonMode = PolygonMode::Filled;
-    rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
-    rasterState.backfaceCullingEnabled = true;
 
     Texture& colorTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::RGBA16F, Texture::Usage::All);
     reg.publish("color", colorTexture);
@@ -117,14 +96,24 @@ RenderGraphBasicNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Regi
     Buffer& dirLightUniformBuffer = reg.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     BindingSet& dirLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, dirLightShadowMap }, { 1, ShaderStageFragment, &dirLightUniformBuffer } });
 
-    std::vector<const BindingSet*> allBindingSets {};
-    allBindingSets.push_back(&fixedBindingSet);
-    //for (auto& drawable : state.drawables) { // TODO: We have to provide the layouts in order!!!
-    allBindingSets.push_back(m_drawables[0].bindingSet);
-    //}
-    allBindingSets.push_back(&dirLightBindingSet);
+    Shader shader = Shader::createBasic("forwardSlow", "forwardSlow.vert", "forwardSlow.frag");
+    VertexLayout vertexLayout = VertexLayout {
+        sizeof(Vertex),
+        { { 0, VertexAttributeType::Float3, offsetof(Vertex, position) },
+          { 1, VertexAttributeType::Float2, offsetof(Vertex, texCoord) },
+          { 2, VertexAttributeType ::Float3, offsetof(Vertex, normal) },
+          { 3, VertexAttributeType ::Float4, offsetof(Vertex, tangent) } }
+    };
 
-    RenderState& renderState = reg.createRenderState(renderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
+    RenderStateBuilder renderStateBuilder { renderTarget, shader, vertexLayout };
+
+    // TODO: These have to be provided in order of the descriptor sets & of the correct amounts etc..
+    renderStateBuilder
+        .addBindingSet(fixedBindingSet)
+        .addBindingSet(*m_drawables[0].bindingSet)
+        .addBindingSet(dirLightBindingSet);
+
+    RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.setRenderState(renderState, ClearColor(0.2f, 0.2f, 0.2f), 1.0f);

@@ -32,26 +32,10 @@ void ShadowMapNode::constructNode(Registry& nodeReg)
 
 RenderGraphNode::ExecuteCallback ShadowMapNode::constructFrame(Registry& reg) const
 {
-    Shader shader = Shader::createVertexOnly("shadowSun", "shadowSun.vert");
-    VertexLayout vertexLayout = VertexLayout { sizeof(vec3), { { 0, VertexAttributeType::Float3, 0 } } };
-
     const SunLight& sunLight = m_scene.sun();
 
     Texture& shadowMap = reg.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::All);
     reg.publish("directional", shadowMap);
-
-    const RenderTarget& shadowRenderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
-
-    Viewport viewport;
-    viewport.extent = shadowRenderTarget.extent();
-
-    BlendState blendState;
-    blendState.enabled = false;
-
-    RasterState rasterState;
-    rasterState.polygonMode = PolygonMode::Filled;
-    rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
-    rasterState.backfaceCullingEnabled = true;
 
     Buffer& lightDataBuffer = reg.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     BindingSet& lightBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, &lightDataBuffer } });
@@ -59,9 +43,16 @@ RenderGraphNode::ExecuteCallback ShadowMapNode::constructFrame(Registry& reg) co
     Buffer& transformDataBuffer = reg.createBuffer(m_drawables.size() * sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     BindingSet& transformBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
 
-    std::vector<const BindingSet*> allBindingSets { &lightBindingSet, &transformBindingSet };
+    const RenderTarget& shadowRenderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
+    Shader shader = Shader::createVertexOnly("shadowSun", "shadowSun.vert");
+    VertexLayout vertexLayout = VertexLayout { sizeof(vec3), { { 0, VertexAttributeType::Float3, 0 } } };
 
-    RenderState& renderState = reg.createRenderState(shadowRenderTarget, vertexLayout, shader, allBindingSets, viewport, blendState, rasterState);
+    RenderStateBuilder renderStateBuilder { shadowRenderTarget, shader, vertexLayout };
+    renderStateBuilder
+        .addBindingSet(lightBindingSet)
+        .addBindingSet(transformBindingSet);
+
+    RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.setRenderState(renderState, ClearColor(1, 0, 1), 1.0f);

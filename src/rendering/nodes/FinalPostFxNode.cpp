@@ -23,27 +23,15 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     const Texture* sourceTexture = reg.getTexture(ForwardRenderNode::name(), "color");
     if (!sourceTexture) {
         LogError("FinalPostFxNode: could not find the input texture 'forward:color', using test texture\n");
-        //sourceTexture = &registry.node.loadTexture2D("assets/test-pattern.png", true, true);
         sourceTexture = &reg.loadTexture2D("assets/test-pattern.png", true, true);
     }
 
     ShaderBinding textureSamplerBinding = { 0, ShaderStageFragment, sourceTexture };
     BindingSet& bindingSet = reg.createBindingSet({ textureSamplerBinding });
 
-    const RenderTarget& windowTarget = reg.windowRenderTarget();
-
-    Viewport viewport;
-    viewport.extent = windowTarget.extent();
-
-    BlendState blendState;
-    blendState.enabled = false;
-
-    RasterState rasterState;
-    rasterState.polygonMode = PolygonMode::Filled;
-    rasterState.backfaceCullingEnabled = true;
-    rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
-
-    RenderState& renderState = reg.createRenderState(windowTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
+    RenderStateBuilder renderStateBuilder { reg.windowRenderTarget(), shader, vertexLayout };
+    renderStateBuilder.addBindingSet(bindingSet);
+    RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
