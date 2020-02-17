@@ -1,7 +1,7 @@
 #include "ShaderManager.h"
 
-#include "utility/fileio.h"
-#include "utility/logging.h"
+#include "utility/FileIO.h"
+#include "utility/Logging.h"
 #include "utility/util.h"
 #include <chrono>
 #include <cstddef>
@@ -40,7 +40,7 @@ void ShaderManager::startFileWatching(unsigned msBetweenPolls)
                 std::vector<std::string> filesToRemove {};
                 for (auto& [_, data] : m_loadedShaders) {
 
-                    if (!fileio::isFileReadable(data.path)) {
+                    if (!FileIO::isFileReadable(data.path)) {
                         LogWarning("ShaderManager: removing shader '%s' from managed set since it seems to have been removed.\n");
                         filesToRemove.push_back(data.path);
                         continue;
@@ -49,7 +49,7 @@ void ShaderManager::startFileWatching(unsigned msBetweenPolls)
                     uint64_t lastEdit = getFileEditTimestamp(data.path);
                     if (lastEdit > data.lastEditTimestamp) {
                         //LogInfo("Updating file '%s'\n", data.path.c_str());
-                        data.glslSource = fileio::readEntireFile(data.path).value();
+                        data.glslSource = FileIO::readEntireFile(data.path).value();
                         data.lastEditTimestamp = lastEdit;
                         if (compileGlslToSpirv(data)) {
                             data.currentBinaryVersion += 1;
@@ -107,12 +107,12 @@ ShaderManager::ShaderStatus ShaderManager::loadAndCompileImmediately(const std::
     auto result = m_loadedShaders.find(path);
     if (result == m_loadedShaders.end()) {
 
-        if (!fileio::isFileReadable(path)) {
+        if (!FileIO::isFileReadable(path)) {
             return ShaderStatus::FileNotFound;
         }
 
         ShaderData data { name, path };
-        data.glslSource = fileio::readEntireFile(path).value();
+        data.glslSource = FileIO::readEntireFile(path).value();
         data.lastEditTimestamp = getFileEditTimestamp(path);
 
         compileGlslToSpirv(data);
@@ -178,7 +178,7 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
 
             auto* fileData = new FileData();
             fileData->path = m_shaderManager.resolvePath(requested_source);
-            fileData->content = fileio::readEntireFile(fileData->path).value();
+            fileData->content = FileIO::readEntireFile(fileData->path).value();
             data->user_data = fileData;
 
             data->source_name = fileData->path.c_str();

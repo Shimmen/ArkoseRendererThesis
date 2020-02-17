@@ -3,7 +3,7 @@
 #include "rendering/Backend.h"
 #include "rendering/ShaderManager.h"
 #include "utility/Input.h"
-#include "utility/logging.h"
+#include "utility/Logging.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>

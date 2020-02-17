@@ -1,6 +1,6 @@
 #include "Resources.h"
 
-#include "utility/logging.h"
+#include "utility/Logging.h"
 #include "utility/util.h"
 
 uint64_t Resource::id() const

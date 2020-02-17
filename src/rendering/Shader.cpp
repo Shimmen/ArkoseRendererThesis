@@ -1,7 +1,7 @@
 #include "Shader.h"
 
 #include "rendering/ShaderManager.h"
-#include <utility/logging.h>
+#include <utility/Logging.h>
 
 ShaderFile::ShaderFile(std::string name, ShaderFileType type)
     : m_name(std::move(name))

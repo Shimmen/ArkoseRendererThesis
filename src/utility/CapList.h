@@ -1,6 +1,6 @@
 #pragma once
 
-#include "logging.h"
+#include "Logging.h"
 #include <vector>
 
 /// Defines a list with a fixed capacity. It's pretty much like std::array but it doesn't have the capacity as a template argument.

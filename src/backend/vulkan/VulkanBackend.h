@@ -3,7 +3,6 @@
 #include "VulkanQueueInfo.h"
 #include "rendering/App.h"
 #include "rendering/Backend.h"
-#include "utility/ArenaAllocator.h"
 #include "utility/PersistentIndexedList.h"
 #include <array>
 #include <vk_mem_alloc.h>

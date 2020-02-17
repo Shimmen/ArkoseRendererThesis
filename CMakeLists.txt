@@ -21,12 +21,11 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/ForwardRenderNode.cpp
         src/rendering/nodes/SlowForwardRenderNode.cpp
         src/rendering/nodes/ShadowMapNode.cpp
-        src/utility/ArenaAllocator.cpp
         src/utility/GlobalState.cpp
         src/utility/GltfModel.cpp
         src/utility/FpsCamera.cpp
         src/utility/Input.cpp
-        src/utility/fileio.cpp
+        src/utility/FileIO.cpp
         src/utility/Random.cpp)
 
 target_compile_options(ArkoseRenderer PRIVATE -Wall)

@@ -3,7 +3,7 @@
 #include <optional>
 #include <vector>
 
-namespace fileio {
+namespace FileIO {
 
 using BinaryData = std::vector<char>;
 std::optional<BinaryData> readEntireFileAsByteBuffer(const std::string& filePath);

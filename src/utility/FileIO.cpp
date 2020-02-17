@@ -1,8 +1,8 @@
-#include "fileio.h"
+#include "FileIO.h"
 
 #include <fstream>
 
-std::optional<fileio::BinaryData> fileio::readEntireFileAsByteBuffer(const std::string& filePath)
+std::optional<FileIO::BinaryData> FileIO::readEntireFileAsByteBuffer(const std::string& filePath)
 {
     // Open file as binary and immediately seek to the end
     std::ifstream file(filePath, std::ios::ate | std::ios::binary);
@@ -11,7 +11,7 @@ std::optional<fileio::BinaryData> fileio::readEntireFileAsByteBuffer(const std::
         return {};
 
     size_t sizeInBytes = file.tellg();
-    fileio::BinaryData binaryData(sizeInBytes);
+    FileIO::BinaryData binaryData(sizeInBytes);
 
     file.seekg(0);
     file.read(binaryData.data(), sizeInBytes);
@@ -20,7 +20,7 @@ std::optional<fileio::BinaryData> fileio::readEntireFileAsByteBuffer(const std::
     return binaryData;
 }
 
-std::optional<std::string> fileio::readEntireFile(const std::string& filePath)
+std::optional<std::string> FileIO::readEntireFile(const std::string& filePath)
 {
     // Open file as binary and immediately seek to the end
     std::ifstream file(filePath, std::ios::ate | std::ios::binary);
@@ -40,7 +40,7 @@ std::optional<std::string> fileio::readEntireFile(const std::string& filePath)
     return contents;
 }
 
-bool fileio::isFileReadable(const std::string& filePath)
+bool FileIO::isFileReadable(const std::string& filePath)
 {
     std::ifstream file(filePath);
     bool isGood = file.good();

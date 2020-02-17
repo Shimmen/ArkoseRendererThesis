@@ -1,7 +1,7 @@
 #include "Registry.h"
 
-#include "utility/fileio.h"
-#include "utility/logging.h"
+#include "utility/FileIO.h"
+#include "utility/Logging.h"
 #include "utility/util.h"
 #include <stb_image.h>
 
@@ -62,7 +62,7 @@ BindingSet& Registry::createBindingSet(std::initializer_list<ShaderBinding> shad
 
 Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps)
 {
-    if (!fileio::isFileReadable(imagePath)) {
+    if (!FileIO::isFileReadable(imagePath)) {
         LogErrorAndExit("Could not read image at path '%s'.\n", imagePath.c_str());
     }
 

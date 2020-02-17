@@ -7,9 +7,9 @@
 #include "VulkanQueueInfo.h"
 #include "rendering/Registry.h"
 #include "rendering/ShaderManager.h"
+#include "utility/FileIO.h"
 #include "utility/GlobalState.h"
-#include "utility/fileio.h"
-#include "utility/logging.h"
+#include "utility/Logging.h"
 #include "utility/util.h"
 #include <algorithm>
 #include <cstring>
@@ -1331,7 +1331,7 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
         LogErrorAndExit("Trying to update an already-deleted or not-yet-created texture\n");
     }
 
-    if (!fileio::isFileReadable(update.path())) {
+    if (!FileIO::isFileReadable(update.path())) {
         LogError("VulkanBackend::updateTexture(): there is no file that can be read at path '%s'.\n", update.path().c_str());
         return;
     }

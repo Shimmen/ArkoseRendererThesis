@@ -4,8 +4,6 @@
 #include "Registry.h"
 #include "Resources.h"
 #include "rendering/CommandList.h"
-#include "utility/ArenaAllocator.h"
-#include "utility/copying.h"
 #include <functional>
 #include <memory>
 #include <string>

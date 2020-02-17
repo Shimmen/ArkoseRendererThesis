@@ -1,6 +1,6 @@
 #include "GltfModel.h"
 
-#include "utility/logging.h"
+#include "utility/Logging.h"
 #include <string>
 #include <unordered_map>
 

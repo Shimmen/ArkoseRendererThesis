@@ -4,7 +4,6 @@
 #include "NodeDependency.h"
 #include "ResourceChange.h"
 #include "Resources.h"
-#include "utility/ArenaAllocator.h"
 #include "utility/CapList.h"
 #include "utility/util.h"
 #include <unordered_map>

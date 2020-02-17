@@ -1,6 +1,6 @@
 #include "RenderGraph.h"
 
-#include <utility/logging.h>
+#include <utility/Logging.h>
 
 void RenderGraph::addNode(const std::string& name, const RenderGraphBasicNode::ConstructorFunction& constructorFunction)
 {
