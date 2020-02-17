@@ -32,11 +32,9 @@ void TestApp::setup(RenderGraph& graph)
     m_scene.sun().worldExtent = 6.0f;
 
     graph.addNode(CameraUniformNode::name(), CameraUniformNode::construct(m_scene.camera()));
+
     graph.addNode<ShadowMapNode>(m_scene);
-
-    //graph.addNode(ForwardRenderNode::name(), ForwardRenderNode::construct(m_scene));
-    graph.addNode(SlowForwardRenderNode::name(), SlowForwardRenderNode::construct(m_scene));
-
+    graph.addNode<SlowForwardRenderNode>(m_scene);
     graph.addNode<FinalPostFxNode>();
 }
 

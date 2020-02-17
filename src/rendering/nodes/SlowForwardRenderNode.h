@@ -5,10 +5,14 @@
 #include "utility/FpsCamera.h"
 #include "utility/Model.h"
 
-class SlowForwardRenderNode {
+class SlowForwardRenderNode final : public RenderGraphNode {
 public:
+    explicit SlowForwardRenderNode(const Scene&);
+
     static std::string name();
-    static RenderGraphBasicNode::ConstructorFunction construct(const Scene&);
+
+    void constructNode(Registry&) override;
+    ExecuteCallback constructFrame(Registry&) const override;
 
 private:
     struct Vertex {
@@ -27,9 +31,6 @@ private:
         BindingSet* bindingSet {};
     };
 
-    struct State {
-        std::vector<Drawable> drawables {};
-    };
-
-    static void setupState(const Scene&, Registry&, State&);
+    std::vector<Drawable> m_drawables {};
+    const Scene& m_scene;
 };
