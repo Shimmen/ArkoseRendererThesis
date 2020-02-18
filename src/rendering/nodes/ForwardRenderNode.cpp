@@ -21,7 +21,7 @@ RenderGraphBasicNode::ConstructorFunction ForwardRenderNode::constructFastImplem
         setupState(scene, reg, state); // TODO: Don't use the frame registry!
 
         // TODO: Well, now it seems very reasonable to actually include this in the resource manager..
-        Shader shader = Shader::createBasic("forward", "forward.vert", "forward.frag");
+        Shader shader = Shader::createBasic("forward.vert", "forward.frag");
 
         VertexLayout vertexLayout = VertexLayout {
             sizeof(Vertex),

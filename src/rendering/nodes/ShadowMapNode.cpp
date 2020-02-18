@@ -44,7 +44,7 @@ RenderGraphNode::ExecuteCallback ShadowMapNode::constructFrame(Registry& reg) co
     BindingSet& transformBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
 
     const RenderTarget& shadowRenderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
-    Shader shader = Shader::createVertexOnly("shadowSun", "shadowSun.vert");
+    Shader shader = Shader::createVertexOnly("shadowSun.vert");
     VertexLayout vertexLayout = VertexLayout { sizeof(vec3), { { 0, VertexAttributeType::Float3, 0 } } };
 
     RenderStateBuilder renderStateBuilder { shadowRenderTarget, shader, vertexLayout };

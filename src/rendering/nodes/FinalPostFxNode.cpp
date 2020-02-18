@@ -14,7 +14,7 @@ std::string FinalPostFxNode::name()
 
 FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) const
 {
-    Shader shader = Shader::createBasic("finalPostFX", "finalPostFx.vert", "finalPostFx.frag");
+    Shader shader = Shader::createBasic("finalPostFx.vert", "finalPostFx.frag");
 
     VertexLayout vertexLayout = VertexLayout { sizeof(vec2), { { 0, VertexAttributeType::Float2, 0 } } };
     std::vector<vec2> fullScreenTriangle { { -1, -3 }, { -1, 1 }, { 3, 1 } };

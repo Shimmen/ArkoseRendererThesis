@@ -10,13 +10,13 @@ enum class ShaderFileType {
 };
 
 struct ShaderFile {
-    ShaderFile(std::string name, ShaderFileType);
+    ShaderFile(std::string path, ShaderFileType);
 
-    [[nodiscard]] const std::string& name() const;
+    [[nodiscard]] const std::string& path() const;
     [[nodiscard]] ShaderFileType type() const;
 
 private:
-    std::string m_name;
+    std::string m_path;
     ShaderFileType m_type;
 };
 
@@ -27,12 +27,12 @@ enum class ShaderType {
 
 struct Shader {
 
-    static Shader createVertexOnly(std::string name, std::string vertexName);
-    static Shader createBasic(std::string name, std::string vertexName, std::string fragmentName);
-    static Shader createCompute(std::string name, std::string computeName);
+    static Shader createVertexOnly(std::string vertexName);
+    static Shader createBasic(std::string vertexName, std::string fragmentName);
+    static Shader createCompute(std::string computeName);
 
     Shader() = default;
-    Shader(std::string name, std::vector<ShaderFile>, ShaderType type);
+    Shader(std::vector<ShaderFile>, ShaderType type);
     ~Shader();
 
     [[nodiscard]] ShaderType type() const;
@@ -43,7 +43,6 @@ struct Shader {
     //  but maybe that is backend-specific or file specific?
 
 private:
-    std::string m_name {};
     std::vector<ShaderFile> m_files {};
     ShaderType m_type {};
 };

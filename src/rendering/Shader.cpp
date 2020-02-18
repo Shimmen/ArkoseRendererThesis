@@ -3,17 +3,17 @@
 #include "rendering/ShaderManager.h"
 #include <utility/Logging.h>
 
-ShaderFile::ShaderFile(std::string name, ShaderFileType type)
-    : m_name(std::move(name))
+ShaderFile::ShaderFile(std::string path, ShaderFileType type)
+    : m_path(std::move(path))
     , m_type(type)
 {
     auto& manager = ShaderManager::instance();
-    switch (manager.loadAndCompileImmediately(m_name)) {
+    switch (manager.loadAndCompileImmediately(m_path)) {
     case ShaderManager::ShaderStatus::FileNotFound:
         LogErrorAndExit("Shader file '%s' not found, exiting.\n");
     case ShaderManager::ShaderStatus::CompileError: {
-        std::string errorMessage = manager.shaderError(m_name).value();
-        LogError("Shader file '%s' has compile errors:\n", m_name.c_str());
+        std::string errorMessage = manager.shaderError(m_path).value();
+        LogError("Shader file '%s' has compile errors:\n", m_path.c_str());
         LogError("%s\n", errorMessage.c_str());
         LogErrorAndExit("Exiting due to bad shader at startup.\n");
     }
@@ -22,9 +22,9 @@ ShaderFile::ShaderFile(std::string name, ShaderFileType type)
     }
 }
 
-const std::string& ShaderFile::name() const
+const std::string& ShaderFile::path() const
 {
-    return m_name;
+    return m_path;
 }
 
 ShaderFileType ShaderFile::type() const
@@ -32,37 +32,34 @@ ShaderFileType ShaderFile::type() const
     return m_type;
 }
 
-Shader Shader::createVertexOnly(std::string name, std::string vertexName)
+Shader Shader::createVertexOnly(std::string vertexName)
 {
     ShaderFile vertexFile { std::move(vertexName), ShaderFileType::Vertex };
-    return Shader(std::move(name), { vertexFile }, ShaderType::Raster);
+    return Shader({ vertexFile }, ShaderType::Raster);
 }
 
-Shader Shader::createBasic(std::string name, std::string vertexName, std::string fragmentName)
+Shader Shader::createBasic(std::string vertexName, std::string fragmentName)
 {
     ShaderFile vertexFile { std::move(vertexName), ShaderFileType::Vertex };
     ShaderFile fragmentFile { std::move(fragmentName), ShaderFileType::Fragment };
-    return Shader(std::move(name), { vertexFile, fragmentFile }, ShaderType::Raster);
+    return Shader({ vertexFile, fragmentFile }, ShaderType::Raster);
 }
 
-Shader Shader::createCompute(std::string name, std::string computeName)
+Shader Shader::createCompute(std::string computeName)
 {
     ShaderFile computeFile { std::move(computeName), ShaderFileType::Compute };
-    return Shader(std::move(name), { computeFile }, ShaderType::Compute);
+    return Shader({ computeFile }, ShaderType::Compute);
 }
 
-Shader::Shader(std::string name, std::vector<ShaderFile> files, ShaderType type)
-    : m_name(std::move(name))
-    , m_files(std::move(files))
+Shader::Shader(std::vector<ShaderFile> files, ShaderType type)
+    : m_files(std::move(files))
     , m_type(type)
 {
 }
 
 Shader::~Shader()
 {
-    if (!m_name.empty()) {
-        // TODO: Maybe tell the resource manager that a shader was removed, so that it can reference count?
-    }
+    // TODO: Maybe tell the resource manager that a shader was removed, so that it can reference count?
 }
 
 ShaderType Shader::type() const

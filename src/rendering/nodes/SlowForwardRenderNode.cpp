@@ -96,7 +96,7 @@ RenderGraphBasicNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Regi
     Buffer& dirLightUniformBuffer = reg.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     BindingSet& dirLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, dirLightShadowMap }, { 1, ShaderStageFragment, &dirLightUniformBuffer } });
 
-    Shader shader = Shader::createBasic("forwardSlow", "forwardSlow.vert", "forwardSlow.frag");
+    Shader shader = Shader::createBasic("forwardSlow.vert", "forwardSlow.frag");
     VertexLayout vertexLayout = VertexLayout {
         sizeof(Vertex),
         { { 0, VertexAttributeType::Float3, offsetof(Vertex, position) },

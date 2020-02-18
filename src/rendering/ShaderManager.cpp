@@ -22,15 +22,17 @@ ShaderManager::ShaderManager(std::string basePath)
 {
 }
 
-void ShaderManager::startFileWatching(unsigned msBetweenPolls)
+void ShaderManager::startFileWatching(unsigned msBetweenPolls, std::function<void()> fileChangeCallback)
 {
     if (m_fileWatcherThread != nullptr || m_fileWatchingActive) {
         return;
     }
 
     m_fileWatchingActive = true;
-    m_fileWatcherThread = std::make_unique<std::thread>([this, msBetweenPolls]() {
+    m_fileWatcherThread = std::make_unique<std::thread>([this, msBetweenPolls, &fileChangeCallback]() {
         while (m_fileWatchingActive) {
+
+            int numChangedFiles = 0;
 
             std::this_thread::sleep_for(std::chrono::milliseconds(msBetweenPolls));
             {
@@ -40,27 +42,32 @@ void ShaderManager::startFileWatching(unsigned msBetweenPolls)
                 std::vector<std::string> filesToRemove {};
                 for (auto& [_, data] : m_loadedShaders) {
 
-                    if (!FileIO::isFileReadable(data.path)) {
+                    if (!FileIO::isFileReadable(data.filePath)) {
                         LogWarning("ShaderManager: removing shader '%s' from managed set since it seems to have been removed.\n");
-                        filesToRemove.push_back(data.path);
+                        filesToRemove.push_back(data.filePath);
                         continue;
                     }
 
-                    uint64_t lastEdit = getFileEditTimestamp(data.path);
+                    uint64_t lastEdit = getFileEditTimestamp(data.filePath);
                     if (lastEdit > data.lastEditTimestamp) {
                         //LogInfo("Updating file '%s'\n", data.path.c_str());
-                        data.glslSource = FileIO::readEntireFile(data.path).value();
+                        data.glslSource = FileIO::readEntireFile(data.filePath).value();
                         data.lastEditTimestamp = lastEdit;
                         if (compileGlslToSpirv(data)) {
                             data.currentBinaryVersion += 1;
+                            numChangedFiles += 1;
                         } else {
-                            LogError("Shader at path '%s' could not compile:\n\t%s\n", data.path.c_str(), data.lastCompileError.c_str());
+                            LogError("Shader at path '%s' could not compile:\n\t%s\n", data.filePath.c_str(), data.lastCompileError.c_str());
                         }
                     }
                 }
 
                 for (const auto& path : filesToRemove) {
                     m_loadedShaders.erase(path);
+                }
+
+                if (numChangedFiles > 0) {
+                    fileChangeCallback();
                 }
             }
         }
@@ -111,7 +118,7 @@ ShaderManager::ShaderStatus ShaderManager::loadAndCompileImmediately(const std::
             return ShaderStatus::FileNotFound;
         }
 
-        ShaderData data { name, path };
+        ShaderData data { path };
         data.glslSource = FileIO::readEntireFile(path).value();
         data.lastEditTimestamp = getFileEditTimestamp(path);
 
@@ -211,8 +218,8 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
 
     // TODO: Why doesn't the automatic inferring work?!
     shaderc_shader_kind kind = shaderc_glsl_infer_from_source;
-    bool isProbablyVert = data.name.find(".vert") != std::string::npos;
-    bool isProbablyFrag = data.name.find(".frag") != std::string::npos;
+    bool isProbablyVert = data.filePath.find(".vert") != std::string::npos;
+    bool isProbablyFrag = data.filePath.find(".frag") != std::string::npos;
     if (isProbablyVert && !isProbablyFrag)
         kind = shaderc_glsl_vertex_shader;
     else if (isProbablyFrag && !isProbablyVert)
@@ -220,7 +227,7 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
     else
         ASSERT_NOT_REACHED();
 
-    shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(data.glslSource, kind, data.name.c_str(), options);
+    shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(data.glslSource, kind, data.filePath.c_str(), options);
 
     // Note that we only should overwrite the binary if it compiled correctly!
     if (module.GetCompilationStatus() != shaderc_compilation_status_success) {

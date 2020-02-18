@@ -22,7 +22,7 @@ public:
     ShaderManager(ShaderManager&) = delete;
     ShaderManager(ShaderManager&&) = delete;
 
-    void startFileWatching(unsigned msBetweenPolls);
+    void startFileWatching(unsigned msBetweenPolls, std::function<void()> fileChangeCallback = {});
     void stopFileWatching();
 
     [[nodiscard]] std::string resolvePath(const std::string& name) const;
@@ -40,14 +40,12 @@ private:
 
     struct ShaderData {
         ShaderData() = default;
-        ShaderData(std::string name, std::string path)
-            : name(std::move(name))
-            , path(std::move(path))
+        explicit ShaderData(std::string path)
+            : filePath(std::move(path))
         {
         }
 
-        std::string name {};
-        std::string path {};
+        std::string filePath {};
 
         uint64_t lastEditTimestamp { 0 };
         uint32_t currentBinaryVersion { 0 };

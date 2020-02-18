@@ -2080,7 +2080,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
 
             // TODO: Maybe don't create new modules every time? Currently they are deleted later in this function
             VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-            const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(file.name());
+            const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(file.path());
             moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
             moduleCreateInfo.pCode = spirv.data();
 
