@@ -3,3 +3,6 @@ BasedOnStyle: WebKit
 Language: Cpp
 SpaceAfterTemplateKeyword: false
 AlignAfterOpenBracket: Align
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeTernaryOperators: true
