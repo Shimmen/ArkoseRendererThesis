@@ -83,7 +83,7 @@ RenderTarget::RenderTarget(Badge<Registry>, std::initializer_list<Attachment> at
 
     for (auto& attachment : m_attachments) {
         const Texture& texture = *attachment.texture;
-        if (texture.usage() != Texture::Usage::Attachment && texture.usage() != Texture::Usage::All) {
+        if (texture.usage() != Texture::Usage::Attachment && texture.usage() != Texture::Usage::AttachAndSample) {
             LogErrorAndExit("RenderTarget error: tried to create with texture that can't be used as attachment\n");
         }
     }
@@ -210,7 +210,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Text
     if (!texture) {
         LogErrorAndExit("ShaderBinding error: null texture\n");
     }
-    if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::All) {
+    if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::AttachAndSample) {
         LogErrorAndExit("ShaderBinding error: texture does not support sampling\n");
     }
 }
@@ -231,7 +231,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std:
         if (!texture) {
             LogErrorAndExit("ShaderBinding error: null texture in list\n");
         }
-        if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::All) {
+        if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::AttachAndSample) {
             LogErrorAndExit("ShaderBinding error: texture in list does not support sampling\n");
         }
     }

@@ -34,7 +34,7 @@ RenderGraphNode::ExecuteCallback ShadowMapNode::constructFrame(Registry& reg) co
 {
     const SunLight& sunLight = m_scene.sun();
 
-    Texture& shadowMap = reg.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::All);
+    Texture& shadowMap = reg.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::AttachAndSample);
     reg.publish("directional", shadowMap);
 
     Buffer& lightDataBuffer = reg.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);

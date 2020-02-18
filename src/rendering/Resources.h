@@ -62,7 +62,8 @@ struct Texture : public Resource {
     enum class Usage {
         Attachment,
         Sampled,
-        All,
+        AttachAndSample,
+        StorageAndSample,
     };
 
     enum class MinFilter {
@@ -239,6 +240,7 @@ enum ShaderStage : uint8_t {
 
 enum class ShaderBindingType {
     UniformBuffer,
+    StorageImage,
     TextureSampler,
     TextureSamplerArray,
 };

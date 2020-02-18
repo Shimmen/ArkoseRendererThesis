@@ -1138,10 +1138,11 @@ void VulkanBackend::newTexture(const Texture& texture)
     case Texture::Usage::Sampled:
         usageFlags = sampledFlags;
         break;
-    case Texture::Usage::All:
-        // TODO: Something more that needs to be here?
+    case Texture::Usage::AttachAndSample:
         usageFlags = attachmentFlags | sampledFlags;
         break;
+    case Texture::Usage::StorageAndSample:
+        usageFlags = VK_IMAGE_USAGE_STORAGE_BIT | sampledFlags;
     }
 
     // (if we later want to generate mipmaps we need the ability to use each mip as a src & dst in blitting)
@@ -1259,13 +1260,15 @@ void VulkanBackend::newTexture(const Texture& texture)
 
     VkImageLayout layout;
     switch (texture.usage()) {
+    case Texture::Usage::AttachAndSample:
+        // We probably want to render to it before sampling from it
     case Texture::Usage::Attachment:
         layout = texture.hasDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         break;
     case Texture::Usage::Sampled:
         layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         break;
-    case Texture::Usage::All:
+    case Texture::Usage::StorageAndSample:
         layout = VK_IMAGE_LAYOUT_GENERAL;
         break;
     }
@@ -1411,13 +1414,15 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
 
     VkImageLayout finalLayout;
     switch (update.texture().usage()) {
+    case Texture::Usage::AttachAndSample:
+        // We probably want to render to it before sampling from it
     case Texture::Usage::Attachment:
         finalLayout = update.texture().hasDepthFormat() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         break;
     case Texture::Usage::Sampled:
         finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         break;
-    case Texture::Usage::All:
+    case Texture::Usage::StorageAndSample:
         finalLayout = VK_IMAGE_LAYOUT_GENERAL;
         break;
     }
@@ -1823,6 +1828,9 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
             case ShaderBindingType::UniformBuffer:
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 break;
+            case ShaderBindingType::StorageImage:
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                break;
             case ShaderBindingType::TextureSampler:
             case ShaderBindingType::TextureSamplerArray:
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1870,6 +1878,9 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 switch (bindingInfo.type) {
                 case ShaderBindingType::UniformBuffer:
                     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    break;
+                case ShaderBindingType::StorageImage:
+                    poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                     break;
                 case ShaderBindingType::TextureSampler:
                 case ShaderBindingType::TextureSamplerArray:
@@ -1945,6 +1956,31 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 break;
             }
 
+            case ShaderBindingType::StorageImage: {
+
+                ASSERT(bindingInfo.textures.size() == 1);
+                ASSERT(bindingInfo.textures[0]);
+
+                const Texture& texture = *bindingInfo.textures[0];
+                const TextureInfo& texInfo = textureInfo(texture);
+
+                VkDescriptorImageInfo descImageInfo {};
+                descImageInfo.sampler = texInfo.sampler;
+                descImageInfo.imageView = texInfo.view;
+
+                ASSERT(texture.usage() == Texture::Usage::StorageAndSample);
+                descImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+                descImageInfos.push_back(descImageInfo);
+                write.pImageInfo = &descImageInfos.back();
+                write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+
+                write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+
             case ShaderBindingType::TextureSampler: {
 
                 ASSERT(bindingInfo.textures.size() == 1);
@@ -1958,7 +1994,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 descImageInfo.imageView = texInfo.view;
 
                 //ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                ASSERT(texture.usage() == Texture::Usage::Sampled || texture.usage() == Texture::Usage::All);
+                ASSERT(texture.usage() == Texture::Usage::Sampled || texture.usage() == Texture::Usage::AttachAndSample);
                 descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //texInfo.currentLayout;
 
                 descImageInfos.push_back(descImageInfo);
@@ -1988,7 +2024,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                     descImageInfo.sampler = texInfo.sampler;
                     descImageInfo.imageView = texInfo.view;
 
-                    ASSERT(texture->usage() == Texture::Usage::Sampled || texture->usage() == Texture::Usage::All);
+                    ASSERT(texture->usage() == Texture::Usage::Sampled || texture->usage() == Texture::Usage::AttachAndSample);
                     descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
                     descImageInfos.push_back(descImageInfo);
