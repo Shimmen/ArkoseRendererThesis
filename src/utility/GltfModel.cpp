@@ -1,5 +1,6 @@
 #include "GltfModel.h"
 
+#include "FileIO.h"
 #include "utility/Logging.h"
 #include <string>
 #include <unordered_map>
@@ -8,7 +9,12 @@ static std::unordered_map<std::string, tinygltf::Model> s_loadedModels {};
 
 std::unique_ptr<Model> GltfModel::load(const std::string& path)
 {
-    auto entry = s_loadedModels.find(path);
+    if (!FileIO::isFileReadable(path)) {
+        LogError("Could not find glTF model file at path '%s'\n", path.c_str());
+        return nullptr;
+    }
+
+        auto entry = s_loadedModels.find(path);
     if (entry != s_loadedModels.end()) {
         tinygltf::Model& internal = s_loadedModels[path];
         return std::make_unique<GltfModel>(path, internal);

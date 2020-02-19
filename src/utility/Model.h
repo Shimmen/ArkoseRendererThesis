@@ -3,6 +3,7 @@
 #include "FpsCamera.h"
 #include "mathkit.h"
 #include "rendering/Resources.h"
+#include <functional>
 
 class Material {
 public:

@@ -50,7 +50,7 @@ private:
 
 class TextureUpdateFromData : public TextureUpdate {
 public:
-    std::vector<const char> m_data;
+    std::vector<char> m_data;
 };
 
 class ResourceActions {

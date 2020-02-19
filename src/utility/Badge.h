@@ -5,6 +5,8 @@ template<typename T>
 class Badge {
 private:
     friend T;
-    Badge() {}
-    Badge(Badge&) {}
+    Badge() { }
+
+public:
+    Badge(Badge&) { }
 };

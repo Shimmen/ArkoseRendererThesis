@@ -1,7 +1,5 @@
-cmake_minimum_required(VERSION 3.7 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 project(ArkoseRenderer)
-
-set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
@@ -28,8 +26,18 @@ add_executable(ArkoseRenderer
         src/utility/FileIO.cpp
         src/utility/Random.cpp)
 
-target_compile_options(ArkoseRenderer PRIVATE -Wall)
-target_compile_options(ArkoseRenderer PRIVATE -Wimplicit-fallthrough)
+# (C++20 is required for designated initializers in VC++)
+target_compile_features(ArkoseRenderer PRIVATE cxx_std_20)
+
+if (MSVC)
+    add_compile_options(/MT)
+    target_compile_options(ArkoseRenderer PRIVATE /MT)
+    #set_target_properties(ArkoseRenderer PROPERTIES 
+    #    VS_DEBUGGER_WORKING_DIRECTORY "C:\\Users\\simon.moos\\Developer\\ArkoseRenderer")
+else()
+    target_compile_options(ArkoseRenderer PRIVATE -Wall)
+    target_compile_options(ArkoseRenderer PRIVATE -Wimplicit-fallthrough)
+endif()
 
 target_include_directories(ArkoseRenderer PRIVATE src/)
 target_include_directories(ArkoseRenderer PRIVATE shaders/shared)

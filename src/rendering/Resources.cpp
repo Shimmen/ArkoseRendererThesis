@@ -2,6 +2,7 @@
 
 #include "utility/Logging.h"
 #include "utility/util.h"
+#include <algorithm>
 
 uint64_t Resource::id() const
 {
@@ -244,7 +245,7 @@ BindingSet::BindingSet(Badge<Registry>, std::vector<ShaderBinding> shaderBinding
         return left.bindingIndex < right.bindingIndex;
     });
 
-    for (int i = 0; i < m_shaderBindings.size() - 1; ++i) {
+    for (size_t i = 0; i < m_shaderBindings.size() - 1; ++i) {
         if (m_shaderBindings[i].bindingIndex == m_shaderBindings[i + 1].bindingIndex) {
             LogErrorAndExit("BindingSet error: duplicate bindings\n");
         }

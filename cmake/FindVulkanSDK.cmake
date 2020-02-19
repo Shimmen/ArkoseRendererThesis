@@ -2,11 +2,11 @@
 if (APPLE)
     set(VULKAN_SDK_SEARCH_PATHS /usr/local/lib)
 elseif(WIN32)
-    # TODO: Implement me!!
+    # TODO: Don't assume SDK version like this! Do something proper
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        # todo
+        set(VULKAN_SDK_SEARCH_PATHS "C:/VulkanSDK/1.2.131.2/Lib")
     else()
-        # todo
+        set(VULKAN_SDK_SEARCH_PATHS "C:/VulkanSDK/1.2.131.2/Lib32")
     endif()
 endif()
 

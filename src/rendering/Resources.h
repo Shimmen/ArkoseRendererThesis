@@ -6,6 +6,7 @@
 #include "utility/mathkit.h"
 #include "utility/util.h"
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
