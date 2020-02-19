@@ -7,6 +7,7 @@ add_executable(ArkoseRenderer
         src/apps/TestApp.cpp
         src/main.cpp
         src/backend/vulkan/VulkanBackend.cpp
+        src/backend/vulkan/VulkanCore.cpp
         src/backend/vulkan/VulkanCommandList.cpp
         src/backend/vulkan/VulkanRTX.cpp
         src/rendering/Shader.cpp
