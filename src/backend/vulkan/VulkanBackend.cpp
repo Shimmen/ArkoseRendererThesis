@@ -47,6 +47,10 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     m_device = createDevice(m_physicalDevice, m_surface);
     createSemaphoresAndFences(m_device);
 
+    if (VulkanRTX::isSupportedOnPhysicalDevice(m_physicalDevice)) {
+        m_rtx = VulkanRTX(m_physicalDevice, m_device);
+    }
+
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.physicalDevice = m_physicalDevice;
     allocatorInfo.device = m_device;
@@ -125,6 +129,9 @@ std::vector<const char*> VulkanBackend::requiredInstanceExtensions() const
 
     // For debug messages etc.
     extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+    // For later spec (e.g. ray tracing stuff) queries
+    extensions.emplace_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
     return extensions;
 }

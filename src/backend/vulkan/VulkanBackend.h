@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VulkanQueueInfo.h"
+#include "VulkanRTX.h"
 #include "rendering/App.h"
 #include "rendering/Backend.h"
 #include "utility/PersistentIndexedList.h"
@@ -176,6 +177,11 @@ private:
     std::array<VkSemaphore, maxFramesInFlight> m_imageAvailableSemaphores {};
     std::array<VkSemaphore, maxFramesInFlight> m_renderFinishedSemaphores {};
     std::array<VkFence, maxFramesInFlight> m_inFlightFrameFences {};
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Sub-systems
+
+    std::optional<VulkanRTX> m_rtx {};
 
     ///////////////////////////////////////////////////////////////////////////
     /// Resource & resource management members

@@ -8,6 +8,7 @@ add_executable(ArkoseRenderer
         src/main.cpp
         src/backend/vulkan/VulkanBackend.cpp
         src/backend/vulkan/VulkanCommandList.cpp
+        src/backend/vulkan/VulkanRTX.cpp
         src/rendering/Shader.cpp
         src/rendering/ShaderManager.cpp
         src/rendering/Registry.cpp
@@ -19,6 +20,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/ForwardRenderNode.cpp
         src/rendering/nodes/SlowForwardRenderNode.cpp
         src/rendering/nodes/ShadowMapNode.cpp
+        src/rendering/nodes/RTXReflectionsNode.cpp
         src/utility/GlobalState.cpp
         src/utility/GltfModel.cpp
         src/utility/FpsCamera.cpp
