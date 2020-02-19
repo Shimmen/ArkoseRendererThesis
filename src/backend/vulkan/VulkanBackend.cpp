@@ -4,7 +4,6 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanCommandList.h"
-#include "VulkanQueueInfo.h"
 #include "rendering/Registry.h"
 #include "rendering/ShaderManager.h"
 #include "utility/FileIO.h"
@@ -29,54 +28,46 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
     int width, height;
     glfwGetWindowSize(window, &width, &height);
     GlobalState::getMutable(backendBadge()).updateWindowExtent({ width, height });
-    glfwSetFramebufferSizeCallback(m_window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int width, int height) {
+    glfwSetFramebufferSizeCallback(window, static_cast<GLFWframebuffersizefun>([](GLFWwindow* window, int width, int height) {
                                        GlobalState::getMutable(backendBadge()).updateWindowExtent({ width, height });
                                        s_unhandledWindowResize = true;
                                    }));
 
-    // TODO: Make the creation & deletion of this conditional! We might not always wont this (for performance)
-    VkDebugUtilsMessengerCreateInfoEXT dbgMessengerCreateInfo = debugMessengerCreateInfo();
+    m_core = std::make_unique<VulkanCore>(window, true);
 
-    m_instance = createInstance(&dbgMessengerCreateInfo);
-    m_messenger = createDebugMessenger(m_instance, &dbgMessengerCreateInfo);
+    createSemaphoresAndFences(device());
 
-    m_surface = createSurface(m_instance, m_window);
-    m_physicalDevice = pickBestPhysicalDevice(m_instance, m_surface);
-
-    m_queueInfo = findQueueFamilyIndices(m_physicalDevice, m_surface);
-    m_device = createDevice(m_physicalDevice, m_surface);
-    createSemaphoresAndFences(m_device);
-
-    if (VulkanRTX::isSupportedOnPhysicalDevice(m_physicalDevice)) {
-        m_rtx = VulkanRTX(m_physicalDevice, m_device);
+    // TODO: Cleanup!
+    if (VulkanRTX::isSupportedOnPhysicalDevice(m_core->physicalDevice())) {
+        m_rtx = VulkanRTX(m_core->physicalDevice(), device());
     }
 
     VmaAllocatorCreateInfo allocatorInfo = {};
-    allocatorInfo.physicalDevice = m_physicalDevice;
-    allocatorInfo.device = m_device;
+    allocatorInfo.physicalDevice = m_core->physicalDevice();
+    allocatorInfo.device = device();
     allocatorInfo.flags = 0u;
     if (vmaCreateAllocator(&allocatorInfo, &m_memoryAllocator) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create memory allocator, exiting.\n");
     }
 
-    vkGetDeviceQueue(m_device, m_queueInfo.presentQueueFamilyIndex, 0, &m_presentQueue);
-    vkGetDeviceQueue(m_device, m_queueInfo.graphicsQueueFamilyIndex, 0, &m_graphicsQueue);
+    m_presentQueue = m_core->getPresentQueue();
+    m_graphicsQueue = m_core->getGraphicsQueue();
 
     VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    poolCreateInfo.queueFamilyIndex = m_queueInfo.graphicsQueueFamilyIndex;
+    poolCreateInfo.queueFamilyIndex = m_core->m_graphicsQueueFamilyIndex;
     poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // (so we can easily reuse them each frame)
-    if (vkCreateCommandPool(m_device, &poolCreateInfo, nullptr, &m_renderGraphFrameCommandPool) != VK_SUCCESS) {
+    if (vkCreateCommandPool(m_core->device(), &poolCreateInfo, nullptr, &m_renderGraphFrameCommandPool) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create command pool for the graphics queue, exiting.\n");
     }
 
     VkCommandPoolCreateInfo transientPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     transientPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    transientPoolCreateInfo.queueFamilyIndex = m_queueInfo.graphicsQueueFamilyIndex;
-    if (vkCreateCommandPool(m_device, &transientPoolCreateInfo, nullptr, &m_transientCommandPool) != VK_SUCCESS) {
+    transientPoolCreateInfo.queueFamilyIndex = m_core->m_graphicsQueueFamilyIndex;
+    if (vkCreateCommandPool(m_core->device(), &transientPoolCreateInfo, nullptr, &m_transientCommandPool) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create transient command pool, exiting.\n");
     }
 
-    createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
+    createAndSetupSwapchain(m_core->physicalDevice(), device(), m_core->surface());
     createWindowRenderTargetFrontend();
 
     setupDearImgui();
@@ -89,404 +80,28 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 VulkanBackend::~VulkanBackend()
 {
     // Before destroying stuff, make sure it's done with all scheduled work
-    vkDeviceWaitIdle(m_device);
+    vkDeviceWaitIdle(device());
 
     destroyDearImgui();
 
-    vkFreeCommandBuffers(m_device, m_renderGraphFrameCommandPool, m_frameCommandBuffers.size(), m_frameCommandBuffers.data());
+    vkFreeCommandBuffers(device(), m_renderGraphFrameCommandPool, m_frameCommandBuffers.size(), m_frameCommandBuffers.data());
 
     destroyRenderGraphResources();
 
     destroySwapchain();
 
-    vkDestroyCommandPool(m_device, m_renderGraphFrameCommandPool, nullptr);
-    vkDestroyCommandPool(m_device, m_transientCommandPool, nullptr);
+    vkDestroyCommandPool(device(), m_renderGraphFrameCommandPool, nullptr);
+    vkDestroyCommandPool(device(), m_transientCommandPool, nullptr);
 
     for (size_t it = 0; it < maxFramesInFlight; ++it) {
-        vkDestroySemaphore(m_device, m_imageAvailableSemaphores[it], nullptr);
-        vkDestroySemaphore(m_device, m_renderFinishedSemaphores[it], nullptr);
-        vkDestroyFence(m_device, m_inFlightFrameFences[it], nullptr);
+        vkDestroySemaphore(device(), m_imageAvailableSemaphores[it], nullptr);
+        vkDestroySemaphore(device(), m_renderFinishedSemaphores[it], nullptr);
+        vkDestroyFence(device(), m_inFlightFrameFences[it], nullptr);
     }
 
     vmaDestroyAllocator(m_memoryAllocator);
 
-    vkDestroyDevice(m_device, nullptr);
-    vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
-    destroyDebugMessenger(m_instance, m_messenger);
-    vkDestroyInstance(m_instance, nullptr);
-}
-
-std::vector<const char*> VulkanBackend::requiredInstanceExtensions() const
-{
-    std::vector<const char*> extensions;
-
-    // GLFW requires a few for basic presenting etc.
-    uint32_t requiredCount;
-    const char** requiredExtensions = glfwGetRequiredInstanceExtensions(&requiredCount);
-    while (requiredCount--) {
-        extensions.emplace_back(requiredExtensions[requiredCount]);
-    }
-
-    // For debug messages etc.
-    extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
-    // For later spec (e.g. ray tracing stuff) queries
-    extensions.emplace_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-    return extensions;
-}
-
-std::vector<const char*> VulkanBackend::requiredValidationLayers() const
-{
-    std::vector<const char*> layers;
-
-    if (vulkanDebugMode) {
-        layers.emplace_back("VK_LAYER_KHRONOS_validation");
-    }
-
-    return layers;
-}
-
-bool VulkanBackend::checkValidationLayerSupport(const std::vector<const char*>& layers) const
-{
-    uint32_t availableLayerCount;
-    vkEnumerateInstanceLayerProperties(&availableLayerCount, nullptr);
-    std::vector<VkLayerProperties> availableLayers(availableLayerCount);
-    vkEnumerateInstanceLayerProperties(&availableLayerCount, availableLayers.data());
-
-    bool fullSupport = true;
-    for (const char* layer : layers) {
-        bool found = false;
-        for (auto availableLayer : availableLayers) {
-            if (std::strcmp(layer, availableLayer.layerName) == 0) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            LogError("VulkanBackend::checkValidationLayerSupport(): layer '%s' is not supported.\n", layer);
-            fullSupport = false;
-        }
-    }
-
-    return fullSupport;
-}
-
-VkBool32 VulkanBackend::debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-                                             const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
-{
-    LogError("VulkanBackend::debugMessageCallback(): %s\n", pCallbackData->pMessage);
-    return VK_FALSE;
-}
-
-VkDebugUtilsMessengerCreateInfoEXT VulkanBackend::debugMessengerCreateInfo() const
-{
-    VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo = { VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
-
-    debugMessengerCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT; // NOLINT(hicpp-signed-bitwise)
-    debugMessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT; // NOLINT(hicpp-signed-bitwise)
-    debugMessengerCreateInfo.pfnUserCallback = debugMessageCallback;
-    debugMessengerCreateInfo.pUserData = nullptr;
-
-    return debugMessengerCreateInfo;
-}
-
-VkDebugUtilsMessengerEXT VulkanBackend::createDebugMessenger(VkInstance instance, VkDebugUtilsMessengerCreateInfoEXT* createInfo) const
-{
-    auto createFunc = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-    if (!createFunc) {
-        LogErrorAndExit("VulkanBackend::createDebugMessenger(): could not get function 'vkCreateDebugUtilsMessengerEXT', exiting.\n");
-    }
-
-    VkDebugUtilsMessengerEXT messenger;
-    if (createFunc(instance, createInfo, nullptr, &messenger) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::createDebugMessenger(): could not create the debug messenger, exiting.\n");
-    }
-
-    return messenger;
-}
-
-void VulkanBackend::destroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT messenger) const
-{
-    auto destroyFunc = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (!destroyFunc) {
-        LogErrorAndExit("VulkanBackend::destroyDebugMessenger(): could not get function 'vkDestroyDebugUtilsMessengerEXT', exiting.\n");
-    }
-    destroyFunc(instance, messenger, nullptr);
-}
-
-VulkanQueueInfo VulkanBackend::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
-{
-    uint32_t count;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, nullptr);
-    std::vector<VkQueueFamilyProperties> queueFamilies(count);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &count, queueFamilies.data());
-
-    bool foundGraphicsQueue = false;
-    bool foundComputeQueue = false;
-    bool foundPresentQueue = false;
-
-    VulkanQueueInfo queueInfo {};
-
-    for (uint32_t idx = 0; idx < count; ++idx) {
-        const auto& queueFamily = queueFamilies[idx];
-
-        if (!foundGraphicsQueue && queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            queueInfo.graphicsQueueFamilyIndex = idx;
-            foundGraphicsQueue = true;
-        }
-
-        if (!foundComputeQueue && queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-            queueInfo.computeQueueFamilyIndex = idx;
-            foundComputeQueue = true;
-        }
-
-        if (!foundPresentQueue) {
-            VkBool32 presentSupportForQueue;
-            vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, idx, surface, &presentSupportForQueue);
-            if (presentSupportForQueue) {
-                queueInfo.presentQueueFamilyIndex = idx;
-                foundPresentQueue = true;
-            }
-        }
-    }
-
-    if (!foundGraphicsQueue) {
-        LogErrorAndExit("VulkanBackend::findQueueFamilyIndices(): could not find a graphics queue, exiting.\n");
-    }
-    if (!foundComputeQueue) {
-        LogErrorAndExit("VulkanBackend::findQueueFamilyIndices(): could not find a compute queue, exiting.\n");
-    }
-    if (!foundPresentQueue) {
-        LogErrorAndExit("VulkanBackend::findQueueFamilyIndices(): could not find a present queue, exiting.\n");
-    }
-
-    return queueInfo;
-}
-
-VkPhysicalDevice VulkanBackend::pickBestPhysicalDevice(VkInstance instance, VkSurfaceKHR surface) const
-{
-    uint32_t count;
-    vkEnumeratePhysicalDevices(instance, &count, nullptr);
-    if (count < 1) {
-        LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find any physical devices with Vulkan support, exiting.\n");
-    }
-    std::vector<VkPhysicalDevice> devices(count);
-    vkEnumeratePhysicalDevices(instance, &count, devices.data());
-
-    if (count > 1) {
-        LogWarning("VulkanBackend::pickBestPhysicalDevice(): more than one physical device available, one will be chosen arbitrarily (FIXME!)\n");
-    }
-
-    // FIXME: Don't just pick the first one if there are more than one!
-    VkPhysicalDevice physicalDevice = devices[0];
-
-    // Verify that the physical device supports presenting
-    VkBool32 presentSupport = false;
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-    std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-    for (uint32_t it = 0; it < queueFamilyCount; ++it) {
-        VkBool32 presentSupportForQueue;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, it, surface, &presentSupportForQueue);
-        presentSupport = presentSupport || presentSupportForQueue;
-    }
-    if (!presentSupport) {
-        LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with present support, exiting.\n");
-    }
-
-    uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
-
-    // Verify that the physical device has swapchain support (etc)
-    bool swapchainSupport = false;
-    bool descriptorIndexing = false;
-    for (auto& extension : availableExtensions) {
-        if (std::strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
-            swapchainSupport = true;
-        }
-        if (std::strcmp(extension.extensionName, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) == 0) {
-            descriptorIndexing = true;
-        }
-    }
-    if (!swapchainSupport) {
-        LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with swapchain support, exiting.\n");
-    }
-
-    VkPhysicalDeviceFeatures supportedFeatures;
-    vkGetPhysicalDeviceFeatures(physicalDevice, &supportedFeatures);
-    if (!supportedFeatures.samplerAnisotropy) {
-        LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with sampler anisotropy support, exiting.\n");
-    }
-
-    // For dynamic indexing in shaders, see http://chunkstories.xyz/blog/a-note-on-descriptor-indexing/
-    if (!supportedFeatures.shaderSampledImageArrayDynamicIndexing || !descriptorIndexing) {
-        LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with support for shaderSampledImageArrayDynamicIndexing, exiting.\n");
-    }
-
-    VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(physicalDevice, &props);
-    LogInfo("VulkanBackend::pickBestPhysicalDevice(): using physical device '%s'\n", props.deviceName);
-
-    return physicalDevice;
-}
-
-VkSurfaceFormatKHR VulkanBackend::pickBestSurfaceFormat(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const
-{
-    uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
-    std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, surfaceFormats.data());
-
-    for (const auto& format : surfaceFormats) {
-        // We use the *_UNORM format since "working directly with SRGB colors is a little bit challenging"
-        // (https://vulkan-tutorial.com/Drawing_a_triangle/Presentation/Swap_chain). I don't really know what that's about..
-        if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            LogInfo("VulkanBackend::pickBestSurfaceFormat(): picked optimal RGBA8 sRGB surface format.\n");
-            return format;
-        }
-    }
-
-    // If we didn't find the optimal one, just chose an arbitrary one
-    LogInfo("VulkanBackend::pickBestSurfaceFormat(): couldn't find optimal surface format, so picked arbitrary supported format.\n");
-    VkSurfaceFormatKHR format = surfaceFormats[0];
-
-    if (format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-        LogWarning("VulkanBackend::pickBestSurfaceFormat(): could not find a sRGB surface format, so images won't be pretty!\n");
-    }
-
-    return format;
-}
-
-VkPresentModeKHR VulkanBackend::pickBestPresentMode(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const
-{
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
-    std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.data());
-
-    for (const auto& mode : presentModes) {
-        // Try to chose the mailbox mode, i.e. use-last-fully-generated-image mode
-        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            LogInfo("VulkanBackend::pickBestPresentMode(): picked optimal mailbox present mode.\n");
-            return mode;
-        }
-    }
-
-    // VK_PRESENT_MODE_FIFO_KHR is guaranteed to be available and it basically corresponds to normal v-sync so it's fine
-    LogInfo("VulkanBackend::pickBestPresentMode(): picked standard FIFO present mode.\n");
-    return VK_PRESENT_MODE_FIFO_KHR;
-}
-
-VkExtent2D VulkanBackend::pickBestSwapchainExtent(VkSurfaceCapabilitiesKHR surfaceCapabilities, GLFWwindow* window) const
-{
-    if (surfaceCapabilities.currentExtent.width != UINT32_MAX) {
-        // The surface has specified the extent (probably to whatever the window extent is) and we should choose that
-        LogInfo("VulkanBackend::pickBestSwapchainExtent(): using optimal window extents for swap chain.\n");
-        return surfaceCapabilities.currentExtent;
-    }
-
-    // The drivers are flexible, so let's choose something good that is within the the legal extents
-    VkExtent2D extent = {};
-
-    int framebufferWidth, framebufferHeight;
-    glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
-
-    extent.width = std::clamp(static_cast<uint32_t>(framebufferWidth), surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width);
-    extent.height = std::clamp(static_cast<uint32_t>(framebufferHeight), surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height);
-    LogInfo("VulkanBackend::pickBestSwapchainExtent(): using specified extents (%u x %u) for swap chain.\n", extent.width, extent.height);
-
-    return extent;
-}
-
-VkInstance VulkanBackend::createInstance(VkDebugUtilsMessengerCreateInfoEXT* debugMessengerCreateInfo) const
-{
-    VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
-    appInfo.pApplicationName = "ArkoseRenderer";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0); // NOLINT(hicpp-signed-bitwise)
-    appInfo.pEngineName = "ArkoseRendererEngine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0); // NOLINT(hicpp-signed-bitwise)
-    appInfo.apiVersion = VK_API_VERSION_1_1; // NOLINT(hicpp-signed-bitwise)
-
-    VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-    instanceCreateInfo.pNext = debugMessengerCreateInfo;
-    instanceCreateInfo.pApplicationInfo = &appInfo;
-
-    const auto& extensions = requiredInstanceExtensions();
-    instanceCreateInfo.enabledExtensionCount = extensions.size();
-    instanceCreateInfo.ppEnabledExtensionNames = extensions.data();
-
-    const auto& layers = requiredValidationLayers();
-    if (!checkValidationLayerSupport(layers)) {
-        LogErrorAndExit("VulkanBackend::createInstance(): there are unsupported but required validation layers, exiting.\n");
-    }
-    instanceCreateInfo.enabledLayerCount = layers.size();
-    instanceCreateInfo.ppEnabledLayerNames = layers.data();
-
-    VkInstance instance;
-    if (vkCreateInstance(&instanceCreateInfo, nullptr, &instance) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::createInstance(): could not create instance.\n");
-    }
-
-    return instance;
-}
-
-VkSurfaceKHR VulkanBackend::createSurface(VkInstance instance, GLFWwindow* window) const
-{
-    VkSurfaceKHR surface;
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::createSurface(): can't create window surface, exiting.\n");
-    }
-
-    return surface;
-}
-
-VkDevice VulkanBackend::createDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
-{
-    std::unordered_set<uint32_t> queueFamilyIndices = { m_queueInfo.graphicsQueueFamilyIndex, m_queueInfo.computeQueueFamilyIndex, m_queueInfo.presentQueueFamilyIndex };
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    const float queuePriority = 1.0f;
-    for (uint32_t familyIndex : queueFamilyIndices) {
-        VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.queueFamilyIndex = familyIndex;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
-
-        queueCreateInfos.push_back(queueCreateInfo);
-    }
-
-    VkPhysicalDeviceFeatures requestedDeviceFeatures = {};
-    requestedDeviceFeatures.samplerAnisotropy = VK_TRUE;
-    requestedDeviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
-
-    VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
-    deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
-    deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
-    deviceCreateInfo.pEnabledFeatures = &requestedDeviceFeatures;
-
-    std::vector<const char*> deviceValidationLayers;
-    if (vulkanDebugMode) {
-        // (the existence of this extension should already have been checked!)
-        deviceValidationLayers.emplace_back("VK_LAYER_KHRONOS_validation");
-    }
-    deviceCreateInfo.enabledLayerCount = deviceValidationLayers.size();
-    deviceCreateInfo.ppEnabledLayerNames = deviceValidationLayers.data();
-
-    // (the existence of this extension should already have been checked!)
-    std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-    deviceCreateInfo.enabledExtensionCount = deviceExtensions.size();
-    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
-
-    VkDevice device;
-    if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanBackend::createDevice(): could not create a device, exiting.\n");
-    }
-
-    return device;
+    m_core.release();
 }
 
 void VulkanBackend::createSemaphoresAndFences(VkDevice device)
@@ -525,7 +140,7 @@ void VulkanBackend::createSemaphoresAndFences(VkDevice device)
 void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface)
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &surfaceCapabilities) != VK_SUCCESS) {
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_core->physicalDevice(), m_core->surface(), &surfaceCapabilities) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::createAndSetupSwapchain(): could not get surface capabilities, exiting.\n");
     }
 
@@ -539,21 +154,21 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
         createInfo.minImageCount = std::min(createInfo.minImageCount, surfaceCapabilities.maxImageCount);
     }
 
-    VkSurfaceFormatKHR surfaceFormat = pickBestSurfaceFormat(m_physicalDevice, m_surface);
+    VkSurfaceFormatKHR surfaceFormat = m_core->pickBestSurfaceFormat();
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
 
-    VkPresentModeKHR presentMode = pickBestPresentMode(m_physicalDevice, m_surface);
+    VkPresentModeKHR presentMode = m_core->pickBestPresentMode();
     createInfo.presentMode = presentMode;
 
-    VkExtent2D swapchainExtent = pickBestSwapchainExtent(surfaceCapabilities, m_window);
+    VkExtent2D swapchainExtent = m_core->pickBestSwapchainExtent();
     createInfo.imageExtent = swapchainExtent;
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT; // TODO: What do we want here? Maybe this suffices?
     // TODO: Assure VK_IMAGE_USAGE_STORAGE_BIT is supported using vkGetPhysicalDeviceSurfaceCapabilitiesKHR & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT
 
-    uint32_t queueFamilyIndices[] = { m_queueInfo.graphicsQueueFamilyIndex, m_queueInfo.presentQueueFamilyIndex };
-    if (!m_queueInfo.combinedGraphicsComputeQueue()) {
+    uint32_t queueFamilyIndices[] = { m_core->m_graphicsQueueFamilyIndex, m_core->m_presentQueueFamilyIndex };
+    if (!m_core->hasCombinedGraphicsComputeQueue()) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
         createInfo.queueFamilyIndexCount = 2;
@@ -629,7 +244,7 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
         commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // (can be submitted to a queue for execution, but cannot be called from other command buffers)
         commandBufferAllocateInfo.commandBufferCount = m_frameCommandBuffers.size();
 
-        if (vkAllocateCommandBuffers(m_device, &commandBufferAllocateInfo, m_frameCommandBuffers.data()) != VK_SUCCESS) {
+        if (vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, m_frameCommandBuffers.data()) != VK_SUCCESS) {
             LogErrorAndExit("VulkanBackend::createAndSetupSwapchain(): could not create the main command buffers, exiting.\n");
         }
     }
@@ -639,15 +254,15 @@ void VulkanBackend::destroySwapchain()
 {
     destroyWindowRenderTargets();
 
-    vkDestroyImageView(m_device, m_depthImageView, nullptr);
-    vkDestroyImage(m_device, m_depthImage, nullptr);
-    vkFreeMemory(m_device, m_depthImageMemory, nullptr);
+    vkDestroyImageView(device(), m_depthImageView, nullptr);
+    vkDestroyImage(device(), m_depthImage, nullptr);
+    vkFreeMemory(device(), m_depthImageMemory, nullptr);
 
     for (size_t it = 0; it < m_numSwapchainImages; ++it) {
-        vkDestroyImageView(m_device, m_swapchainImageViews[it], nullptr);
+        vkDestroyImageView(device(), m_swapchainImageViews[it], nullptr);
     }
 
-    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+    vkDestroySwapchainKHR(device(), m_swapchain, nullptr);
 }
 
 Extent2D VulkanBackend::recreateSwapchain()
@@ -665,10 +280,10 @@ Extent2D VulkanBackend::recreateSwapchain()
         }
     }
 
-    vkDeviceWaitIdle(m_device);
+    vkDeviceWaitIdle(device());
 
     destroySwapchain();
-    createAndSetupSwapchain(m_physicalDevice, m_device, m_surface);
+    createAndSetupSwapchain(m_core->physicalDevice(), device(), m_core->surface());
     createWindowRenderTargetFrontend();
 
     s_unhandledWindowResize = false;
@@ -759,7 +374,7 @@ void VulkanBackend::setupDearImgui()
     descPoolCreateInfo.maxSets = 1000 * IM_ARRAYSIZE(poolSizes);
     descPoolCreateInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(poolSizes);
     descPoolCreateInfo.pPoolSizes = poolSizes;
-    if (vkCreateDescriptorPool(m_device, &descPoolCreateInfo, nullptr, &m_guiDescriptorPool) != VK_SUCCESS) {
+    if (vkCreateDescriptorPool(device(), &descPoolCreateInfo, nullptr, &m_guiDescriptorPool) != VK_SUCCESS) {
         LogErrorAndExit("DearImGui error while setting up descriptor pool\n");
     }
 
@@ -804,7 +419,7 @@ void VulkanBackend::setupDearImgui()
     renderPassCreateInfo.dependencyCount = 1;
     renderPassCreateInfo.pDependencies = &subpassDependency;
 
-    if (vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &m_guiRenderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(device(), &renderPassCreateInfo, nullptr, &m_guiRenderPass) != VK_SUCCESS) {
         LogErrorAndExit("DearImGui error while setting up render pass\n");
     }
 
@@ -821,12 +436,12 @@ void VulkanBackend::setupDearImgui()
         }
     };
 
-    initInfo.Instance = m_instance;
-    initInfo.PhysicalDevice = m_physicalDevice;
-    initInfo.Device = m_device;
+    initInfo.Instance = m_core->instance();
+    initInfo.PhysicalDevice = m_core->physicalDevice();
+    initInfo.Device = device();
     initInfo.Allocator = nullptr;
 
-    initInfo.QueueFamily = m_queueInfo.graphicsQueueFamilyIndex;
+    initInfo.QueueFamily = m_core->m_graphicsQueueFamilyIndex;
     initInfo.Queue = m_graphicsQueue;
 
     initInfo.MinImageCount = m_numSwapchainImages; // (todo: should this be something different than the actual count??)
@@ -851,10 +466,10 @@ void VulkanBackend::setupDearImgui()
 
 void VulkanBackend::destroyDearImgui()
 {
-    vkDestroyDescriptorPool(m_device, m_guiDescriptorPool, nullptr);
-    vkDestroyRenderPass(m_device, m_guiRenderPass, nullptr);
+    vkDestroyDescriptorPool(device(), m_guiDescriptorPool, nullptr);
+    vkDestroyRenderPass(device(), m_guiRenderPass, nullptr);
     for (VkFramebuffer framebuffer : m_guiFramebuffers) {
-        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+        vkDestroyFramebuffer(device(), framebuffer, nullptr);
     }
 
     ImGui_ImplVulkan_Shutdown();
@@ -867,7 +482,7 @@ void VulkanBackend::destroyDearImgui()
 void VulkanBackend::updateDearImguiFramebuffers()
 {
     for (VkFramebuffer& framebuffer : m_guiFramebuffers) {
-        vkDestroyFramebuffer(m_device, framebuffer, nullptr);
+        vkDestroyFramebuffer(device(), framebuffer, nullptr);
     }
     m_guiFramebuffers.clear();
 
@@ -881,7 +496,7 @@ void VulkanBackend::updateDearImguiFramebuffers()
         framebufferCreateInfo.layers = 1;
 
         VkFramebuffer framebuffer;
-        if (vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
+        if (vkCreateFramebuffer(device(), &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
             LogErrorAndExit("DearImGui error while setting up framebuffer\n");
         }
         m_guiFramebuffers.push_back(framebuffer);
@@ -908,14 +523,14 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime, bool rend
 {
     uint32_t currentFrameMod = m_currentFrameIndex % maxFramesInFlight;
 
-    if (vkWaitForFences(m_device, 1, &m_inFlightFrameFences[currentFrameMod], VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+    if (vkWaitForFences(device(), 1, &m_inFlightFrameFences[currentFrameMod], VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
         LogError("VulkanBackend::executeFrame(): error while waiting for in-flight frame fence (frame %u).\n", m_currentFrameIndex);
     }
 
     AppState appState { m_swapchainExtent, deltaTime, elapsedTime, m_currentFrameIndex };
 
     uint32_t swapchainImageIndex;
-    VkResult acquireResult = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[currentFrameMod], VK_NULL_HANDLE, &swapchainImageIndex);
+    VkResult acquireResult = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX, m_imageAvailableSemaphores[currentFrameMod], VK_NULL_HANDLE, &swapchainImageIndex);
 
     if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
         // Since we couldn't acquire an image to draw to, recreate the swapchain and report that it didn't work
@@ -1208,7 +823,7 @@ void VulkanBackend::newTexture(const Texture& texture)
     viewCreateInfo.subresourceRange.layerCount = 1;
 
     VkImageView imageView;
-    if (vkCreateImageView(m_device, &viewCreateInfo, nullptr, &imageView) != VK_SUCCESS) {
+    if (vkCreateImageView(device(), &viewCreateInfo, nullptr, &imageView) != VK_SUCCESS) {
         LogError("VulkanBackend::newTexture(): could not create image view.\n");
     }
 
@@ -1263,7 +878,7 @@ void VulkanBackend::newTexture(const Texture& texture)
     }
 
     VkSampler sampler;
-    if (vkCreateSampler(m_device, &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
+    if (vkCreateSampler(device(), &samplerCreateInfo, nullptr, &sampler) != VK_SUCCESS) {
         LogError("VulkanBackend::newTexture(): could not create sampler for the image.\n");
     }
 
@@ -1331,8 +946,8 @@ void VulkanBackend::deleteTexture(const Texture& texture)
     }
 
     TextureInfo& texInfo = textureInfo(texture);
-    vkDestroySampler(m_device, texInfo.sampler, nullptr);
-    vkDestroyImageView(m_device, texInfo.view, nullptr);
+    vkDestroySampler(device(), texInfo.sampler, nullptr);
+    vkDestroyImageView(device(), texInfo.view, nullptr);
     vmaDestroyImage(m_memoryAllocator, texInfo.image, texInfo.allocation);
 
     m_textureInfos.remove(texture.id());
@@ -1665,7 +1280,7 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     renderPassCreateInfo.pDependencies = nullptr;
 
     VkRenderPass renderPass {};
-    if (vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(device(), &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to create render pass\n");
     }
 
@@ -1678,7 +1293,7 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     framebufferCreateInfo.layers = 1;
 
     VkFramebuffer framebuffer;
-    if (vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
+    if (vkCreateFramebuffer(device(), &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to create framebuffer\n");
     }
 
@@ -1700,8 +1315,8 @@ void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
     }
 
     RenderTargetInfo& targetInfo = renderTargetInfo(renderTarget);
-    vkDestroyFramebuffer(m_device, targetInfo.framebuffer, nullptr);
-    vkDestroyRenderPass(m_device, targetInfo.compatibleRenderPass, nullptr);
+    vkDestroyFramebuffer(device(), targetInfo.framebuffer, nullptr);
+    vkDestroyRenderPass(device(), targetInfo.compatibleRenderPass, nullptr);
 
     m_renderTargetInfos.remove(renderTarget.id());
     renderTarget.unregisterBackend(backendBadge());
@@ -1767,7 +1382,7 @@ void VulkanBackend::setupWindowRenderTargets()
     renderPassCreateInfo.pDependencies = &subpassDependency;
 
     VkRenderPass renderPass {};
-    if (vkCreateRenderPass(m_device, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
+    if (vkCreateRenderPass(device(), &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to create window render pass\n");
     }
     m_swapchainRenderPass = renderPass;
@@ -1789,7 +1404,7 @@ void VulkanBackend::setupWindowRenderTargets()
         framebufferCreateInfo.layers = 1;
 
         VkFramebuffer framebuffer;
-        if (vkCreateFramebuffer(m_device, &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
+        if (vkCreateFramebuffer(device(), &framebufferCreateInfo, nullptr, &framebuffer) != VK_SUCCESS) {
             LogErrorAndExit("Error trying to create window framebuffer\n");
         }
 
@@ -1801,11 +1416,11 @@ void VulkanBackend::destroyWindowRenderTargets()
 {
     for (RenderTarget& renderTarget : m_swapchainRenderTargets) {
         RenderTargetInfo& info = renderTargetInfo(renderTarget);
-        vkDestroyFramebuffer(m_device, info.framebuffer, nullptr);
+        vkDestroyFramebuffer(device(), info.framebuffer, nullptr);
     }
 
     RenderTargetInfo& info = renderTargetInfo(m_swapchainRenderTargets[0]);
-    vkDestroyRenderPass(m_device, info.compatibleRenderPass, nullptr);
+    vkDestroyRenderPass(device(), info.compatibleRenderPass, nullptr);
 }
 
 VulkanBackend::RenderTargetInfo& VulkanBackend::renderTargetInfo(const RenderTarget& renderTarget)
@@ -1862,7 +1477,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
         descriptorSetLayoutCreateInfo.bindingCount = layoutBindings.size();
         descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();
 
-        if (vkCreateDescriptorSetLayout(m_device, &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(device(), &descriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
             LogErrorAndExit("Error trying to create descriptor set layout\n");
         }
     }
@@ -1913,7 +1528,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
         descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
         descriptorPoolCreateInfo.maxSets = 1; // TODO: Handle multiple descriptor sets!
 
-        if (vkCreateDescriptorPool(m_device, &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(device(), &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             LogErrorAndExit("Error trying to create descriptor pool\n");
         }
     }
@@ -1925,7 +1540,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
         descriptorSetAllocateInfo.descriptorSetCount = 1;
         descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
 
-        if (vkAllocateDescriptorSets(m_device, &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS) {
+        if (vkAllocateDescriptorSets(device(), &descriptorSetAllocateInfo, &descriptorSet) != VK_SUCCESS) {
             LogErrorAndExit("Error trying to create descriptor set\n");
         }
     }
@@ -2052,7 +1667,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
             descriptorSetWrites.push_back(write);
         }
 
-        vkUpdateDescriptorSets(m_device, descriptorSetWrites.size(), descriptorSetWrites.data(), 0, nullptr);
+        vkUpdateDescriptorSets(device(), descriptorSetWrites.size(), descriptorSetWrites.data(), 0, nullptr);
     }
 
     BindingSetInfo info {};
@@ -2071,8 +1686,8 @@ void VulkanBackend::deleteBindingSet(const BindingSet& bindingSet)
     }
 
     BindingSetInfo& setInfo = bindingSetInfo(bindingSet);
-    vkDestroyDescriptorPool(m_device, setInfo.descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(m_device, setInfo.descriptorSetLayout, nullptr);
+    vkDestroyDescriptorPool(device(), setInfo.descriptorPool, nullptr);
+    vkDestroyDescriptorSetLayout(device(), setInfo.descriptorSetLayout, nullptr);
 
     m_bindingSetInfos.remove(bindingSet.id());
     bindingSet.unregisterBackend(backendBadge());
@@ -2130,7 +1745,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
             moduleCreateInfo.pCode = spirv.data();
 
             VkShaderModule shaderModule {};
-            if (vkCreateShaderModule(m_device, &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            if (vkCreateShaderModule(device(), &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
                 LogErrorAndExit("Error trying to create shader module\n");
             }
 
@@ -2178,7 +1793,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
     VkPipelineLayout pipelineLayout {};
-    if (vkCreatePipelineLayout(m_device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(device(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to create pipeline layout\n");
     }
 
@@ -2313,13 +1928,13 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     pipelineCreateInfo.basePipelineIndex = -1;
 
     VkPipeline graphicsPipeline {};
-    if (vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to create graphics pipeline\n");
     }
 
     // Remove shader modules, they are no longer needed after creating the pipeline
     for (auto& stage : shaderStages) {
-        vkDestroyShaderModule(m_device, stage.module, nullptr);
+        vkDestroyShaderModule(device(), stage.module, nullptr);
     }
 
     RenderStateInfo renderStateInfo {};
@@ -2345,8 +1960,8 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
     }
 
     RenderStateInfo& stateInfo = renderStateInfo(renderState);
-    vkDestroyPipeline(m_device, stateInfo.pipeline, nullptr);
-    vkDestroyPipelineLayout(m_device, stateInfo.pipelineLayout, nullptr);
+    vkDestroyPipeline(device(), stateInfo.pipeline, nullptr);
+    vkDestroyPipelineLayout(device(), stateInfo.pipelineLayout, nullptr);
 
     m_renderStateInfos.remove(renderState.id());
     renderState.unregisterBackend(backendBadge());
@@ -2456,9 +2071,9 @@ bool VulkanBackend::issueSingleTimeCommand(const std::function<void(VkCommandBuf
     commandBufferAllocInfo.commandBufferCount = 1;
 
     VkCommandBuffer oneTimeCommandBuffer;
-    vkAllocateCommandBuffers(m_device, &commandBufferAllocInfo, &oneTimeCommandBuffer);
+    vkAllocateCommandBuffers(device(), &commandBufferAllocInfo, &oneTimeCommandBuffer);
     AT_SCOPE_EXIT([&] {
-        vkFreeCommandBuffers(m_device, m_transientCommandPool, 1, &oneTimeCommandBuffer);
+        vkFreeCommandBuffers(device(), m_transientCommandPool, 1, &oneTimeCommandBuffer);
     });
 
     VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
@@ -2574,26 +2189,26 @@ VkImage VulkanBackend::createImage2D(uint32_t width, uint32_t height, VkFormat f
     imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkImage image;
-    if (vkCreateImage(m_device, &imageCreateInfo, nullptr, &image) != VK_SUCCESS) {
+    if (vkCreateImage(device(), &imageCreateInfo, nullptr, &image) != VK_SUCCESS) {
         LogError("VulkanBackend::createImage2D(): could not create image.\n");
         memory = {};
         return {};
     }
 
     VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(m_device, image, &memoryRequirements);
+    vkGetImageMemoryRequirements(device(), image, &memoryRequirements);
 
     VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     allocateInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, memoryProperties);
     allocateInfo.allocationSize = memoryRequirements.size;
 
-    if (vkAllocateMemory(m_device, &allocateInfo, nullptr, &memory) != VK_SUCCESS) {
+    if (vkAllocateMemory(device(), &allocateInfo, nullptr, &memory) != VK_SUCCESS) {
         LogError("VulkanBackend::createImage2D(): could not allocate memory for image.\n");
         memory = {};
         return {};
     }
 
-    if (vkBindImageMemory(m_device, image, memory, 0) != VK_SUCCESS) {
+    if (vkBindImageMemory(device(), image, memory, 0) != VK_SUCCESS) {
         LogError("VulkanBackend::createImage2D(): could not bind the allocated memory to the image.\n");
         return {};
     }
@@ -2623,7 +2238,7 @@ VkImageView VulkanBackend::createImageView2D(VkImage image, VkFormat format, VkI
     viewCreateInfo.subresourceRange.layerCount = 1;
 
     VkImageView imageView;
-    if (vkCreateImageView(m_device, &viewCreateInfo, nullptr, &imageView) != VK_SUCCESS) {
+    if (vkCreateImageView(device(), &viewCreateInfo, nullptr, &imageView) != VK_SUCCESS) {
         LogError("VulkanBackend::createImageView2D(): could not create the image view.\n");
     }
 
@@ -2764,7 +2379,7 @@ void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSem
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signal;
 
-    if (vkResetFences(m_device, 1, inFlight) != VK_SUCCESS) {
+    if (vkResetFences(device(), 1, inFlight) != VK_SUCCESS) {
         LogError("VulkanBackend::submitQueue(): error resetting in-flight frame fence (index %u).\n", imageIndex);
     }
 
@@ -2776,7 +2391,7 @@ void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSem
 uint32_t VulkanBackend::findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {
     VkPhysicalDeviceMemoryProperties memoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memoryProperties);
+    vkGetPhysicalDeviceMemoryProperties(m_core->physicalDevice(), &memoryProperties);
 
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
         // Is type i at all supported, given the typeBits?

@@ -24,19 +24,16 @@ VulkanCore::VulkanCore(GLFWwindow* window, bool debugModeEnabled)
         m_instance = createInstance(nullptr);
     }
 
-    if (glfwCreateWindowSurface(m_instance, window, nullptr, &m_surface) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanCore::VulkanCore(): can't create window surface, exiting.\n");
-    }
-
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &m_surfaceCapabilities) != VK_SUCCESS) {
-        LogErrorAndExit("VulkanCore::VulkanCore(): could not get surface capabilities, exiting.\n");
-    }
-
     if (!verifyValidationLayerSupport()) {
         LogErrorAndExit("VulkanCore::VulkanCore(): missing support for one or more validation layers, exiting.\n");
     }
 
+    if (glfwCreateWindowSurface(m_instance, window, nullptr, &m_surface) != VK_SUCCESS) {
+        LogErrorAndExit("VulkanCore::VulkanCore(): can't create window surface, exiting.\n");
+    }
+
     m_physicalDevice = pickBestPhysicalDevice();
+
     findQueueFamilyIndices(m_physicalDevice, m_surface);
     m_device = createDevice(m_physicalDevice);
 }
@@ -104,10 +101,16 @@ VkPresentModeKHR VulkanCore::pickBestPresentMode() const
 
 VkExtent2D VulkanCore::pickBestSwapchainExtent() const
 {
-    if (m_surfaceCapabilities.currentExtent.width != UINT32_MAX) {
+    VkSurfaceCapabilitiesKHR surfaceCapabilities {};
+
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &surfaceCapabilities) != VK_SUCCESS) {
+        LogErrorAndExit("VulkanCore::VulkanCore(): could not get surface capabilities, exiting.\n");
+    }
+
+    if (surfaceCapabilities.currentExtent.width != UINT32_MAX) {
         // The surface has specified the extent (probably to whatever the window extent is) and we should choose that
         LogInfo("VulkanCore::pickBestSwapchainExtent(): using optimal window extents for swap chain.\n");
-        return m_surfaceCapabilities.currentExtent;
+        return surfaceCapabilities.currentExtent;
     }
 
     // The drivers are flexible, so let's choose something good that is within the the legal extents
@@ -116,11 +119,27 @@ VkExtent2D VulkanCore::pickBestSwapchainExtent() const
     int framebufferWidth, framebufferHeight;
     glfwGetFramebufferSize(m_window, &framebufferWidth, &framebufferHeight);
 
-    extent.width = std::clamp(static_cast<uint32_t>(framebufferWidth), m_surfaceCapabilities.minImageExtent.width, m_surfaceCapabilities.maxImageExtent.width);
-    extent.height = std::clamp(static_cast<uint32_t>(framebufferHeight), m_surfaceCapabilities.minImageExtent.height, m_surfaceCapabilities.maxImageExtent.height);
+    extent.width = std::clamp(static_cast<uint32_t>(framebufferWidth), surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width);
+    extent.height = std::clamp(static_cast<uint32_t>(framebufferHeight), surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height);
     LogInfo("VulkanCore::pickBestSwapchainExtent(): using specified extents (%u x %u) for swap chain.\n", extent.width, extent.height);
 
     return extent;
+}
+
+VkQueue VulkanCore::getPresentQueue() const
+{
+    // TODO: Probably extract when creating the device?
+    VkQueue presentQueue {};
+    vkGetDeviceQueue(m_device, m_presentQueueFamilyIndex, 0, &presentQueue);
+    return presentQueue;
+}
+
+VkQueue VulkanCore::getGraphicsQueue() const
+{
+    // TODO: Probably extract when creating the device?
+    VkQueue graphicsQueue {};
+    vkGetDeviceQueue(m_device, m_graphicsQueueFamilyIndex, 0, &graphicsQueue);
+    return graphicsQueue;
 }
 
 VkBool32 VulkanCore::debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,

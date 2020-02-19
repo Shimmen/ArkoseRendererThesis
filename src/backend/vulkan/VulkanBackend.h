@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VulkanQueueInfo.h"
+#include "VulkanCore.h"
 #include "VulkanRTX.h"
 #include "rendering/App.h"
 #include "rendering/Backend.h"
@@ -32,6 +32,14 @@ public:
     bool executeFrame(double elapsedTime, double deltaTime, bool renderGui) override;
 
 private:
+    ///////////////////////////////////////////////////////////////////////////
+    /// Utilities
+
+    VkDevice device() const
+    {
+        return m_core->device();
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
@@ -72,6 +80,8 @@ private:
 
     void submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight);
 
+    void createSemaphoresAndFences(VkDevice);
+
     void createAndSetupSwapchain(VkPhysicalDevice, VkDevice, VkSurfaceKHR);
     void destroySwapchain();
     Extent2D recreateSwapchain();
@@ -95,6 +105,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.
 
+    // TODO: Remove me! Only used by createImage2D which is only used to create the swapchain depth image
     [[nodiscard]] uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags) const;
 
     bool issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const;
@@ -110,47 +121,10 @@ private:
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height, bool isDepthImage) const;
 
     ///////////////////////////////////////////////////////////////////////////
-    /// Utilities for setting up the backend
-
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT,
-                                                               const VkDebugUtilsMessengerCallbackDataEXT*, void* userData);
-    [[nodiscard]] VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo() const;
-    [[nodiscard]] VkDebugUtilsMessengerEXT createDebugMessenger(VkInstance, VkDebugUtilsMessengerCreateInfoEXT*) const;
-    void destroyDebugMessenger(VkInstance, VkDebugUtilsMessengerEXT) const;
-
-    [[nodiscard]] std::vector<const char*> requiredInstanceExtensions() const;
-    [[nodiscard]] std::vector<const char*> requiredValidationLayers() const;
-    [[nodiscard]] bool checkValidationLayerSupport(const std::vector<const char*>&) const;
-
-    [[nodiscard]] VulkanQueueInfo findQueueFamilyIndices(VkPhysicalDevice, VkSurfaceKHR);
-    [[nodiscard]] VkPhysicalDevice pickBestPhysicalDevice(VkInstance, VkSurfaceKHR) const;
-    [[nodiscard]] VkSurfaceFormatKHR pickBestSurfaceFormat(VkPhysicalDevice, VkSurfaceKHR) const;
-    [[nodiscard]] VkPresentModeKHR pickBestPresentMode(VkPhysicalDevice, VkSurfaceKHR) const;
-    [[nodiscard]] VkExtent2D pickBestSwapchainExtent(VkSurfaceCapabilitiesKHR, GLFWwindow*) const;
-
-    [[nodiscard]] VkInstance createInstance(VkDebugUtilsMessengerCreateInfoEXT*) const;
-    [[nodiscard]] VkSurfaceKHR createSurface(VkInstance, GLFWwindow*) const;
-    [[nodiscard]] VkDevice createDevice(VkPhysicalDevice, VkSurfaceKHR);
-    void createSemaphoresAndFences(VkDevice);
-
-    ///////////////////////////////////////////////////////////////////////////
-    /// Common backend members
-
-    VkInstance m_instance {};
-    VkDebugUtilsMessengerEXT m_messenger {};
-    VkPhysicalDevice m_physicalDevice {};
-
-    VkDevice m_device {};
-    VulkanQueueInfo m_queueInfo {};
-
-    VmaAllocator m_memoryAllocator {};
-
-    ///////////////////////////////////////////////////////////////////////////
     /// Window and swapchain related members
 
     GLFWwindow* m_window;
 
-    VkSurfaceKHR m_surface {};
     VkSwapchainKHR m_swapchain {};
     VkQueue m_presentQueue {};
 
@@ -181,10 +155,14 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Sub-systems
 
+    // TODO: Add swapchain management sub-system?
+    std::unique_ptr<VulkanCore> m_core {};
     std::optional<VulkanRTX> m_rtx {};
 
     ///////////////////////////////////////////////////////////////////////////
     /// Resource & resource management members
+
+    VmaAllocator m_memoryAllocator {};
 
     App& m_app;
 
@@ -230,9 +208,6 @@ private:
     };
 
     struct RenderStateInfo {
-        //VkDescriptorPool descriptorPool {};
-        //VkDescriptorSet descriptorSet {};
-        //VkDescriptorSetLayout descriptorSetLayout {};
         VkPipelineLayout pipelineLayout {};
         VkPipeline pipeline {};
 

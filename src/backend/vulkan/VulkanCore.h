@@ -15,6 +15,15 @@ public:
     VkPresentModeKHR pickBestPresentMode() const;
     VkExtent2D pickBestSwapchainExtent() const;
 
+    VkQueue getPresentQueue() const;
+    VkQueue getGraphicsQueue() const;
+    bool hasCombinedGraphicsComputeQueue() const;
+
+    const VkInstance& instance() const { return m_instance; }
+    const VkPhysicalDevice& physicalDevice() const { return m_physicalDevice; }
+    const VkSurfaceKHR& surface() const { return m_surface; }
+    const VkDevice& device() const { return m_device; }
+
 private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT,
                                                                const VkDebugUtilsMessengerCallbackDataEXT*, void* userData);
@@ -26,7 +35,6 @@ private:
     VkDevice createDevice(VkPhysicalDevice);
 
     void findQueueFamilyIndices(VkPhysicalDevice, VkSurfaceKHR);
-    bool hasCombinedGraphicsComputeQueue() const;
 
     std::vector<const char*> instanceExtensions() const;
     bool verifyValidationLayerSupport() const;
@@ -44,8 +52,8 @@ private:
     VkDevice m_device {};
 
     VkSurfaceKHR m_surface {};
-    VkSurfaceCapabilitiesKHR m_surfaceCapabilities {};
 
+public:
     uint32_t m_graphicsQueueFamilyIndex;
     uint32_t m_computeQueueFamilyIndex;
     uint32_t m_presentQueueFamilyIndex;
