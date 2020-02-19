@@ -23,10 +23,6 @@ void main()
 {
     ForwardMaterial material = materials[vMaterialIndex];
 
-    // TODO: We need to enable fully dynamic indexing for this to work, and it doesn't seem to work on my MacBook...
-    material.baseColor = 0;
-    material.normalMap = 1;
-
     vec3 baseColor = texture(uSamplers[material.baseColor], vTexCoord).rgb;
 
     vec3 packedNormal = texture(uSamplers[material.normalMap], vTexCoord).rgb;

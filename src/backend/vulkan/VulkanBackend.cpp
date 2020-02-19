@@ -126,9 +126,6 @@ std::vector<const char*> VulkanBackend::requiredInstanceExtensions() const
     // For debug messages etc.
     extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-    // For dynamic indexing in shaders, see http://chunkstories.xyz/blog/a-note-on-descriptor-indexing/
-    //extensions.emplace_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-
     return extensions;
 }
 
@@ -297,12 +294,15 @@ VkPhysicalDevice VulkanBackend::pickBestPhysicalDevice(VkInstance instance, VkSu
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
-    // Verify that the physical device has swapchain support
+    // Verify that the physical device has swapchain support (etc)
     bool swapchainSupport = false;
+    bool descriptorIndexing = false;
     for (auto& extension : availableExtensions) {
         if (std::strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0) {
             swapchainSupport = true;
-            break;
+        }
+        if (std::strcmp(extension.extensionName, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME) == 0) {
+            descriptorIndexing = true;
         }
     }
     if (!swapchainSupport) {
@@ -314,7 +314,9 @@ VkPhysicalDevice VulkanBackend::pickBestPhysicalDevice(VkInstance instance, VkSu
     if (!supportedFeatures.samplerAnisotropy) {
         LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with sampler anisotropy support, exiting.\n");
     }
-    if (!supportedFeatures.shaderSampledImageArrayDynamicIndexing) { // || !supportedFeatures.shaderSampledImageArrayNonUniformIndexing) {
+
+    // For dynamic indexing in shaders, see http://chunkstories.xyz/blog/a-note-on-descriptor-indexing/
+    if (!supportedFeatures.shaderSampledImageArrayDynamicIndexing || !descriptorIndexing) {
         LogErrorAndExit("VulkanBackend::pickBestPhysicalDevice(): could not find a physical device with support for shaderSampledImageArrayDynamicIndexing, exiting.\n");
     }
 

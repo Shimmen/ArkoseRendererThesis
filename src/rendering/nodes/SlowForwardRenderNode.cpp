@@ -1,17 +1,13 @@
 #include "SlowForwardRenderNode.h"
-#include <imgui.h>
 
 #include "CameraUniformNode.h"
+#include "ForwardRenderNode.h"
 #include "LightData.h"
 #include "ShadowMapNode.h"
-
-std::string SlowForwardRenderNode::name()
-{
-    return "forward";
-}
+#include <imgui.h>
 
 SlowForwardRenderNode::SlowForwardRenderNode(const Scene& scene)
-    : RenderGraphNode(SlowForwardRenderNode::name())
+    : RenderGraphNode(ForwardRenderNode::name())
     , m_scene(scene)
 {
 }
@@ -74,7 +70,7 @@ void SlowForwardRenderNode::constructNode(Registry& nodeReg)
     }
 }
 
-RenderGraphBasicNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry& reg) const
+RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry& reg) const
 {
     const RenderTarget& windowTarget = reg.windowRenderTarget();
 

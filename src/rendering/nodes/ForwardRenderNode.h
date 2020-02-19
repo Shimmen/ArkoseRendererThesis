@@ -5,10 +5,14 @@
 #include "utility/FpsCamera.h"
 #include "utility/Model.h"
 
-class ForwardRenderNode {
+class ForwardRenderNode final : public RenderGraphNode {
 public:
+    explicit ForwardRenderNode(const Scene&);
+
     static std::string name();
-    static RenderGraphBasicNode::ConstructorFunction construct(const Scene&);
+
+    void constructNode(Registry&) override;
+    ExecuteCallback constructFrame(Registry&) const override;
 
 private:
     struct Vertex {
@@ -26,13 +30,8 @@ private:
         int materialIndex {};
     };
 
-    struct State {
-        std::vector<Drawable> drawables {};
-        std::vector<const Texture*> textures {};
-        std::vector<ForwardMaterial> materials {};
-    };
-
-    static void setupState(const Scene&, Registry&, State&);
-
-    static RenderGraphBasicNode::ConstructorFunction constructFastImplementation(const Scene&);
+    std::vector<Drawable> m_drawables {};
+    std::vector<const Texture*> m_textures {};
+    std::vector<ForwardMaterial> m_materials {};
+    const Scene& m_scene;
 };
