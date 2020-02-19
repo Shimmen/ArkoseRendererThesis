@@ -221,13 +221,18 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
 
     m_swapchainExtent = { swapchainExtent.width, swapchainExtent.height };
     m_swapchainImageFormat = surfaceFormat.format;
-    m_depthImageFormat = VK_FORMAT_D32_SFLOAT;
+
+    // TODO: This is clearly stupid.. again....!!
+    Registry badgeGiver {};
+    m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F, Texture::Usage::Attachment,
+                                      Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
+    newTexture(m_swapchainDepthTexture);
 
     // FIXME: For now also create a depth image, but later we probably don't want one on the final presentation images
     //  so it doesn't really make sense to have it here anyway. I guess that's an excuse for the code structure.. :)
     // FIXME: Should we add an explicit image transition for the depth image..?
-    m_depthImage = createImage2D(swapchainExtent.width, swapchainExtent.height, m_depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_depthImageMemory);
-    m_depthImageView = createImageView2D(m_depthImage, m_depthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+    //m_depthImage = createImage2D(swapchainExtent.width, swapchainExtent.height, m_depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_depthImageMemory);
+    //m_depthImageView = createImageView2D(m_depthImage, m_depthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     setupWindowRenderTargets();
 
@@ -254,9 +259,10 @@ void VulkanBackend::destroySwapchain()
 {
     destroyWindowRenderTargets();
 
-    vkDestroyImageView(device(), m_depthImageView, nullptr);
-    vkDestroyImage(device(), m_depthImage, nullptr);
-    vkFreeMemory(device(), m_depthImageMemory, nullptr);
+    deleteTexture(m_swapchainDepthTexture);
+    //vkDestroyImageView(device(), m_depthImageView, nullptr);
+    //vkDestroyImage(device(), m_depthImage, nullptr);
+    //vkFreeMemory(device(), m_depthImageMemory, nullptr);
 
     for (size_t it = 0; it < m_numSwapchainImages; ++it) {
         vkDestroyImageView(device(), m_swapchainImageViews[it], nullptr);
@@ -298,22 +304,8 @@ void VulkanBackend::createWindowRenderTargetFrontend()
     // TODO: This is clearly stupid..
     Registry badgeGiver {};
 
-    TextureInfo depthInfo {};
-    depthInfo.format = m_depthImageFormat;
-    depthInfo.image = m_depthImage;
-    depthInfo.view = m_depthImageView;
-    depthInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    if (m_swapchainDepthTexture.hasBackend()) {
-        m_textureInfos.remove(m_swapchainDepthTexture.id());
-    }
-    m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F,
-                                      Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
-    size_t depthIndex = m_textureInfos.add(depthInfo);
-    m_swapchainDepthTexture.registerBackend(backendBadge(), depthIndex);
-
-    m_swapchainColorTextures.resize(m_numSwapchainImages);
-    m_swapchainRenderTargets.resize(m_numSwapchainImages);
+    m_swapchainMockColorTextures.resize(m_numSwapchainImages);
+    m_swapchainMockRenderTargets.resize(m_numSwapchainImages);
 
     for (size_t i = 0; i < m_numSwapchainImages; ++i) {
 
@@ -323,24 +315,27 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         colorInfo.view = m_swapchainImageViews[i];
         colorInfo.currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        if (m_swapchainColorTextures[i].hasBackend()) {
-            m_textureInfos.remove(m_swapchainColorTextures[i].id());
+        if (m_swapchainMockColorTextures[i].hasBackend()) {
+            m_textureInfos.remove(m_swapchainMockColorTextures[i].id());
         }
-        m_swapchainColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown,
-                                              Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
+        m_swapchainMockColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown,
+                                                  Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
         size_t colorIndex = m_textureInfos.add(colorInfo);
-        m_swapchainColorTextures[i].registerBackend(backendBadge(), colorIndex);
+        m_swapchainMockColorTextures[i].registerBackend(backendBadge(), colorIndex);
 
         RenderTargetInfo targetInfo {};
         targetInfo.compatibleRenderPass = m_swapchainRenderPass;
         targetInfo.framebuffer = m_swapchainFramebuffers[i];
 
-        if (m_swapchainRenderTargets[i].hasBackend()) {
-            m_renderTargetInfos.remove(m_swapchainRenderTargets[i].id());
+        if (m_swapchainMockRenderTargets[i].hasBackend()) {
+            m_renderTargetInfos.remove(m_swapchainMockRenderTargets[i].id());
         }
-        m_swapchainRenderTargets[i] = RenderTarget(badgeGiver.exchangeBadges(backendBadge()), { { RenderTarget::AttachmentType::Color0, &m_swapchainColorTextures[i] }, { RenderTarget::AttachmentType::Depth, &m_swapchainDepthTexture } });
+        m_swapchainMockRenderTargets[i] = RenderTarget(
+            badgeGiver.exchangeBadges(backendBadge()),
+            { { RenderTarget::AttachmentType::Color0, &m_swapchainMockColorTextures[i] },
+              { RenderTarget::AttachmentType::Depth, &m_swapchainDepthTexture } });
         size_t targetIndex = m_renderTargetInfos.add(targetInfo);
-        m_swapchainRenderTargets[i].registerBackend(backendBadge(), targetIndex);
+        m_swapchainMockRenderTargets[i].registerBackend(backendBadge(), targetIndex);
     }
 }
 
@@ -549,7 +544,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime, bool rend
     }
 
     // We shouldn't use the data from the swapchain image, so we set current layout accordingly (not sure about depth, but sure..)
-    const Texture& currentColorTexture = m_swapchainColorTextures[swapchainImageIndex];
+    const Texture& currentColorTexture = m_swapchainMockColorTextures[swapchainImageIndex];
     textureInfo(currentColorTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     textureInfo(m_swapchainDepthTexture).currentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -1324,6 +1319,10 @@ void VulkanBackend::deleteRenderTarget(const RenderTarget& renderTarget)
 
 void VulkanBackend::setupWindowRenderTargets()
 {
+    // TODO: Could this be rewritten to only use our existing newRenderTarget method?
+
+    auto& depthTexInfo = textureInfo(m_swapchainDepthTexture);
+
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = m_swapchainImageFormat;
     colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1335,7 +1334,7 @@ void VulkanBackend::setupWindowRenderTargets()
     colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     VkAttachmentDescription depthAttachment = {};
-    depthAttachment.format = m_depthImageFormat;
+    depthAttachment.format = depthTexInfo.format;
     depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -1392,7 +1391,7 @@ void VulkanBackend::setupWindowRenderTargets()
 
         std::array<VkImageView, 2> attachmentImageViews = {
             m_swapchainImageViews[it],
-            m_depthImageView
+            depthTexInfo.view
         };
 
         VkFramebufferCreateInfo framebufferCreateInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
@@ -1414,12 +1413,14 @@ void VulkanBackend::setupWindowRenderTargets()
 
 void VulkanBackend::destroyWindowRenderTargets()
 {
-    for (RenderTarget& renderTarget : m_swapchainRenderTargets) {
+    // TODO: Could this be rewritten to only use our existing deleteRenderTarget method?
+
+    for (RenderTarget& renderTarget : m_swapchainMockRenderTargets) {
         RenderTargetInfo& info = renderTargetInfo(renderTarget);
         vkDestroyFramebuffer(device(), info.framebuffer, nullptr);
     }
 
-    RenderTargetInfo& info = renderTargetInfo(m_swapchainRenderTargets[0]);
+    RenderTargetInfo& info = renderTargetInfo(m_swapchainMockRenderTargets[0]);
     vkDestroyRenderPass(device(), info.compatibleRenderPass, nullptr);
 }
 
@@ -1981,7 +1982,7 @@ void VulkanBackend::reconstructRenderGraphResources(RenderGraph& renderGraph)
     auto nodeRegistry = std::make_unique<Registry>();
     std::vector<std::unique_ptr<Registry>> frameRegistries {};
     for (uint32_t i = 0; i < numFrameManagers; ++i) {
-        const RenderTarget& windowRenderTargetForFrame = m_swapchainRenderTargets[i];
+        const RenderTarget& windowRenderTargetForFrame = m_swapchainMockRenderTargets[i];
         frameRegistries.push_back(std::make_unique<Registry>(&windowRenderTargetForFrame));
     }
 
@@ -2174,77 +2175,6 @@ bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void*
     return true;
 }
 
-VkImage VulkanBackend::createImage2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkDeviceMemory& memory, VkImageTiling tiling)
-{
-    VkImageCreateInfo imageCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageCreateInfo.extent = { .width = width, .height = height, .depth = 1 };
-    imageCreateInfo.mipLevels = 1; // FIXME?
-    imageCreateInfo.arrayLayers = 1;
-    imageCreateInfo.usage = usage;
-    imageCreateInfo.format = format;
-    imageCreateInfo.tiling = tiling;
-    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VkImage image;
-    if (vkCreateImage(device(), &imageCreateInfo, nullptr, &image) != VK_SUCCESS) {
-        LogError("VulkanBackend::createImage2D(): could not create image.\n");
-        memory = {};
-        return {};
-    }
-
-    VkMemoryRequirements memoryRequirements;
-    vkGetImageMemoryRequirements(device(), image, &memoryRequirements);
-
-    VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-    allocateInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements.memoryTypeBits, memoryProperties);
-    allocateInfo.allocationSize = memoryRequirements.size;
-
-    if (vkAllocateMemory(device(), &allocateInfo, nullptr, &memory) != VK_SUCCESS) {
-        LogError("VulkanBackend::createImage2D(): could not allocate memory for image.\n");
-        memory = {};
-        return {};
-    }
-
-    if (vkBindImageMemory(device(), image, memory, 0) != VK_SUCCESS) {
-        LogError("VulkanBackend::createImage2D(): could not bind the allocated memory to the image.\n");
-        return {};
-    }
-
-    return image;
-}
-
-VkImageView VulkanBackend::createImageView2D(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) const
-{
-    VkImageViewCreateInfo viewCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-
-    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewCreateInfo.subresourceRange.aspectMask = aspectFlags;
-    viewCreateInfo.image = image;
-    viewCreateInfo.format = format;
-
-    viewCreateInfo.components = {
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY
-    };
-
-    viewCreateInfo.subresourceRange.baseMipLevel = 0;
-    viewCreateInfo.subresourceRange.levelCount = 1;
-    viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-    viewCreateInfo.subresourceRange.layerCount = 1;
-
-    VkImageView imageView;
-    if (vkCreateImageView(device(), &viewCreateInfo, nullptr, &imageView) != VK_SUCCESS) {
-        LogError("VulkanBackend::createImageView2D(): could not create the image view.\n");
-    }
-
-    return imageView;
-}
-
 bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* currentCommandBuffer) const
 {
     VkImageMemoryBarrier imageBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
@@ -2386,23 +2316,4 @@ void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSem
     if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, *inFlight) != VK_SUCCESS) {
         LogError("VulkanBackend::submitQueue(): could not submit the graphics queue (index %u).\n", imageIndex);
     }
-}
-
-uint32_t VulkanBackend::findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const
-{
-    VkPhysicalDeviceMemoryProperties memoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(m_core->physicalDevice(), &memoryProperties);
-
-    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
-        // Is type i at all supported, given the typeBits?
-        if (!(typeBits & (1u << i))) {
-            continue;
-        }
-
-        if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
-
-    LogErrorAndExit("VulkanBackend::findAppropriateMemory(): could not find any appropriate memory, exiting.\n");
 }

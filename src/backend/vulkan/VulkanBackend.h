@@ -105,17 +105,11 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     /// Internal and low level Vulkan resource API. Maybe to be removed at some later time.
 
-    // TODO: Remove me! Only used by createImage2D which is only used to create the swapchain depth image
-    [[nodiscard]] uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags) const;
-
     bool issueSingleTimeCommand(const std::function<void(VkCommandBuffer)>& callback) const;
 
     bool copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSize size, VkCommandBuffer* = nullptr) const;
     bool setBufferMemoryUsingMapping(VmaAllocation, const void* data, VkDeviceSize size);
     bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size, VkCommandBuffer* = nullptr);
-
-    VkImage createImage2D(uint32_t width, uint32_t height, VkFormat, VkImageUsageFlags, VkMemoryPropertyFlags, VkDeviceMemory&, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL);
-    VkImageView createImageView2D(VkImage, VkFormat, VkImageAspectFlags) const;
 
     bool transitionImageLayout(VkImage, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height, bool isDepthImage) const;
@@ -135,10 +129,7 @@ private:
     std::vector<VkImage> m_swapchainImages {};
     std::vector<VkImageView> m_swapchainImageViews {};
 
-    VkFormat m_depthImageFormat {};
-    VkImage m_depthImage {};
-    VkImageView m_depthImageView {};
-    VkDeviceMemory m_depthImageMemory {};
+    Texture m_swapchainDepthTexture {};
 
     std::vector<VkFramebuffer> m_swapchainFramebuffers {};
     VkRenderPass m_swapchainRenderPass {};
@@ -227,7 +218,6 @@ private:
     PersistentIndexedList<BindingSetInfo> m_bindingSetInfos {};
     PersistentIndexedList<RenderStateInfo> m_renderStateInfos {};
 
-    Texture m_swapchainDepthTexture {};
-    std::vector<Texture> m_swapchainColorTextures {};
-    std::vector<RenderTarget> m_swapchainRenderTargets {};
+    std::vector<Texture> m_swapchainMockColorTextures {};
+    std::vector<RenderTarget> m_swapchainMockRenderTargets {};
 };
