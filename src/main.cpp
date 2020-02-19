@@ -4,6 +4,7 @@
 #include "rendering/ShaderManager.h"
 #include "utility/Input.h"
 #include "utility/Logging.h"
+#include <direct.h>
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -68,8 +69,24 @@ std::unique_ptr<Backend> createBackend(BackendType backendType, GLFWwindow* wind
     return backend;
 }
 
-int main()
+void setApplicationWorkingDirectory(char* executableName)
 {
+    const std::string workingDirName = "ArkoseRenderer";
+
+    char fullPathBuf[_MAX_PATH] = {};
+    ASSERT(_fullpath(fullPathBuf, executableName, sizeof(fullPathBuf)));
+    std::string fullPath { fullPathBuf };
+
+    size_t startOfWorkingDirName = fullPath.find(workingDirName);
+    std::string newWorkingDir = fullPath.substr(0, startOfWorkingDirName + workingDirName.length() + 1);
+    ASSERT(_chdir(newWorkingDir.c_str()) == 0);
+}
+
+int main(int argc, char** argv)
+{
+    char* executableName = argv[0];
+    setApplicationWorkingDirectory(executableName);
+
     if (!glfwInit()) {
         LogErrorAndExit("ArkoseRenderer::main(): could not initialize GLFW, exiting.\n");
     }
