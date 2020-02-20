@@ -338,6 +338,15 @@ enum class IndexType : uint32_t {
     UInt32,
 };
 
+// TODO: When we want more than 1 geometries in the BLAS, use this!
+struct RTGeometry {
+    const Buffer* vertexBuffer;
+    VertexFormat vertexFormat;
+
+    const Buffer* indexBuffer;
+    IndexType indexType;
+};
+
 class BottomLevelAS : public Resource {
 public:
 
@@ -358,4 +367,22 @@ private:
 
     VertexFormat m_vertexFormat {};
     IndexType m_indexType {};
+};
+
+struct GeometryInstance {
+    uint32_t geometryIndex;
+    mat4 transform;
+};
+
+class TopLevelAS : public Resource {
+public:
+
+    TopLevelAS() = default;
+    TopLevelAS(const TopLevelAS&) = default;
+    TopLevelAS(Badge<Registry>, std::vector<GeometryInstance>);
+
+    [[nodiscard]] uint32_t instanceCount() const;
+
+private:
+    std::vector<GeometryInstance> m_instances {};
 };

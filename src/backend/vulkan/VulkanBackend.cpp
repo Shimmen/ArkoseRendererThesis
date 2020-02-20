@@ -1963,6 +1963,8 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
         LogErrorAndExit("Trying to create a bottom level acceleration structure, but there is no ray tracing support!\n");
     }
 
+    // TODO: Support multiple geometries!!!
+
     VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
     aabbs.numAABBs = 0;
 
@@ -2015,7 +2017,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
     accelerationStructureCreateInfo.info = accelerationStructureInfo;
     VkAccelerationStructureNV accelerationStructure;
     if (m_rtx->vkCreateAccelerationStructureNV(device(), &accelerationStructureCreateInfo, nullptr, &accelerationStructure) != VK_SUCCESS) {
-        LogErrorAndExit("Error trying to acceleration structure\n");
+        LogErrorAndExit("Error trying to create bottom level acceleration structure\n");
     }
 
     VkAccelerationStructureMemoryRequirementsInfoNV memoryRequirementsInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
@@ -2056,7 +2058,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
 void VulkanBackend::deleteBottomLevelAccelerationStructure(const BottomLevelAS& blas)
 {
     if (blas.id() == Resource::NullId) {
-        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render acceleration structure\n");
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created bottom level acceleration structure\n");
     }
 
     AccelerationStructureInfo& blasInfo = accelerationStructureInfo(blas);
@@ -2067,9 +2069,82 @@ void VulkanBackend::deleteBottomLevelAccelerationStructure(const BottomLevelAS& 
     blas.unregisterBackend(backendBadge());
 }
 
+void VulkanBackend::newTopLevelAccelerationStructure(const TopLevelAS& tlas)
+{
+    if (!m_rtx.has_value()) {
+        LogErrorAndExit("Trying to create a bottom level acceleration structure, but there is no ray tracing support!\n");
+    }
+
+    VkAccelerationStructureInfoNV accelerationStructureInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+    accelerationStructureInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+    accelerationStructureInfo.instanceCount = tlas.instanceCount();
+    accelerationStructureInfo.geometryCount = 0;
+
+    VkAccelerationStructureCreateInfoNV accelerationStructureCreateInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV };
+    accelerationStructureCreateInfo.info = accelerationStructureInfo;
+    VkAccelerationStructureNV accelerationStructure;
+    if (m_rtx->vkCreateAccelerationStructureNV(device(), &accelerationStructureCreateInfo, nullptr, &accelerationStructure) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create top level acceleration structure\n");
+    }
+
+    VkAccelerationStructureMemoryRequirementsInfoNV memoryRequirementsInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
+    memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
+    memoryRequirementsInfo.accelerationStructure = accelerationStructure;
+    VkMemoryRequirements2 memoryRequirements2 {};
+    m_rtx->vkGetAccelerationStructureMemoryRequirementsNV(device(), &memoryRequirementsInfo, &memoryRequirements2);
+
+    VkMemoryAllocateInfo memoryAllocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    memoryAllocateInfo.allocationSize = memoryRequirements2.memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements2.memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VkDeviceMemory memory;
+    if (vkAllocateMemory(device(), &memoryAllocateInfo, nullptr, &memory) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create allocate memory for acceleration structure\n");
+    }
+
+    VkBindAccelerationStructureMemoryInfoNV accelerationStructureMemoryInfo { VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NV };
+    accelerationStructureMemoryInfo.accelerationStructure = accelerationStructure;
+    accelerationStructureMemoryInfo.memory = memory;
+    if (m_rtx->vkBindAccelerationStructureMemoryNV(device(), 1, &accelerationStructureMemoryInfo) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to bind memory to acceleration structure\n");
+    }
+
+    uint64_t handle { 0 };
+    if (m_rtx->vkGetAccelerationStructureHandleNV(device(), accelerationStructure, sizeof(uint64_t), &handle) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to get acceleration structure handle\n");
+    }
+
+    AccelerationStructureInfo info {};
+    info.accelerationStructure = accelerationStructure;
+    info.memory = memory;
+    info.handle = handle;
+
+    size_t index = m_accStructInfos.add(info);
+    tlas.registerBackend(backendBadge(), index);
+}
+
+void VulkanBackend::deleteTopLevelAccelerationStructure(const TopLevelAS& tlas)
+{
+    if (tlas.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created top level acceleration structure\n");
+    }
+
+    AccelerationStructureInfo& tlasInfo = accelerationStructureInfo(tlas);
+    m_rtx->vkDestroyAccelerationStructureNV(device(), tlasInfo.accelerationStructure, nullptr);
+    vkFreeMemory(device(), tlasInfo.memory, nullptr);
+
+    m_accStructInfos.remove(tlas.id());
+    tlas.unregisterBackend(backendBadge());
+}
+
 VulkanBackend::AccelerationStructureInfo& VulkanBackend::accelerationStructureInfo(const BottomLevelAS& blas)
 {
     AccelerationStructureInfo& accStructInfo = m_accStructInfos[blas.id()];
+    return accStructInfo;
+}
+
+VulkanBackend::AccelerationStructureInfo& VulkanBackend::accelerationStructureInfo(const TopLevelAS& tlas)
+{
+    AccelerationStructureInfo& accStructInfo = m_accStructInfos[tlas.id()];
     return accStructInfo;
 }
 

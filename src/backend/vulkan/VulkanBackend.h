@@ -79,6 +79,9 @@ private:
     void newBottomLevelAccelerationStructure(const BottomLevelAS&);
     void deleteBottomLevelAccelerationStructure(const BottomLevelAS&);
 
+    void newTopLevelAccelerationStructure(const TopLevelAS&);
+    void deleteTopLevelAccelerationStructure(const TopLevelAS&);
+
     ///////////////////////////////////////////////////////////////////////////
     /// Drawing
 
@@ -229,6 +232,7 @@ private:
     BindingSetInfo& bindingSetInfo(const BindingSet&);
     RenderStateInfo& renderStateInfo(const RenderState&);
     AccelerationStructureInfo& accelerationStructureInfo(const BottomLevelAS&);
+    AccelerationStructureInfo& accelerationStructureInfo(const TopLevelAS&);
 
     PersistentIndexedList<BufferInfo> m_bufferInfos {};
     PersistentIndexedList<TextureInfo> m_textureInfos {};

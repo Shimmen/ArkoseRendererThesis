@@ -350,3 +350,13 @@ IndexType BottomLevelAS::indexType() const
 {
     return m_indexType;
 }
+
+TopLevelAS::TopLevelAS(Badge<Registry>, std::vector<GeometryInstance> instances)
+    : m_instances(instances)
+{
+}
+
+uint32_t TopLevelAS::instanceCount() const
+{
+    return m_instances.size();
+}
