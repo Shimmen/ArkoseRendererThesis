@@ -31,7 +31,8 @@ public:
     [[nodiscard]] RenderState& createRenderState(const RenderStateBuilder&);
     [[nodiscard]] RenderState& createRenderState(const RenderTarget&, const VertexLayout&, const Shader&, std::vector<const BindingSet*>, const Viewport&, const BlendState&, const RasterState&);
 
-    [[nodiscard]] BottomLevelAS& createBottomLevelAccelerationStructure(const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat, IndexType);
+    [[nodiscard]] BottomLevelAS& createBottomLevelAccelerationStructure(std::vector<RTGeometry>);
+    [[nodiscard]] TopLevelAS& createTopLevelAccelerationStructure(std::vector<RTGeometryInstance>);
 
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture&);
@@ -47,6 +48,7 @@ public:
     [[nodiscard]] const std::vector<BindingSet>& bindingSets() const;
     [[nodiscard]] const std::vector<RenderState>& renderStates() const;
     [[nodiscard]] const std::vector<BottomLevelAS>& bottomLevelAS() const;
+    [[nodiscard]] const std::vector<TopLevelAS>& topLevelAS() const;
     [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
     [[nodiscard]] const std::vector<TextureUpdateFromFile>& textureUpdates() const;
 
@@ -86,6 +88,9 @@ private:
 
     static constexpr int maxNumBottomLevelAS{ 50 };
     CapList<BottomLevelAS> m_bottomLevelAS { maxNumBottomLevelAS };
+
+    static constexpr int maxNumTopLevelAS{ 10 };
+    CapList<TopLevelAS> m_topLevelAS { maxNumTopLevelAS };
 };
 
 template<typename T>

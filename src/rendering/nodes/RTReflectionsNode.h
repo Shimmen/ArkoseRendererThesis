@@ -15,4 +15,5 @@ public:
 
 private:
     const Scene& m_scene;
+    TopLevelAS* m_tlas;
 };

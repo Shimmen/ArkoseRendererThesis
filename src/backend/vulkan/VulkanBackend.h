@@ -6,8 +6,9 @@
 #include "rendering/Backend.h"
 #include "utility/PersistentIndexedList.h"
 #include <array>
-#include <vk_mem_alloc.h>
+#include <optional>
 
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 struct GLFWwindow;
@@ -125,6 +126,9 @@ private:
 
     bool transitionImageLayout(VkImage, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height, bool isDepthImage) const;
+
+    VkBuffer createScratchBufferForAccelerationStructure(VkAccelerationStructureNV, VmaAllocation&) const;
+    VkBuffer createRTXInstanceBuffer(std::vector<RTGeometryInstance>, VmaAllocation&);
 
     uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 

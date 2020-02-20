@@ -329,60 +329,51 @@ private:
     std::vector<const BindingSet*> m_bindingSets {};
 };
 
+// TODO: Move to the model class? And make is possible to query a model/mesh for this?
 enum class VertexFormat {
     XYZ32F
 };
-
 enum class IndexType : uint32_t {
     UInt16,
     UInt32,
 };
 
-// TODO: When we want more than 1 geometries in the BLAS, use this!
 struct RTGeometry {
-    const Buffer* vertexBuffer;
+    const Buffer& vertexBuffer;
     VertexFormat vertexFormat;
 
-    const Buffer* indexBuffer;
+    const Buffer& indexBuffer;
     IndexType indexType;
+
+    [[nodiscard]] uint32_t vertexStride() const;
 };
 
 class BottomLevelAS : public Resource {
 public:
-
     BottomLevelAS() = default;
     BottomLevelAS(const BottomLevelAS&) = default;
-    BottomLevelAS(Badge<Registry>, const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat, IndexType);
+    BottomLevelAS(Badge<Registry>, std::vector<RTGeometry>);
 
-    [[nodiscard]] const Buffer& vertexBuffer() const;
-    [[nodiscard]] VertexFormat vertexFormat() const;
-    [[nodiscard]] uint32_t vertexStride() const;
-
-    [[nodiscard]] const Buffer& indexBuffer() const;
-    [[nodiscard]] IndexType indexType() const;
+    [[nodiscard]] const std::vector<RTGeometry>& geometries() const;
 
 private:
-    const Buffer& m_vertexBuffer {};
-    const Buffer& m_indexBuffer {};
-
-    VertexFormat m_vertexFormat {};
-    IndexType m_indexType {};
+    std::vector<RTGeometry> m_geometries {};
 };
 
-struct GeometryInstance {
-    uint32_t geometryIndex;
+struct RTGeometryInstance {
+    const BottomLevelAS& blas;
     mat4 transform;
 };
 
 class TopLevelAS : public Resource {
 public:
-
     TopLevelAS() = default;
     TopLevelAS(const TopLevelAS&) = default;
-    TopLevelAS(Badge<Registry>, std::vector<GeometryInstance>);
+    TopLevelAS(Badge<Registry>, std::vector<RTGeometryInstance>);
 
+    [[nodiscard]] const std::vector<RTGeometryInstance>& instances() const;
     [[nodiscard]] uint32_t instanceCount() const;
 
 private:
-    std::vector<GeometryInstance> m_instances {};
+    std::vector<RTGeometryInstance> m_instances {};
 };

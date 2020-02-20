@@ -116,11 +116,18 @@ RenderState& Registry::createRenderState(
     return m_renderStates.back();
 }
 
-BottomLevelAS& Registry::createBottomLevelAccelerationStructure(const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat vertexFormat, IndexType indexType)
+BottomLevelAS& Registry::createBottomLevelAccelerationStructure(std::vector<RTGeometry> geometries)
 {
-    BottomLevelAS blas = { {}, vertexBuffer, indexBuffer, vertexFormat, indexType };
+    BottomLevelAS blas = { {}, geometries };
     m_bottomLevelAS.push_back(blas);
     return m_bottomLevelAS.back();
+}
+
+TopLevelAS& Registry::createTopLevelAccelerationStructure(std::vector<RTGeometryInstance> instances)
+{
+    TopLevelAS tlas = { {}, instances };
+    m_topLevelAS.push_back(tlas);
+    return m_topLevelAS.back();
 }
 
 void Registry::publish(const std::string& name, const Buffer& buffer)
@@ -208,6 +215,11 @@ const std::vector<RenderState>& Registry::renderStates() const
 const std::vector<BottomLevelAS>& Registry::bottomLevelAS() const
 {
     return m_bottomLevelAS.vector();
+}
+
+const std::vector<TopLevelAS>& Registry::topLevelAS() const
+{
+    return m_topLevelAS.vector();
 }
 
 const std::vector<BufferUpdate>& Registry::bufferUpdates() const

@@ -1963,49 +1963,50 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
         LogErrorAndExit("Trying to create a bottom level acceleration structure, but there is no ray tracing support!\n");
     }
 
-    // TODO: Support multiple geometries!!!
-
-    VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
-    aabbs.numAABBs = 0;
-
-    VkGeometryTrianglesNV triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
-
-    triangles.vertexData = bufferInfo(blas.vertexBuffer()).buffer;
-    triangles.vertexOffset = 0;
-    triangles.vertexStride = blas.vertexStride();
-    triangles.vertexCount = blas.vertexBuffer().size() / triangles.vertexStride;
-    switch (blas.vertexFormat()) {
-    case VertexFormat::XYZ32F:
-        triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-        break;
-    }
-
-    triangles.indexData = bufferInfo(blas.indexBuffer()).buffer;
-    triangles.indexOffset = 0;
-    switch (blas.indexType()) {
-    case IndexType::UInt16:
-        triangles.indexType = VK_INDEX_TYPE_UINT16;
-        triangles.indexCount = blas.indexBuffer().size() / sizeof(uint16_t);
-        break;
-    case IndexType::UInt32:
-        triangles.indexType = VK_INDEX_TYPE_UINT32;
-        triangles.indexCount = blas.indexBuffer().size() / sizeof(uint32_t);
-        break;
-    }
-
-    triangles.transformData = VK_NULL_HANDLE;
-    triangles.transformOffset = 0;
-
-    VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
-    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV; // "indicates that this geometry does not invoke the any-hit shaders even if present in a hit group."
-    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
-    geometry.geometry.triangles = triangles;
-    geometry.geometry.aabbs = aabbs;
-
     std::vector<VkGeometryNV> geometries {};
-    geometries.push_back(geometry);
 
-    //
+    for (auto& geo : blas.geometries()) {
+
+        VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
+        aabbs.numAABBs = 0;
+
+        VkGeometryTrianglesNV triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
+
+        triangles.vertexData = bufferInfo(geo.vertexBuffer).buffer;
+        triangles.vertexOffset = 0;
+        triangles.vertexStride = geo.vertexStride();
+        triangles.vertexCount = geo.vertexBuffer.size() / triangles.vertexStride;
+        switch (geo.vertexFormat) {
+        case VertexFormat::XYZ32F:
+            triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+            break;
+        }
+
+        triangles.indexData = bufferInfo(geo.indexBuffer).buffer;
+        triangles.indexOffset = 0;
+        switch (geo.indexType) {
+        case IndexType::UInt16:
+            triangles.indexType = VK_INDEX_TYPE_UINT16;
+            triangles.indexCount = geo.indexBuffer.size() / sizeof(uint16_t);
+            break;
+        case IndexType::UInt32:
+            triangles.indexType = VK_INDEX_TYPE_UINT32;
+            triangles.indexCount = geo.indexBuffer.size() / sizeof(uint32_t);
+            break;
+        }
+
+        // TODO: Add transform data! Somehow.. Maybe a single buffer of transforms & then offsets for each individual geometry?
+        triangles.transformData = VK_NULL_HANDLE;
+        triangles.transformOffset = 0;
+
+        VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
+        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV; // "indicates that this geometry does not invoke the any-hit shaders even if present in a hit group."
+        geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
+        geometry.geometry.triangles = triangles;
+        geometry.geometry.aabbs = aabbs;
+
+        geometries.push_back(geometry);
+    }
 
     VkAccelerationStructureInfoNV accelerationStructureInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     accelerationStructureInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
@@ -2045,6 +2046,27 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
     if (m_rtx->vkGetAccelerationStructureHandleNV(device(), accelerationStructure, sizeof(uint64_t), &handle) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to get acceleration structure handle\n");
     }
+
+    VmaAllocation scratchAllocation;
+    VkBuffer scratchBuffer = createScratchBufferForAccelerationStructure(accelerationStructure, scratchAllocation);
+
+    VkAccelerationStructureInfoNV buildInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+    buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+    buildInfo.geometryCount = geometries.size();
+    buildInfo.pGeometries = geometries.data();
+
+    this->issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+        m_rtx->vkCmdBuildAccelerationStructureNV(
+            commandBuffer,
+            &buildInfo,
+            VK_NULL_HANDLE, 0,
+            VK_FALSE,
+            accelerationStructure,
+            VK_NULL_HANDLE,
+            scratchBuffer, 0);
+    });
+
+    vmaDestroyBuffer(m_memoryAllocator, scratchBuffer, scratchAllocation);
 
     AccelerationStructureInfo info {};
     info.accelerationStructure = accelerationStructure;
@@ -2112,6 +2134,32 @@ void VulkanBackend::newTopLevelAccelerationStructure(const TopLevelAS& tlas)
     if (m_rtx->vkGetAccelerationStructureHandleNV(device(), accelerationStructure, sizeof(uint64_t), &handle) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to get acceleration structure handle\n");
     }
+
+    VmaAllocation scratchAllocation;
+    VkBuffer scratchBuffer = createScratchBufferForAccelerationStructure(accelerationStructure, scratchAllocation);
+
+    VmaAllocation instanceAllocation;
+    VkBuffer instanceBuffer = createRTXInstanceBuffer(tlas.instances(), instanceAllocation);
+
+    VkAccelerationStructureInfoNV buildInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+    buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+    buildInfo.instanceCount = tlas.instanceCount();
+    buildInfo.geometryCount = 0;
+    buildInfo.pGeometries = nullptr;
+
+    this->issueSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+        m_rtx->vkCmdBuildAccelerationStructureNV(
+            commandBuffer,
+            &buildInfo,
+            instanceBuffer, 0,
+            VK_FALSE,
+            accelerationStructure,
+            VK_NULL_HANDLE,
+            scratchBuffer, 0);
+    });
+
+    vmaDestroyBuffer(m_memoryAllocator, scratchBuffer, scratchAllocation);
+    vmaDestroyBuffer(m_memoryAllocator, instanceBuffer, instanceAllocation);
 
     AccelerationStructureInfo info {};
     info.accelerationStructure = accelerationStructure;
@@ -2219,6 +2267,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         for (auto& bottomLevelAS : previous->bottomLevelAS()) {
             deleteBottomLevelAccelerationStructure(bottomLevelAS);
         }
+        for (auto& topLevelAS : previous->topLevelAS()) {
+            deleteTopLevelAccelerationStructure(topLevelAS);
+        }
     }
 
     // Create new resources
@@ -2246,6 +2297,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         }
         for (auto& bottomLevelAS : current->bottomLevelAS()) {
             newBottomLevelAccelerationStructure(bottomLevelAS);
+        }
+        for (auto& topLevelAS : current->topLevelAS()) {
+            newTopLevelAccelerationStructure(topLevelAS);
         }
     }
 }
@@ -2478,6 +2532,81 @@ bool VulkanBackend::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t w
     }
 
     return true;
+}
+
+VkBuffer VulkanBackend::createScratchBufferForAccelerationStructure(VkAccelerationStructureNV accelerationStructure, VmaAllocation& allocation) const
+{
+    if (!m_rtx.has_value()) {
+        LogErrorAndExit("Trying to create a RTX scratch buffer, but there is no ray tracing support!\n");
+    }
+
+    VkAccelerationStructureMemoryRequirementsInfoNV memoryRequirementsInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
+    memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+
+    VkMemoryRequirements2 scratchMemRequirements2;
+    memoryRequirementsInfo.accelerationStructure = accelerationStructure;
+    m_rtx->vkGetAccelerationStructureMemoryRequirementsNV(device(), &memoryRequirementsInfo, &scratchMemRequirements2);
+
+    VkBufferCreateInfo scratchBufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    scratchBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
+    scratchBufferCreateInfo.size = scratchMemRequirements2.memoryRequirements.size;
+
+    VmaAllocationCreateInfo scratchAllocCreateInfo = {};
+    scratchAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    VkBuffer scratchBuffer;
+    if (vmaCreateBuffer(m_memoryAllocator, &scratchBufferCreateInfo, &scratchAllocCreateInfo, &scratchBuffer, &allocation, nullptr) != VK_SUCCESS) {
+        LogError("VulkanBackend::createScratchBufferForAccelerationStructure(): could not create scratch buffer.\n");
+    }
+
+    return scratchBuffer;
+}
+
+VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> instances, VmaAllocation& allocation)
+{
+    if (!m_rtx.has_value()) {
+        LogErrorAndExit("Trying to create a RTX instance buffer, but there is no ray tracing support!\n");
+    }
+
+    std::vector<VulkanRTX::GeometryInstance> instanceData {};
+    for (auto& instance : instances) {
+        VulkanRTX::GeometryInstance data {};
+
+        data.transform = instance.transform;
+
+        const auto& blasInfo = accelerationStructureInfo(instance.blas);
+        data.accelerationStructureHandle = blasInfo.handle;
+
+        // TODO: This probably needs to be adjusted!
+        data.instanceId = 0; // Relevant for who? Do we get this value in the shaders maybe? Makes sense to me.
+        data.mask = 0xff;
+        data.instanceOffset = 0;
+        data.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
+
+        instanceData.push_back(data);
+    }
+
+    VkDeviceSize totalSize = instanceData.size() * sizeof(VulkanRTX::GeometryInstance);
+
+    VkBufferCreateInfo instanceBufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    instanceBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    instanceBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
+    instanceBufferCreateInfo.size = totalSize;
+
+    VmaAllocationCreateInfo instanceAllocCreateInfo = {};
+    instanceAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+    VkBuffer instanceBuffer;
+    if (vmaCreateBuffer(m_memoryAllocator, &instanceBufferCreateInfo, &instanceAllocCreateInfo, &instanceBuffer, &allocation, nullptr) != VK_SUCCESS) {
+        LogError("VulkanBackend::createRTXInstanceBuffer(): could not create instance buffer.\n");
+    }
+
+    if (!setBufferMemoryUsingMapping(allocation, instanceData.data(), totalSize)) {
+        LogError("VulkanBackend::createRTXInstanceBuffer(): could not set instance instance buffer data.\n");
+    }
+
+    return instanceBuffer;
 }
 
 uint32_t VulkanBackend::findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const

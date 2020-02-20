@@ -315,45 +315,32 @@ const std::vector<const BindingSet*>& RenderStateBuilder::bindingSets() const
     return m_bindingSets;
 }
 
-BottomLevelAS::BottomLevelAS(Badge<Registry>, const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat vertexFormat, IndexType indexType)
-    : m_vertexBuffer(vertexBuffer)
-    , m_indexBuffer(indexBuffer)
-    , m_vertexFormat(vertexFormat)
-    , m_indexType(indexType)
+uint32_t RTGeometry::vertexStride() const
 {
-}
-
-const Buffer& BottomLevelAS::vertexBuffer() const
-{
-    return m_vertexBuffer;
-}
-
-VertexFormat BottomLevelAS::vertexFormat() const
-{
-    return m_vertexFormat;
-}
-
-uint32_t BottomLevelAS::vertexStride() const
-{
-    switch (m_vertexFormat) {
+    switch (vertexFormat) {
     case VertexFormat::XYZ32F:
         return 3 * 4;
     }
 }
 
-const Buffer& BottomLevelAS::indexBuffer() const
+BottomLevelAS::BottomLevelAS(Badge<Registry>, std::vector<RTGeometry> geometries)
+    : m_geometries(geometries)
 {
-    return m_indexBuffer;
 }
 
-IndexType BottomLevelAS::indexType() const
+const std::vector<RTGeometry>& BottomLevelAS::geometries() const
 {
-    return m_indexType;
+    return m_geometries;
 }
 
-TopLevelAS::TopLevelAS(Badge<Registry>, std::vector<GeometryInstance> instances)
+TopLevelAS::TopLevelAS(Badge<Registry>, std::vector<RTGeometryInstance> instances)
     : m_instances(instances)
 {
+}
+
+const std::vector<RTGeometryInstance>& TopLevelAS::instances() const
+{
+    return m_instances;
 }
 
 uint32_t TopLevelAS::instanceCount() const

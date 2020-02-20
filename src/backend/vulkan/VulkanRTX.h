@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glm/glm.hpp>
 #include <optional>
 #include <vulkan/vulkan.h>
 
@@ -20,6 +21,16 @@ public:
     PFN_vkCmdTraceRaysNV vkCmdTraceRaysNV { nullptr };
 
     const VkPhysicalDeviceRayTracingPropertiesNV& properties() const;
+
+public:
+    struct GeometryInstance {
+        glm::mat3x4 transform;
+        uint32_t instanceId : 24;
+        uint32_t mask : 8;
+        uint32_t instanceOffset : 24;
+        uint32_t flags : 8;
+        uint64_t accelerationStructureHandle;
+    };
 
 private:
     VkPhysicalDevice m_physicalDevice;
