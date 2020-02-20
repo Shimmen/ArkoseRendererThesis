@@ -37,24 +37,23 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 
     createSemaphoresAndFences(device());
 
-    // TODO: Cleanup!
-    if (VulkanRTX::isSupportedOnPhysicalDevice(m_core->physicalDevice())) {
-        m_rtx = VulkanRTX(m_core->physicalDevice(), device());
+    if (VulkanRTX::isSupportedOnPhysicalDevice(physicalDevice())) {
+        m_rtx = VulkanRTX(physicalDevice(), device());
     }
 
     VmaAllocatorCreateInfo allocatorInfo = {};
-    allocatorInfo.physicalDevice = m_core->physicalDevice();
+    allocatorInfo.physicalDevice = physicalDevice();
     allocatorInfo.device = device();
     allocatorInfo.flags = 0u;
     if (vmaCreateAllocator(&allocatorInfo, &m_memoryAllocator) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create memory allocator, exiting.\n");
     }
 
-    m_presentQueue = m_core->getPresentQueue();
-    m_graphicsQueue = m_core->getGraphicsQueue();
+    m_presentQueue = m_core->presentQueue();
+    m_graphicsQueue = m_core->graphicsQueue();
 
     VkCommandPoolCreateInfo poolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    poolCreateInfo.queueFamilyIndex = m_core->m_graphicsQueueFamilyIndex;
+    poolCreateInfo.queueFamilyIndex = m_graphicsQueue.familyIndex;
     poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // (so we can easily reuse them each frame)
     if (vkCreateCommandPool(m_core->device(), &poolCreateInfo, nullptr, &m_renderGraphFrameCommandPool) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create command pool for the graphics queue, exiting.\n");
@@ -62,12 +61,12 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
 
     VkCommandPoolCreateInfo transientPoolCreateInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     transientPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    transientPoolCreateInfo.queueFamilyIndex = m_core->m_graphicsQueueFamilyIndex;
+    transientPoolCreateInfo.queueFamilyIndex = m_graphicsQueue.familyIndex;
     if (vkCreateCommandPool(m_core->device(), &transientPoolCreateInfo, nullptr, &m_transientCommandPool) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::VulkanBackend(): could not create transient command pool, exiting.\n");
     }
 
-    createAndSetupSwapchain(m_core->physicalDevice(), device(), m_core->surface());
+    createAndSetupSwapchain(physicalDevice(), device(), m_core->surface());
     createWindowRenderTargetFrontend();
 
     setupDearImgui();
@@ -140,7 +139,7 @@ void VulkanBackend::createSemaphoresAndFences(VkDevice device)
 void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface)
 {
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_core->physicalDevice(), m_core->surface(), &surfaceCapabilities) != VK_SUCCESS) {
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities) != VK_SUCCESS) {
         LogErrorAndExit("VulkanBackend::createAndSetupSwapchain(): could not get surface capabilities, exiting.\n");
     }
 
@@ -167,7 +166,7 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT; // TODO: What do we want here? Maybe this suffices?
     // TODO: Assure VK_IMAGE_USAGE_STORAGE_BIT is supported using vkGetPhysicalDeviceSurfaceCapabilitiesKHR & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT
 
-    uint32_t queueFamilyIndices[] = { m_core->m_graphicsQueueFamilyIndex, m_core->m_presentQueueFamilyIndex };
+    uint32_t queueFamilyIndices[] = { m_graphicsQueue.familyIndex, m_presentQueue.familyIndex };
     if (!m_core->hasCombinedGraphicsComputeQueue()) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -227,13 +226,6 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F, Texture::Usage::Attachment,
                                       Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
     newTexture(m_swapchainDepthTexture);
-
-    // FIXME: For now also create a depth image, but later we probably don't want one on the final presentation images
-    //  so it doesn't really make sense to have it here anyway. I guess that's an excuse for the code structure.. :)
-    // FIXME: Should we add an explicit image transition for the depth image..?
-    //m_depthImage = createImage2D(swapchainExtent.width, swapchainExtent.height, m_depthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_depthImageMemory);
-    //m_depthImageView = createImageView2D(m_depthImage, m_depthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-
     setupWindowRenderTargets();
 
     if (m_guiIsSetup) {
@@ -260,9 +252,6 @@ void VulkanBackend::destroySwapchain()
     destroyWindowRenderTargets();
 
     deleteTexture(m_swapchainDepthTexture);
-    //vkDestroyImageView(device(), m_depthImageView, nullptr);
-    //vkDestroyImage(device(), m_depthImage, nullptr);
-    //vkFreeMemory(device(), m_depthImageMemory, nullptr);
 
     for (size_t it = 0; it < m_numSwapchainImages; ++it) {
         vkDestroyImageView(device(), m_swapchainImageViews[it], nullptr);
@@ -289,7 +278,7 @@ Extent2D VulkanBackend::recreateSwapchain()
     vkDeviceWaitIdle(device());
 
     destroySwapchain();
-    createAndSetupSwapchain(m_core->physicalDevice(), device(), m_core->surface());
+    createAndSetupSwapchain(physicalDevice(), device(), m_core->surface());
     createWindowRenderTargetFrontend();
 
     s_unhandledWindowResize = false;
@@ -432,12 +421,12 @@ void VulkanBackend::setupDearImgui()
     };
 
     initInfo.Instance = m_core->instance();
-    initInfo.PhysicalDevice = m_core->physicalDevice();
+    initInfo.PhysicalDevice = physicalDevice();
     initInfo.Device = device();
     initInfo.Allocator = nullptr;
 
-    initInfo.QueueFamily = m_core->m_graphicsQueueFamilyIndex;
-    initInfo.Queue = m_graphicsQueue;
+    initInfo.QueueFamily = m_graphicsQueue.familyIndex;
+    initInfo.Queue = m_graphicsQueue.queue;
 
     initInfo.MinImageCount = m_numSwapchainImages; // (todo: should this be something different than the actual count??)
     initInfo.ImageCount = m_numSwapchainImages;
@@ -563,7 +552,7 @@ bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime, bool rend
         presentInfo.pSwapchains = &m_swapchain;
         presentInfo.pImageIndices = &swapchainImageIndex;
 
-        VkResult presentResult = vkQueuePresentKHR(m_presentQueue, &presentInfo);
+        VkResult presentResult = vkQueuePresentKHR(m_presentQueue.queue, &presentInfo);
 
         if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR || s_unhandledWindowResize) {
             recreateSwapchain();
@@ -2096,11 +2085,11 @@ bool VulkanBackend::issueSingleTimeCommand(const std::function<void(VkCommandBuf
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &oneTimeCommandBuffer;
 
-    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (vkQueueSubmit(m_graphicsQueue.queue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
         LogError("VulkanBackend::issueSingleTimeCommand(): could not submit the single-time command buffer.\n");
         return false;
     }
-    if (vkQueueWaitIdle(m_graphicsQueue) != VK_SUCCESS) {
+    if (vkQueueWaitIdle(m_graphicsQueue.queue) != VK_SUCCESS) {
         LogError("VulkanBackend::issueSingleTimeCommand(): error while waiting for the graphics queue to idle.\n");
         return false;
     }
@@ -2313,7 +2302,7 @@ void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSem
         LogError("VulkanBackend::submitQueue(): error resetting in-flight frame fence (index %u).\n", imageIndex);
     }
 
-    if (vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, *inFlight) != VK_SUCCESS) {
+    if (vkQueueSubmit(m_graphicsQueue.queue, 1, &submitInfo, *inFlight) != VK_SUCCESS) {
         LogError("VulkanBackend::submitQueue(): could not submit the graphics queue (index %u).\n", imageIndex);
     }
 }

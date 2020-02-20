@@ -40,6 +40,11 @@ private:
         return m_core->device();
     }
 
+    VkPhysicalDevice physicalDevice() const
+    {
+        return m_core->physicalDevice();
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     /// Command translation & resource management
 
@@ -120,7 +125,7 @@ private:
     GLFWwindow* m_window;
 
     VkSwapchainKHR m_swapchain {};
-    VkQueue m_presentQueue {};
+    VulkanQueue m_presentQueue {};
 
     Extent2D m_swapchainExtent {};
     uint32_t m_numSwapchainImages {};
@@ -160,7 +165,7 @@ private:
     std::unique_ptr<Registry> m_nodeRegistry {};
     std::vector<std::unique_ptr<Registry>> m_frameRegistries {};
 
-    VkQueue m_graphicsQueue {};
+    VulkanQueue m_graphicsQueue {};
 
     VkCommandPool m_renderGraphFrameCommandPool {};
     VkCommandPool m_transientCommandPool {};

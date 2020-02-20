@@ -6,6 +6,11 @@
 
 struct GLFWwindow;
 
+struct VulkanQueue {
+    uint32_t familyIndex;
+    VkQueue queue;
+};
+
 class VulkanCore {
 public:
     VulkanCore(GLFWwindow*, bool debugModeEnabled);
@@ -15,8 +20,8 @@ public:
     VkPresentModeKHR pickBestPresentMode() const;
     VkExtent2D pickBestSwapchainExtent() const;
 
-    VkQueue getPresentQueue() const;
-    VkQueue getGraphicsQueue() const;
+    VulkanQueue presentQueue() const;
+    VulkanQueue graphicsQueue() const;
     bool hasCombinedGraphicsComputeQueue() const;
 
     const VkInstance& instance() const { return m_instance; }
@@ -52,9 +57,8 @@ private:
     VkDevice m_device {};
 
     VkSurfaceKHR m_surface {};
+    VulkanQueue m_presentQueue {};
 
-public:
-    uint32_t m_graphicsQueueFamilyIndex;
-    uint32_t m_computeQueueFamilyIndex;
-    uint32_t m_presentQueueFamilyIndex;
+    VulkanQueue m_graphicsQueue {};
+    VulkanQueue m_computeQueue {};
 };

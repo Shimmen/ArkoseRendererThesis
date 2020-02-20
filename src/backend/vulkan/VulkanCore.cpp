@@ -36,6 +36,10 @@ VulkanCore::VulkanCore(GLFWwindow* window, bool debugModeEnabled)
 
     findQueueFamilyIndices(m_physicalDevice, m_surface);
     m_device = createDevice(m_physicalDevice);
+
+    vkGetDeviceQueue(m_device, m_presentQueue.familyIndex, 0, &m_presentQueue.queue);
+    vkGetDeviceQueue(m_device, m_graphicsQueue.familyIndex, 0, &m_graphicsQueue.queue);
+    vkGetDeviceQueue(m_device, m_computeQueue.familyIndex, 0, &m_computeQueue.queue);
 }
 
 VulkanCore::~VulkanCore()
@@ -126,20 +130,14 @@ VkExtent2D VulkanCore::pickBestSwapchainExtent() const
     return extent;
 }
 
-VkQueue VulkanCore::getPresentQueue() const
+VulkanQueue VulkanCore::presentQueue() const
 {
-    // TODO: Probably extract when creating the device?
-    VkQueue presentQueue {};
-    vkGetDeviceQueue(m_device, m_presentQueueFamilyIndex, 0, &presentQueue);
-    return presentQueue;
+    return m_presentQueue;
 }
 
-VkQueue VulkanCore::getGraphicsQueue() const
+VulkanQueue VulkanCore::graphicsQueue() const
 {
-    // TODO: Probably extract when creating the device?
-    VkQueue graphicsQueue {};
-    vkGetDeviceQueue(m_device, m_graphicsQueueFamilyIndex, 0, &graphicsQueue);
-    return graphicsQueue;
+    return m_graphicsQueue;
 }
 
 VkBool32 VulkanCore::debugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes,
@@ -233,7 +231,7 @@ VkInstance VulkanCore::createInstance(VkDebugUtilsMessengerCreateInfoEXT* debugM
 VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
 {
     // TODO: Allow users to specify beforehand that they e.g. might want 2 compute queues.
-    std::unordered_set<uint32_t> queueFamilyIndices = { m_graphicsQueueFamilyIndex, m_computeQueueFamilyIndex, m_presentQueueFamilyIndex };
+    std::unordered_set<uint32_t> queueFamilyIndices = { m_graphicsQueue.familyIndex, m_presentQueue.familyIndex };
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     const float queuePriority = 1.0f;
     for (uint32_t familyIndex : queueFamilyIndices) {
@@ -297,12 +295,12 @@ void VulkanCore::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfa
         const auto& queueFamily = queueFamilies[idx];
 
         if (!foundGraphicsQueue && queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-            m_graphicsQueueFamilyIndex = idx;
+            m_graphicsQueue.familyIndex = idx;
             foundGraphicsQueue = true;
         }
 
         if (!foundComputeQueue && queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-            m_computeQueueFamilyIndex = idx;
+            m_computeQueue.familyIndex = idx;
             foundComputeQueue = true;
         }
 
@@ -310,7 +308,7 @@ void VulkanCore::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfa
             VkBool32 presentSupportForQueue;
             vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, idx, surface, &presentSupportForQueue);
             if (presentSupportForQueue) {
-                m_presentQueueFamilyIndex = idx;
+                m_presentQueue.familyIndex = idx;
                 foundPresentQueue = true;
             }
         }
@@ -329,7 +327,7 @@ void VulkanCore::findQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfa
 
 bool VulkanCore::hasCombinedGraphicsComputeQueue() const
 {
-    return m_graphicsQueueFamilyIndex == m_computeQueueFamilyIndex;
+    return m_graphicsQueue.familyIndex == m_computeQueue.familyIndex;
 }
 
 std::vector<const char*> VulkanCore::instanceExtensions() const
