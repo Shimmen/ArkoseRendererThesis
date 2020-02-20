@@ -234,6 +234,9 @@ enum ShaderStage : uint8_t {
     ShaderStageVertex = 0x01,
     ShaderStageFragment = 0x02,
     ShaderStageCompute = 0x04,
+    ShaderStageRTRayGen = 0x08,
+    ShaderStageRTMiss = 0x10,
+    ShaderStageRTClosestHit = 0x20,
 };
 
 enum class ShaderBindingType {
@@ -241,21 +244,26 @@ enum class ShaderBindingType {
     StorageImage,
     TextureSampler,
     TextureSamplerArray,
+    RTAccelerationStructure,
 };
+
+class TopLevelAS;
 
 struct ShaderBinding {
 
     ShaderBinding(uint32_t index, ShaderStage, const Buffer*);
     ShaderBinding(uint32_t index, ShaderStage, const Texture*);
+    ShaderBinding(uint32_t index, ShaderStage, const TopLevelAS*);
     ShaderBinding(uint32_t index, ShaderStage, const std::vector<const Texture*>&, uint32_t count);
 
     uint32_t bindingIndex;
     uint32_t count;
 
-    ShaderStage shaderStage; // TODO: Later we want flags here I guess, so we can have multiple of them..
+    ShaderStage shaderStage;
 
     ShaderBindingType type;
     const Buffer* buffer;
+    const TopLevelAS* tlas;
     std::vector<const Texture*> textures;
 };
 
@@ -376,4 +384,19 @@ public:
 
 private:
     std::vector<RTGeometryInstance> m_instances {};
+};
+
+class RayTracingState : public Resource {
+public:
+    RayTracingState() = default;
+    RayTracingState(Badge<Registry>, const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*>, uint32_t maxRecursionDepth);
+
+    [[nodiscard]] uint32_t maxRecursionDepth() const;
+    [[nodiscard]] const std::vector<ShaderFile>& shaderBindingTable() const;
+    [[nodiscard]] const std::vector<const BindingSet*>& bindingSets() const;
+
+private:
+    std::vector<ShaderFile> m_shaderBindingTable;
+    std::vector<const BindingSet*> m_bindingSets;
+    uint32_t m_maxRecursionDepth;
 };

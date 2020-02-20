@@ -5,7 +5,6 @@
 #include "utility/util.h"
 #include <chrono>
 #include <cstddef>
-#include <shaderc/shaderc.hpp>
 #include <thread>
 
 // TODO: Implement Windows support!
@@ -163,6 +162,38 @@ uint64_t ShaderManager::getFileEditTimestamp(const std::string& path) const
     ASSERT_NOT_REACHED();
 }
 
+shaderc_shader_kind ShaderManager::shaderKindForPath(const std::string& path) const
+{
+    // Actually, since we have the ShaderFile with ShaderFileType we already know what the author intends the shader to be!
+    // Also, this code is real shit.. but it works!
+
+    if (path.length() < 5) {
+        return shaderc_glsl_infer_from_source;
+    }
+    std::string ext5 = path.substr(path.length() - 5);
+
+    if (ext5 == ".vert") {
+        return shaderc_vertex_shader;
+    } else if (ext5 == ".frag") {
+        return shaderc_fragment_shader;
+    } else if (ext5 == ".rgen") {
+        return shaderc_raygen_shader;
+    }
+
+    if (path.length() < 6) {
+        return shaderc_glsl_infer_from_source;
+    }
+    std::string ext6 = path.substr(path.length() - 6);
+    
+    if (ext6 == ".rmiss") {
+        return shaderc_miss_shader;
+    } else if (ext6 == ".rchit") {
+        return shaderc_closesthit_shader;
+    }
+
+    return shaderc_glsl_infer_from_source;
+}
+
 bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
 {
     ASSERT(!data.glslSource.empty());
@@ -214,19 +245,9 @@ bool ShaderManager::compileGlslToSpirv(ShaderData& data) const
     options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
     options.SetTargetSpirv(shaderc_spirv_version_1_0);
     options.SetSourceLanguage(shaderc_source_language_glsl);
-    options.SetForcedVersionProfile(450, shaderc_profile_none);
+    options.SetForcedVersionProfile(460, shaderc_profile_none);
 
-    // TODO: Why doesn't the automatic inferring work?!
-    shaderc_shader_kind kind = shaderc_glsl_infer_from_source;
-    bool isProbablyVert = data.filePath.find(".vert") != std::string::npos;
-    bool isProbablyFrag = data.filePath.find(".frag") != std::string::npos;
-    if (isProbablyVert && !isProbablyFrag)
-        kind = shaderc_glsl_vertex_shader;
-    else if (isProbablyFrag && !isProbablyVert)
-        kind = shaderc_glsl_fragment_shader;
-    else
-        ASSERT_NOT_REACHED();
-
+    shaderc_shader_kind kind = shaderKindForPath(data.filePath);
     shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(data.glslSource, kind, data.filePath.c_str(), options);
 
     // Note that we only should overwrite the binary if it compiled correctly!

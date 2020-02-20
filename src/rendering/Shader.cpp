@@ -10,7 +10,7 @@ ShaderFile::ShaderFile(std::string path, ShaderFileType type)
     auto& manager = ShaderManager::instance();
     switch (manager.loadAndCompileImmediately(m_path)) {
     case ShaderManager::ShaderStatus::FileNotFound:
-        LogErrorAndExit("Shader file '%s' not found, exiting.\n");
+        LogErrorAndExit("Shader file '%s' not found, exiting.\n", m_path.c_str());
     case ShaderManager::ShaderStatus::CompileError: {
         std::string errorMessage = manager.shaderError(m_path).value();
         LogError("Shader file '%s' has compile errors:\n", m_path.c_str());

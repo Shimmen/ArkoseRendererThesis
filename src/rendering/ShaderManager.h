@@ -9,6 +9,9 @@
 #include <utility>
 #include <vector>
 
+#define NV_EXTENSIONS
+#include <shaderc/shaderc.hpp>
+
 class ShaderManager {
 public:
     enum class ShaderStatus {
@@ -57,6 +60,7 @@ private:
         std::vector<uint32_t> spirvBinary {};
     };
 
+    shaderc_shader_kind shaderKindForPath(const std::string&) const;
     bool compileGlslToSpirv(ShaderData& data) const;
 
     std::string m_shaderBasePath;

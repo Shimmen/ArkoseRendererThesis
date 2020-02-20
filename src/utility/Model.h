@@ -129,6 +129,11 @@ public:
         return m_models[index];
     }
 
+    const std::vector<Model*>& models() const
+    {
+        return m_models;
+    }
+
     int forEachDrawable(std::function<void(int, const Mesh&)> callback) const
     {
         int nextIndex = 0;

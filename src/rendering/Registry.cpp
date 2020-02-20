@@ -130,6 +130,13 @@ TopLevelAS& Registry::createTopLevelAccelerationStructure(std::vector<RTGeometry
     return m_topLevelAS.back();
 }
 
+RayTracingState& Registry::createRayTracingState(const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*> bindingSets)
+{
+    RayTracingState rtState = { {}, shaderBindingTable, bindingSets, 1 };
+    m_rayTracingStates.push_back(rtState);
+    return m_rayTracingStates.back();
+}
+
 void Registry::publish(const std::string& name, const Buffer& buffer)
 {
     ASSERT(m_currentNodeName.has_value());
@@ -220,6 +227,11 @@ const std::vector<BottomLevelAS>& Registry::bottomLevelAS() const
 const std::vector<TopLevelAS>& Registry::topLevelAS() const
 {
     return m_topLevelAS.vector();
+}
+
+const std::vector<RayTracingState>& Registry::rayTracingStates() const
+{
+    return m_rayTracingStates.vector();
 }
 
 const std::vector<BufferUpdate>& Registry::bufferUpdates() const

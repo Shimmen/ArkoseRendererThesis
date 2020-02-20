@@ -204,15 +204,32 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Text
     : bindingIndex(index)
     , count(1)
     , shaderStage(shaderStage)
-    , type(ShaderBindingType::TextureSampler)
     , buffer(nullptr)
     , textures({ texture })
 {
     if (!texture) {
         LogErrorAndExit("ShaderBinding error: null texture\n");
     }
-    if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::AttachAndSample) {
-        LogErrorAndExit("ShaderBinding error: texture does not support sampling\n");
+    if (texture->usage() == Texture::Usage::Sampled || texture->usage() == Texture::Usage::AttachAndSample) {
+        type = ShaderBindingType::TextureSampler;
+    } else if (texture->usage() == Texture::Usage::StorageAndSample) {
+        type = ShaderBindingType::StorageImage; // TODO: We need some better way of differentiating these!!
+    } else {
+        LogErrorAndExit("ShaderBinding error: texture does not have a valid usage for being in a shader binding\n");
+    }
+}
+
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const TopLevelAS* tlas)
+    : bindingIndex(index)
+    , count(1)
+    , shaderStage(shaderStage)
+    , type(ShaderBindingType::RTAccelerationStructure)
+    , tlas(tlas)
+    , buffer()
+    , textures()
+{
+    if (!tlas) {
+        LogErrorAndExit("ShaderBinding error: null acceleration structure\n");
     }
 }
 
@@ -346,4 +363,26 @@ const std::vector<RTGeometryInstance>& TopLevelAS::instances() const
 uint32_t TopLevelAS::instanceCount() const
 {
     return m_instances.size();
+}
+
+RayTracingState::RayTracingState(Badge<Registry>, const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*> bindingSets, uint32_t maxRecursionDepth)
+    : m_shaderBindingTable(shaderBindingTable)
+    , m_bindingSets(bindingSets)
+    , m_maxRecursionDepth(maxRecursionDepth)
+{
+}
+
+uint32_t RayTracingState::maxRecursionDepth() const
+{
+    return m_maxRecursionDepth;
+}
+
+const std::vector<ShaderFile>& RayTracingState::shaderBindingTable() const
+{
+    return m_shaderBindingTable;
+}
+
+const std::vector<const BindingSet*>& RayTracingState::bindingSets() const
+{
+    return m_bindingSets;
 }

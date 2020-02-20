@@ -83,6 +83,9 @@ private:
     void newTopLevelAccelerationStructure(const TopLevelAS&);
     void deleteTopLevelAccelerationStructure(const TopLevelAS&);
 
+    void newRayTracingState(const RayTracingState&);
+    void deleteRayTracingState(const RayTracingState&);
+
     ///////////////////////////////////////////////////////////////////////////
     /// Drawing
 
@@ -229,6 +232,11 @@ private:
         uint64_t handle {};
     };
 
+    struct RayTracingStateInfo {
+        VkPipelineLayout pipelineLayout {};
+        VkPipeline pipeline {};
+    };
+
     // (helpers for accessing from *Infos vectors)
     BufferInfo& bufferInfo(const Buffer&);
     TextureInfo& textureInfo(const Texture&);
@@ -237,6 +245,7 @@ private:
     RenderStateInfo& renderStateInfo(const RenderState&);
     AccelerationStructureInfo& accelerationStructureInfo(const BottomLevelAS&);
     AccelerationStructureInfo& accelerationStructureInfo(const TopLevelAS&);
+    RayTracingStateInfo& rayTracingStateInfo(const RayTracingState&);
 
     PersistentIndexedList<BufferInfo> m_bufferInfos {};
     PersistentIndexedList<TextureInfo> m_textureInfos {};
@@ -244,6 +253,7 @@ private:
     PersistentIndexedList<BindingSetInfo> m_bindingSetInfos {};
     PersistentIndexedList<RenderStateInfo> m_renderStateInfos {};
     PersistentIndexedList<AccelerationStructureInfo> m_accStructInfos {};
+    PersistentIndexedList<RayTracingStateInfo> m_rtStateInfos {};
 
     std::vector<Texture> m_swapchainMockColorTextures {};
     std::vector<RenderTarget> m_swapchainMockRenderTargets {};

@@ -1449,6 +1449,11 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
             case ShaderBindingType::TextureSamplerArray:
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 break;
+            case ShaderBindingType::RTAccelerationStructure:
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+                break;
+            default:
+                ASSERT_NOT_REACHED();
             }
 
             if (bindingInfo.shaderStage & ShaderStageVertex)
@@ -1457,6 +1462,14 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 binding.stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
             if (bindingInfo.shaderStage & ShaderStageCompute)
                 binding.stageFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
+            if (bindingInfo.shaderStage & ShaderStageRTRayGen)
+                binding.stageFlags |= VK_SHADER_STAGE_RAYGEN_BIT_NV;
+            if (bindingInfo.shaderStage & ShaderStageRTMiss)
+                binding.stageFlags |= VK_SHADER_STAGE_MISS_BIT_NV;
+            if (bindingInfo.shaderStage & ShaderStageRTClosestHit)
+                binding.stageFlags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
+
+            ASSERT(binding.stageFlags != 0);
 
             binding.pImmutableSamplers = nullptr;
 
@@ -1500,6 +1513,11 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 case ShaderBindingType::TextureSamplerArray:
                     poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                     break;
+                case ShaderBindingType::RTAccelerationStructure:
+                    poolSize.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+                    break;
+                default:
+                    ASSERT_NOT_REACHED();
                 }
 
                 bindingTypeIndex[type] = descriptorPoolSizes.size();
@@ -1516,7 +1534,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
         VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
         descriptorPoolCreateInfo.poolSizeCount = descriptorPoolSizes.size();
         descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();
-        descriptorPoolCreateInfo.maxSets = 1; // TODO: Handle multiple descriptor sets!
+        descriptorPoolCreateInfo.maxSets = 1;
 
         if (vkCreateDescriptorPool(device(), &descriptorPoolCreateInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             LogErrorAndExit("Error trying to create descriptor pool\n");
@@ -1540,6 +1558,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
         std::vector<VkWriteDescriptorSet> descriptorSetWrites {};
         CapList<VkDescriptorBufferInfo> descBufferInfos { 1024 };
         CapList<VkDescriptorImageInfo> descImageInfos { 1024 };
+        std::optional<VkWriteDescriptorSetAccelerationStructureNV> accelStructWrite {};
 
         for (auto& bindingInfo : bindingSet.shaderBindings()) {
 
@@ -1652,6 +1671,35 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
 
                 break;
             }
+
+            case ShaderBindingType::RTAccelerationStructure: {
+
+                ASSERT(bindingInfo.textures.empty());
+                ASSERT(bindingInfo.buffer == nullptr);
+                ASSERT(bindingInfo.tlas != nullptr);
+
+                const TopLevelAS& tlas = *bindingInfo.tlas;
+                auto& tlasInfo = accelerationStructureInfo(tlas);
+
+                VkWriteDescriptorSetAccelerationStructureNV descriptorAccelerationStructureInfo { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
+                descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
+                descriptorAccelerationStructureInfo.pAccelerationStructures = &tlasInfo.accelerationStructure;
+
+                // (there can only be one in a set!) (well maybe not, but it makes sense..)
+                ASSERT(!accelStructWrite.has_value());
+                accelStructWrite = descriptorAccelerationStructureInfo;
+
+                write.pNext = &accelStructWrite.value();
+                write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+
+                write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+
+            default:
+                ASSERT_NOT_REACHED();
             }
 
             descriptorSetWrites.push_back(write);
@@ -2184,6 +2232,131 @@ void VulkanBackend::deleteTopLevelAccelerationStructure(const TopLevelAS& tlas)
     tlas.unregisterBackend(backendBadge());
 }
 
+void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
+{
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts {};
+    for (auto& set : rtState.bindingSets()) {
+        BindingSetInfo bindingInfo = bindingSetInfo(*set);
+        descriptorSetLayouts.push_back(bindingInfo.descriptorSetLayout);
+    }
+
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
+    pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
+
+    VkPipelineLayout pipelineLayout {};
+    if (vkCreatePipelineLayout(device(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create pipeline layout for ray tracing\n");
+    }
+
+    const std::vector<ShaderFile>& sbt = rtState.shaderBindingTable();
+
+    int shaderIndexRaygen = -1;
+    int shaderIndexMiss = -1;
+    int shaderIndexClosestHit = -1;
+
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages {};
+    std::vector<VkRayTracingShaderGroupCreateInfoNV> shaderGroups {};
+
+    for (size_t idx = 0; idx < sbt.size(); ++idx) {
+        const ShaderFile& file = sbt[idx];
+
+        VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+        const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(file.path());
+        moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
+        moduleCreateInfo.pCode = spirv.data();
+
+        VkShaderModule shaderModule {};
+        if (vkCreateShaderModule(device(), &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create shader module for ray tracing state\n");
+        }
+
+        VkPipelineShaderStageCreateInfo stageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        stageCreateInfo.module = shaderModule;
+        stageCreateInfo.pName = "main";
+
+        VkRayTracingShaderGroupCreateInfoNV shaderGroup = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
+        shaderGroup.generalShader = VK_SHADER_UNUSED_NV;
+        shaderGroup.closestHitShader = VK_SHADER_UNUSED_NV;
+        shaderGroup.anyHitShader = VK_SHADER_UNUSED_NV;
+        shaderGroup.intersectionShader = VK_SHADER_UNUSED_NV;
+
+        switch (file.type()) {
+        case ShaderFileType::RTRaygen:
+            stageCreateInfo.stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
+            shaderIndexRaygen = idx;
+
+            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+            shaderGroup.generalShader = idx;
+
+            break;
+        case ShaderFileType::RTMiss:
+            stageCreateInfo.stage = VK_SHADER_STAGE_MISS_BIT_NV;
+            shaderIndexMiss = idx;
+
+            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+            shaderGroup.generalShader = idx;
+
+            break;
+        case ShaderFileType::RTClosestHit:
+            stageCreateInfo.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
+            shaderIndexClosestHit = idx;
+
+            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV;
+            shaderGroup.generalShader = VK_SHADER_UNUSED_NV;
+            shaderGroup.closestHitShader = idx;
+
+            break;
+        default:
+            LogErrorAndExit("Trying to use non ray trace shader for ray tracing\n");
+        }
+
+        shaderStages.push_back(stageCreateInfo);
+        shaderGroups.push_back(shaderGroup);
+    }
+
+    // TODO: Figure out something more creative or elegant for this..
+    ASSERT(shaderIndexRaygen != -1);
+    ASSERT(shaderIndexMiss != -1);
+    ASSERT(shaderIndexClosestHit != -1);
+
+    VkRayTracingPipelineCreateInfoNV rtPipelineCreateInfo { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV };
+    rtPipelineCreateInfo.maxRecursionDepth = rtState.maxRecursionDepth();
+    rtPipelineCreateInfo.stageCount = shaderStages.size();
+    rtPipelineCreateInfo.pStages = shaderStages.data();
+    rtPipelineCreateInfo.groupCount = shaderGroups.size();
+    rtPipelineCreateInfo.pGroups = shaderGroups.data();
+    rtPipelineCreateInfo.layout = pipelineLayout;
+
+    VkPipeline pipeline {};
+    if (m_rtx->vkCreateRayTracingPipelinesNV(device(), VK_NULL_HANDLE, 1, &rtPipelineCreateInfo, nullptr, &pipeline) != VK_SUCCESS) {
+        LogErrorAndExit("Error creating ray tracing pipeline\n");
+    }
+
+    RayTracingStateInfo rtStateInfo {};
+    rtStateInfo.pipelineLayout = pipelineLayout;
+    rtStateInfo.pipeline = pipeline;
+
+    // TODO: Save textures that we will sample so we can transition their layouts!
+
+    size_t index = m_rtStateInfos.add(rtStateInfo);
+    rtState.registerBackend(backendBadge(), index);
+}
+
+void VulkanBackend::deleteRayTracingState(const RayTracingState& rtState)
+{
+    if (rtState.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created ray tracing state\n");
+    }
+
+    RayTracingStateInfo& rtStateInfo = rayTracingStateInfo(rtState);
+    vkDestroyPipeline(device(), rtStateInfo.pipeline, nullptr);
+    vkDestroyPipelineLayout(device(), rtStateInfo.pipelineLayout, nullptr);
+
+    m_rtStateInfos.remove(rtState.id());
+    rtState.unregisterBackend(backendBadge());
+}
+
 VulkanBackend::AccelerationStructureInfo& VulkanBackend::accelerationStructureInfo(const BottomLevelAS& blas)
 {
     AccelerationStructureInfo& accStructInfo = m_accStructInfos[blas.id()];
@@ -2194,6 +2367,12 @@ VulkanBackend::AccelerationStructureInfo& VulkanBackend::accelerationStructureIn
 {
     AccelerationStructureInfo& accStructInfo = m_accStructInfos[tlas.id()];
     return accStructInfo;
+}
+
+VulkanBackend::RayTracingStateInfo& VulkanBackend::rayTracingStateInfo(const RayTracingState& rtState)
+{
+    RayTracingStateInfo& rtStateInfo = m_rtStateInfos[rtState.id()];
+    return rtStateInfo;
 }
 
 VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState& renderState)
@@ -2270,6 +2449,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         for (auto& topLevelAS : previous->topLevelAS()) {
             deleteTopLevelAccelerationStructure(topLevelAS);
         }
+        for (auto& rtState : previous->rayTracingStates()) {
+            deleteRayTracingState(rtState);
+        }
     }
 
     // Create new resources
@@ -2300,6 +2482,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         }
         for (auto& topLevelAS : current->topLevelAS()) {
             newTopLevelAccelerationStructure(topLevelAS);
+        }
+        for (auto& rtState : current->rayTracingStates()) {
+            newRayTracingState(rtState);
         }
     }
 }

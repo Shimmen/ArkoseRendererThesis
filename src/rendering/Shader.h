@@ -7,6 +7,9 @@ enum class ShaderFileType {
     Vertex,
     Fragment,
     Compute,
+    RTRaygen,
+    RTClosestHit,
+    RTMiss,
 };
 
 struct ShaderFile {

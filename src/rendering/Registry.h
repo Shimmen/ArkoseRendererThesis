@@ -34,6 +34,8 @@ public:
     [[nodiscard]] BottomLevelAS& createBottomLevelAccelerationStructure(std::vector<RTGeometry>);
     [[nodiscard]] TopLevelAS& createTopLevelAccelerationStructure(std::vector<RTGeometryInstance>);
 
+    [[nodiscard]] RayTracingState& createRayTracingState(const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*>);
+
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture&);
 
@@ -49,6 +51,7 @@ public:
     [[nodiscard]] const std::vector<RenderState>& renderStates() const;
     [[nodiscard]] const std::vector<BottomLevelAS>& bottomLevelAS() const;
     [[nodiscard]] const std::vector<TopLevelAS>& topLevelAS() const;
+    [[nodiscard]] const std::vector<RayTracingState>& rayTracingStates() const;
     [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
     [[nodiscard]] const std::vector<TextureUpdateFromFile>& textureUpdates() const;
 
@@ -86,11 +89,14 @@ private:
     static constexpr int maxNumRenderStates { 10 };
     CapList<RenderState> m_renderStates { maxNumRenderStates };
 
-    static constexpr int maxNumBottomLevelAS{ 50 };
+    static constexpr int maxNumBottomLevelAS { 50 };
     CapList<BottomLevelAS> m_bottomLevelAS { maxNumBottomLevelAS };
 
-    static constexpr int maxNumTopLevelAS{ 10 };
+    static constexpr int maxNumTopLevelAS { 10 };
     CapList<TopLevelAS> m_topLevelAS { maxNumTopLevelAS };
+
+    static constexpr int maxNumRayTracingStates { 10 };
+    CapList<RayTracingState> m_rayTracingStates { maxNumRayTracingStates };
 };
 
 template<typename T>

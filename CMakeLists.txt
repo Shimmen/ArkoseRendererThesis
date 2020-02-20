@@ -34,7 +34,9 @@ target_compile_features(ArkoseRenderer PRIVATE cxx_std_20)
 
 if (MSVC)
     add_compile_options(/MT)
+    add_compile_options(/Wall)
     target_compile_options(ArkoseRenderer PRIVATE /MT)
+    target_compile_options(ArkoseRenderer PRIVATE /Wall)
     #set_target_properties(ArkoseRenderer PROPERTIES 
     #    VS_DEBUGGER_WORKING_DIRECTORY "C:\\Users\\simon.moos\\Developer\\ArkoseRenderer")
 else()
