@@ -3,10 +3,10 @@
 #include "../RenderGraphNode.h"
 #include "utility/Model.h"
 
-class RTXReflectionsNode final : public RenderGraphNode {
+class RTReflectionsNode final : public RenderGraphNode {
 public:
-    explicit RTXReflectionsNode(const Scene&);
-    ~RTXReflectionsNode() override = default;
+    explicit RTReflectionsNode(const Scene&);
+    ~RTReflectionsNode() override = default;
 
     static std::string name();
 

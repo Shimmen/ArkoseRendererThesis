@@ -75,6 +75,10 @@ private:
     void newRenderState(const RenderState&);
     void deleteRenderState(const RenderState&);
 
+    // Maybe move to VulkanRTX or similar. In theory we might want multiple possible RT backends, e.g. OptiX vs RTX
+    void newBottomLevelAccelerationStructure(const BottomLevelAS&);
+    void deleteBottomLevelAccelerationStructure(const BottomLevelAS&);
+
     ///////////////////////////////////////////////////////////////////////////
     /// Drawing
 
@@ -118,6 +122,8 @@ private:
 
     bool transitionImageLayout(VkImage, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height, bool isDepthImage) const;
+
+    uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 
     ///////////////////////////////////////////////////////////////////////////
     /// Window and swapchain related members
@@ -210,18 +216,26 @@ private:
         std::vector<const Texture*> sampledTextures {};
     };
 
+    struct AccelerationStructureInfo {
+        VkAccelerationStructureNV accelerationStructure {};
+        VkDeviceMemory memory {};
+        uint64_t handle {};
+    };
+
     // (helpers for accessing from *Infos vectors)
     BufferInfo& bufferInfo(const Buffer&);
     TextureInfo& textureInfo(const Texture&);
     RenderTargetInfo& renderTargetInfo(const RenderTarget&);
     BindingSetInfo& bindingSetInfo(const BindingSet&);
     RenderStateInfo& renderStateInfo(const RenderState&);
+    AccelerationStructureInfo& accelerationStructureInfo(const BottomLevelAS&);
 
     PersistentIndexedList<BufferInfo> m_bufferInfos {};
     PersistentIndexedList<TextureInfo> m_textureInfos {};
     PersistentIndexedList<RenderTargetInfo> m_renderTargetInfos {};
     PersistentIndexedList<BindingSetInfo> m_bindingSetInfos {};
     PersistentIndexedList<RenderStateInfo> m_renderStateInfos {};
+    PersistentIndexedList<AccelerationStructureInfo> m_accStructInfos {};
 
     std::vector<Texture> m_swapchainMockColorTextures {};
     std::vector<RenderTarget> m_swapchainMockRenderTargets {};

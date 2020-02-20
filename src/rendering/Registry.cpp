@@ -116,6 +116,13 @@ RenderState& Registry::createRenderState(
     return m_renderStates.back();
 }
 
+BottomLevelAS& Registry::createBottomLevelAccelerationStructure(const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat vertexFormat, IndexType indexType)
+{
+    BottomLevelAS blas = { {}, vertexBuffer, indexBuffer, vertexFormat, indexType };
+    m_bottomLevelAS.push_back(blas);
+    return m_bottomLevelAS.back();
+}
+
 void Registry::publish(const std::string& name, const Buffer& buffer)
 {
     ASSERT(m_currentNodeName.has_value());
@@ -196,6 +203,11 @@ const std::vector<BindingSet>& Registry::bindingSets() const
 const std::vector<RenderState>& Registry::renderStates() const
 {
     return m_renderStates.vector();
+}
+
+const std::vector<BottomLevelAS>& Registry::bottomLevelAS() const
+{
+    return m_bottomLevelAS.vector();
 }
 
 const std::vector<BufferUpdate>& Registry::bufferUpdates() const

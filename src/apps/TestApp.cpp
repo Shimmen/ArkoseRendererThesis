@@ -3,6 +3,7 @@
 #include "rendering/nodes/CameraUniformNode.h"
 #include "rendering/nodes/FinalPostFxNode.h"
 #include "rendering/nodes/ForwardRenderNode.h"
+#include "rendering/nodes/RTReflectionsNode.h"
 #include "rendering/nodes/ShadowMapNode.h"
 #include "rendering/nodes/SlowForwardRenderNode.h"
 #include "utility/GlobalState.h"
@@ -34,6 +35,7 @@ void TestApp::setup(RenderGraph& graph)
     graph.addNode<CameraUniformNode>(m_scene.camera());
     graph.addNode<ShadowMapNode>(m_scene);
     graph.addNode<SlowForwardRenderNode>(m_scene);
+    graph.addNode<RTReflectionsNode>(m_scene);
     graph.addNode<FinalPostFxNode>();
 }
 

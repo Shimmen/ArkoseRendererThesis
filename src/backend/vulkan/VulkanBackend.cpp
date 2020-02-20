@@ -1957,6 +1957,122 @@ void VulkanBackend::deleteRenderState(const RenderState& renderState)
     renderState.unregisterBackend(backendBadge());
 }
 
+void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& blas)
+{
+    if (!m_rtx.has_value()) {
+        LogErrorAndExit("Trying to create a bottom level acceleration structure, but there is no ray tracing support!\n");
+    }
+
+    VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
+    aabbs.numAABBs = 0;
+
+    VkGeometryTrianglesNV triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
+
+    triangles.vertexData = bufferInfo(blas.vertexBuffer()).buffer;
+    triangles.vertexOffset = 0;
+    triangles.vertexStride = blas.vertexStride();
+    triangles.vertexCount = blas.vertexBuffer().size() / triangles.vertexStride;
+    switch (blas.vertexFormat()) {
+    case VertexFormat::XYZ32F:
+        triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+        break;
+    }
+
+    triangles.indexData = bufferInfo(blas.indexBuffer()).buffer;
+    triangles.indexOffset = 0;
+    switch (blas.indexType()) {
+    case IndexType::UInt16:
+        triangles.indexType = VK_INDEX_TYPE_UINT16;
+        triangles.indexCount = blas.indexBuffer().size() / sizeof(uint16_t);
+        break;
+    case IndexType::UInt32:
+        triangles.indexType = VK_INDEX_TYPE_UINT32;
+        triangles.indexCount = blas.indexBuffer().size() / sizeof(uint32_t);
+        break;
+    }
+
+    triangles.transformData = VK_NULL_HANDLE;
+    triangles.transformOffset = 0;
+
+    VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
+    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV; // "indicates that this geometry does not invoke the any-hit shaders even if present in a hit group."
+    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
+    geometry.geometry.triangles = triangles;
+    geometry.geometry.aabbs = aabbs;
+
+    std::vector<VkGeometryNV> geometries {};
+    geometries.push_back(geometry);
+
+    //
+
+    VkAccelerationStructureInfoNV accelerationStructureInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+    accelerationStructureInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+    accelerationStructureInfo.instanceCount = 0;
+    accelerationStructureInfo.geometryCount = geometries.size();
+    accelerationStructureInfo.pGeometries = geometries.data();
+
+    VkAccelerationStructureCreateInfoNV accelerationStructureCreateInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV };
+    accelerationStructureCreateInfo.info = accelerationStructureInfo;
+    VkAccelerationStructureNV accelerationStructure;
+    if (m_rtx->vkCreateAccelerationStructureNV(device(), &accelerationStructureCreateInfo, nullptr, &accelerationStructure) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to acceleration structure\n");
+    }
+
+    VkAccelerationStructureMemoryRequirementsInfoNV memoryRequirementsInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
+    memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
+    memoryRequirementsInfo.accelerationStructure = accelerationStructure;
+    VkMemoryRequirements2 memoryRequirements2 {};
+    m_rtx->vkGetAccelerationStructureMemoryRequirementsNV(device(), &memoryRequirementsInfo, &memoryRequirements2);
+
+    VkMemoryAllocateInfo memoryAllocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    memoryAllocateInfo.allocationSize = memoryRequirements2.memoryRequirements.size;
+    memoryAllocateInfo.memoryTypeIndex = findAppropriateMemory(memoryRequirements2.memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VkDeviceMemory memory;
+    if (vkAllocateMemory(device(), &memoryAllocateInfo, nullptr, &memory) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create allocate memory for acceleration structure\n");
+    }
+
+    VkBindAccelerationStructureMemoryInfoNV accelerationStructureMemoryInfo { VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NV };
+    accelerationStructureMemoryInfo.accelerationStructure = accelerationStructure;
+    accelerationStructureMemoryInfo.memory = memory;
+    if (m_rtx->vkBindAccelerationStructureMemoryNV(device(), 1, &accelerationStructureMemoryInfo) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to bind memory to acceleration structure\n");
+    }
+
+    uint64_t handle { 0 };
+    if (m_rtx->vkGetAccelerationStructureHandleNV(device(), accelerationStructure, sizeof(uint64_t), &handle) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to get acceleration structure handle\n");
+    }
+
+    AccelerationStructureInfo info {};
+    info.accelerationStructure = accelerationStructure;
+    info.memory = memory;
+    info.handle = handle;
+
+    size_t index = m_accStructInfos.add(info);
+    blas.registerBackend(backendBadge(), index);
+}
+
+void VulkanBackend::deleteBottomLevelAccelerationStructure(const BottomLevelAS& blas)
+{
+    if (blas.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created render acceleration structure\n");
+    }
+
+    AccelerationStructureInfo& blasInfo = accelerationStructureInfo(blas);
+    m_rtx->vkDestroyAccelerationStructureNV(device(), blasInfo.accelerationStructure, nullptr);
+    vkFreeMemory(device(), blasInfo.memory, nullptr);
+
+    m_accStructInfos.remove(blas.id());
+    blas.unregisterBackend(backendBadge());
+}
+
+VulkanBackend::AccelerationStructureInfo& VulkanBackend::accelerationStructureInfo(const BottomLevelAS& blas)
+{
+    AccelerationStructureInfo& accStructInfo = m_accStructInfos[blas.id()];
+    return accStructInfo;
+}
+
 VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState& renderState)
 {
     RenderStateInfo& renderStateInfo = m_renderStateInfos[renderState.id()];
@@ -2025,6 +2141,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         for (auto& renderState : previous->renderStates()) {
             deleteRenderState(renderState);
         }
+        for (auto& bottomLevelAS : previous->bottomLevelAS()) {
+            deleteBottomLevelAccelerationStructure(bottomLevelAS);
+        }
     }
 
     // Create new resources
@@ -2049,6 +2168,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         }
         for (auto& renderState : current->renderStates()) {
             newRenderState(renderState);
+        }
+        for (auto& bottomLevelAS : current->bottomLevelAS()) {
+            newBottomLevelAccelerationStructure(bottomLevelAS);
         }
     }
 }
@@ -2281,6 +2403,25 @@ bool VulkanBackend::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t w
     }
 
     return true;
+}
+
+uint32_t VulkanBackend::findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const
+{
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice(), &memoryProperties);
+
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+        // Is type i at all supported, given the typeBits?
+        if (!(typeBits & (1u << i))) {
+            continue;
+        }
+
+        if ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    LogErrorAndExit("VulkanBackend::findAppropriateMemory(): could not find any appropriate memory, exiting.\n");
 }
 
 void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSemaphore* signal, VkFence* inFlight)

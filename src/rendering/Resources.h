@@ -160,9 +160,6 @@ private:
 
 struct Buffer : public Resource {
 
-    // TODO: Remove at some later date, this is just for testing!
-    friend class VulkanBackend;
-
     enum class Usage {
         Vertex,
         Index,
@@ -330,4 +327,35 @@ private:
     std::optional<BlendState> m_blendState {};
     std::optional<RasterState> m_rasterState {};
     std::vector<const BindingSet*> m_bindingSets {};
+};
+
+enum class VertexFormat {
+    XYZ32F
+};
+
+enum class IndexType : uint32_t {
+    UInt16,
+    UInt32,
+};
+
+class BottomLevelAS : public Resource {
+public:
+
+    BottomLevelAS() = default;
+    BottomLevelAS(const BottomLevelAS&) = default;
+    BottomLevelAS(Badge<Registry>, const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat, IndexType);
+
+    [[nodiscard]] const Buffer& vertexBuffer() const;
+    [[nodiscard]] VertexFormat vertexFormat() const;
+    [[nodiscard]] uint32_t vertexStride() const;
+
+    [[nodiscard]] const Buffer& indexBuffer() const;
+    [[nodiscard]] IndexType indexType() const;
+
+private:
+    const Buffer& m_vertexBuffer {};
+    const Buffer& m_indexBuffer {};
+
+    VertexFormat m_vertexFormat {};
+    IndexType m_indexType {};
 };

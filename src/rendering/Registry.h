@@ -31,6 +31,8 @@ public:
     [[nodiscard]] RenderState& createRenderState(const RenderStateBuilder&);
     [[nodiscard]] RenderState& createRenderState(const RenderTarget&, const VertexLayout&, const Shader&, std::vector<const BindingSet*>, const Viewport&, const BlendState&, const RasterState&);
 
+    [[nodiscard]] BottomLevelAS& createBottomLevelAccelerationStructure(const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat, IndexType);
+
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture&);
 
@@ -44,6 +46,7 @@ public:
     [[nodiscard]] const std::vector<RenderTarget>& renderTargets() const;
     [[nodiscard]] const std::vector<BindingSet>& bindingSets() const;
     [[nodiscard]] const std::vector<RenderState>& renderStates() const;
+    [[nodiscard]] const std::vector<BottomLevelAS>& bottomLevelAS() const;
     [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
     [[nodiscard]] const std::vector<TextureUpdateFromFile>& textureUpdates() const;
 
@@ -64,6 +67,8 @@ private:
     std::vector<BufferUpdate> m_immediateBufferUpdates;
     std::vector<TextureUpdateFromFile> m_immediateTextureUpdates;
 
+    // TODO: Maybe just replace all of this below with a large shared memory arena?
+
     static constexpr int maxNumBuffers { 50 };
     CapList<Buffer> m_buffers { maxNumBuffers };
 
@@ -78,6 +83,9 @@ private:
 
     static constexpr int maxNumRenderStates { 10 };
     CapList<RenderState> m_renderStates { maxNumRenderStates };
+
+    static constexpr int maxNumBottomLevelAS{ 50 };
+    CapList<BottomLevelAS> m_bottomLevelAS { maxNumBottomLevelAS };
 };
 
 template<typename T>

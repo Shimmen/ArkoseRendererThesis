@@ -314,3 +314,39 @@ const std::vector<const BindingSet*>& RenderStateBuilder::bindingSets() const
 {
     return m_bindingSets;
 }
+
+BottomLevelAS::BottomLevelAS(Badge<Registry>, const Buffer& vertexBuffer, const Buffer& indexBuffer, VertexFormat vertexFormat, IndexType indexType)
+    : m_vertexBuffer(vertexBuffer)
+    , m_indexBuffer(indexBuffer)
+    , m_vertexFormat(vertexFormat)
+    , m_indexType(indexType)
+{
+}
+
+const Buffer& BottomLevelAS::vertexBuffer() const
+{
+    return m_vertexBuffer;
+}
+
+VertexFormat BottomLevelAS::vertexFormat() const
+{
+    return m_vertexFormat;
+}
+
+uint32_t BottomLevelAS::vertexStride() const
+{
+    switch (m_vertexFormat) {
+    case VertexFormat::XYZ32F:
+        return 3 * 4;
+    }
+}
+
+const Buffer& BottomLevelAS::indexBuffer() const
+{
+    return m_indexBuffer;
+}
+
+IndexType BottomLevelAS::indexType() const
+{
+    return m_indexType;
+}
