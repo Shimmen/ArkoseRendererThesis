@@ -2,7 +2,6 @@
 
 #include "FpsCamera.h"
 #include "mathkit.h"
-#include "rendering/Resources.h"
 #include <functional>
 
 class Material {
@@ -52,6 +51,15 @@ private:
     mutable mat4 m_localMatrix { 1.0f };
 };
 
+enum class VertexFormat {
+    XYZ32F
+};
+
+enum class IndexType {
+    UInt16,
+    UInt32,
+};
+
 class Mesh {
 public:
     Mesh(Transform transform)
@@ -68,6 +76,9 @@ public:
     virtual std::vector<vec2> texcoordData() const = 0;
     virtual std::vector<vec3> normalData() const = 0;
     virtual std::vector<vec4> tangentData() const = 0;
+
+    virtual VertexFormat vertexFormat() const = 0;
+    virtual IndexType indexType() const = 0;
 
     virtual std::vector<uint16_t> indexData() const = 0;
     virtual size_t indexCount() const = 0;

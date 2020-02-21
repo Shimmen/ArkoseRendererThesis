@@ -3,6 +3,7 @@
 #include "Shader.h"
 #include "utility/Badge.h"
 #include "utility/Extent.h"
+#include "utility/Model.h"
 #include "utility/mathkit.h"
 #include "utility/util.h"
 #include <cstdint>
@@ -335,15 +336,6 @@ private:
     std::optional<BlendState> m_blendState {};
     std::optional<RasterState> m_rasterState {};
     std::vector<const BindingSet*> m_bindingSets {};
-};
-
-// TODO: Move to the model class? And make is possible to query a model/mesh for this?
-enum class VertexFormat {
-    XYZ32F
-};
-enum class IndexType : uint32_t {
-    UInt16,
-    UInt32,
 };
 
 struct RTGeometry {

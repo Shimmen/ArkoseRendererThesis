@@ -289,3 +289,13 @@ bool GltfMesh::isIndexed() const
 {
     return m_primitive->indices != -1;
 }
+
+VertexFormat GltfMesh::vertexFormat() const
+{
+    return VertexFormat::XYZ32F;
+}
+
+IndexType GltfMesh::indexType() const
+{
+    return IndexType::UInt16;
+}

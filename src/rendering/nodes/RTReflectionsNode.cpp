@@ -25,9 +25,9 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
             // TODO: Make sure we get the effect of animations! Maybe that's a TLAS-level thing only though?
             // TODO: We want to specify if the geometry is opaque or not also!
             geometries.push_back({ .vertexBuffer = nodeReg.createBuffer(mesh.positionData(), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                                   .vertexFormat = VertexFormat::XYZ32F,
+                                   .vertexFormat = mesh.vertexFormat(),
                                    .indexBuffer = nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
-                                   .indexType = IndexType::UInt16 });
+                                   .indexType = mesh.indexType() });
         });
 
         BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure(geometries);

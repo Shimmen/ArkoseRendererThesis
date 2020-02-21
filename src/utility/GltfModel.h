@@ -23,6 +23,9 @@ public:
     [[nodiscard]] size_t indexCount() const override;
     [[nodiscard]] bool isIndexed() const override;
 
+    VertexFormat vertexFormat() const override;
+    IndexType indexType() const override;
+
 private:
     const tinygltf::Accessor& getAccessor(const char* name) const;
 
