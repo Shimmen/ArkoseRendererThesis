@@ -27,6 +27,7 @@ void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColo
         endCurrentRenderPassIfAny();
     }
     activeRenderState = &renderState;
+    activeRayTracingState = nullptr;
 
     const RenderTarget& renderTarget = renderState.renderTarget();
     const auto& targetInfo = m_backend.renderTargetInfo(renderTarget);
@@ -83,20 +84,53 @@ void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColo
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, stateInfo.pipeline);
 }
 
+void VulkanCommandList::setRayTracingState(const RayTracingState& rtState)
+{
+    if (!m_backend.m_rtx.has_value()) {
+        LogErrorAndExit("Trying to set ray tracing state but there is no ray tracing support!\n");
+    }
+
+    if (activeRenderState) {
+        LogWarning("setRayTracingState: active render state when starting ray tracing.\n");
+        endCurrentRenderPassIfAny();
+    }
+
+    activeRayTracingState = &rtState;
+
+    auto& rtStateInfo = m_backend.rayTracingStateInfo(rtState);
+    vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, rtStateInfo.pipeline);
+}
+
 void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
 {
-    if (!activeRenderState) {
-        LogErrorAndExit("bindSet: no active render state to bind to!\n");
+    if (!activeRenderState && !activeRayTracingState) {
+        LogErrorAndExit("bindSet: no active render or ray tracing state to bind to!\n");
     }
-    VkPipelineLayout pipelineLayout = m_backend.renderStateInfo(*activeRenderState).pipelineLayout;
+
+    ASSERT(!(activeRenderState && activeRayTracingState));
+    
+    VkPipelineLayout pipelineLayout;
+    VkPipelineBindPoint bindPoint;
+
+    if (activeRenderState) {
+        pipelineLayout = m_backend.renderStateInfo(*activeRenderState).pipelineLayout;
+        bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    }
+    if (activeRayTracingState) {
+        pipelineLayout = m_backend.rayTracingStateInfo(*activeRayTracingState).pipelineLayout;
+        bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_NV;
+    }
 
     auto& bindInfo = m_backend.bindingSetInfo(bindingSet);
-
-    vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, index, 1, &bindInfo.descriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets(m_commandBuffer, bindPoint, pipelineLayout, index, 1, &bindInfo.descriptorSet, 0, nullptr);
 }
 
 void VulkanCommandList::draw(Buffer& vertexBuffer, uint32_t vertexCount)
 {
+    if (!activeRenderState) {
+        LogErrorAndExit("draw: no active render state!\n");
+    }
+
     VkBuffer vertBuffer = m_backend.bufferInfo(vertexBuffer).buffer;
 
     VkBuffer vertexBuffers[] = { vertBuffer };
@@ -108,6 +142,10 @@ void VulkanCommandList::draw(Buffer& vertexBuffer, uint32_t vertexCount)
 
 void VulkanCommandList::drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, uint32_t instanceIndex)
 {
+    if (!activeRenderState) {
+        LogErrorAndExit("drawIndexed: no active render state!\n");
+    }
+
     VkBuffer vertBuffer = m_backend.bufferInfo(vertexBuffer).buffer;
     VkBuffer idxBuffer = m_backend.bufferInfo(indexBuffer).buffer;
 
@@ -117,6 +155,37 @@ void VulkanCommandList::drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, u
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(m_commandBuffer, idxBuffer, 0, VK_INDEX_TYPE_UINT16); // TODO: User should specify index type!
     vkCmdDrawIndexed(m_commandBuffer, indexCount, 1, 0, 0, instanceIndex);
+}
+
+void VulkanCommandList::traceRays(Extent2D extent)
+{
+    if (!activeRayTracingState) {
+        LogErrorAndExit("traceRays: no active ray tracing state!\n");
+    }
+
+    if (!m_backend.m_rtx.has_value()) {
+        LogErrorAndExit("Trying to trace rays but there is no ray tracing support!\n");
+    }
+
+    auto& rtStateInfo = m_backend.rayTracingStateInfo(*activeRayTracingState);
+    VkDeviceSize bindingStride = m_backend.m_rtx->properties().shaderGroupHandleSize;
+
+    // TODO: Store the offsets in the rtStateInfo!
+    /*
+    m_backend.m_rtx->vkCmdTraceRaysNV(m_commandBuffer,
+        rtStateInfo.sbtBuffer, RAYGEN_OFFSET,
+        rtStateInfo.sbtBuffer, MISS_OFFSET, MISS_STRIDE,
+        rtStateInfo.sbtBuffer, HIT_OFFSET, HIT_STRIDE,
+        VK_NULL_HANDLE, 0, 0,
+        extent.width(), extent.height(), 1);
+    */
+
+    m_backend.m_rtx->vkCmdTraceRaysNV(m_commandBuffer,
+        rtStateInfo.sbtBuffer, 0,
+        rtStateInfo.sbtBuffer, 1 * bindingStride, bindingStride,
+        rtStateInfo.sbtBuffer, 2 * bindingStride, bindingStride,
+        VK_NULL_HANDLE, 0, 0,
+        extent.width(), extent.height(), 1);
 }
 
 void VulkanCommandList::debugBarrier()
