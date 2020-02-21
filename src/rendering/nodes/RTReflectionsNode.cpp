@@ -15,27 +15,25 @@ std::string RTReflectionsNode::name()
 
 void RTReflectionsNode::constructNode(Registry& nodeReg)
 {
-    std::vector<RTGeometryInstance> instances {};
+    m_instances.clear();
 
-    for (const auto model : m_scene.models()) {
+    for (auto& model : m_scene.models()) {
 
         std::vector<RTGeometry> geometries {};
         model->forEachMesh([&](const Mesh& mesh) {
-            // TODO: Somehow include the mesh.transform().localMatrix() in the geometry data!
             // TODO: Make sure we get the effect of animations! Maybe that's a TLAS-level thing only though?
             // TODO: We want to specify if the geometry is opaque or not also!
             geometries.push_back({ .vertexBuffer = nodeReg.createBuffer(mesh.positionData(), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
                                    .vertexFormat = mesh.vertexFormat(),
                                    .indexBuffer = nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
-                                   .indexType = mesh.indexType() });
+                                   .indexType = mesh.indexType(),
+                                   .transform = mesh.transform().localMatrix() });
         });
 
         BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure(geometries);
-        instances.push_back({ .blas = blas,
-                              .transform = model->transform().worldMatrix() });
+        m_instances.push_back({ .blas = blas,
+                                .transform = model->transform().worldMatrix() });
     }
-
-    m_tlas = &nodeReg.createTopLevelAccelerationStructure(instances);
 }
 
 RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg) const
@@ -47,8 +45,8 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
     ShaderFile miss = ShaderFile("rt-reflections/miss.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-reflections/closestHit.rchit", ShaderFileType::RTClosestHit);
 
-    // Maybe we want frame-reg TLAS? Since we want to update & compact it, etc.
-    BindingSet& bindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, m_tlas },
+    TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
+    BindingSet& bindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
                                                     { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
                                                     { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
 

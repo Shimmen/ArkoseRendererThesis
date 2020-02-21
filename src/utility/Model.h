@@ -25,6 +25,11 @@ public:
         m_localMatrix = matrix;
     }
 
+    mat4 localMatrix() const
+    {
+        return m_localMatrix;
+    }
+
     mat4 worldMatrix() const
     {
         if (!m_parent) {

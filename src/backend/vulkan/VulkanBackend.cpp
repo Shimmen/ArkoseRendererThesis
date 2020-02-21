@@ -2011,9 +2011,38 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
         LogErrorAndExit("Trying to create a bottom level acceleration structure, but there is no ray tracing support!\n");
     }
 
+    VkBuffer transformBuffer;
+    VmaAllocation transformBufferAllocation;
+    size_t singleTransformSize = 3 * 4 * sizeof(float);
+    {
+        std::vector<glm::mat3x4> transforms {};
+        for (auto& geo : blas.geometries()) {
+            glm::mat3x4 mat34 = transpose(geo.transform);
+            transforms.push_back(mat34);
+        }
+
+        size_t totalSize = transforms.size() * singleTransformSize;
+
+        VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        bufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV; // (I can't find info on usage from the spec, but I assume this should work)
+        bufferCreateInfo.size = totalSize;
+
+        VmaAllocationCreateInfo allocCreateInfo = {};
+        allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+
+        if (vmaCreateBuffer(m_memoryAllocator, &bufferCreateInfo, &allocCreateInfo, &transformBuffer, &transformBufferAllocation, nullptr) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create buffer for the bottom level acceeration structure transforms.\n");
+        }
+
+        if (!setBufferMemoryUsingMapping(transformBufferAllocation, transforms.data(), totalSize)) {
+            LogErrorAndExit("Error trying to copy data to the bottom level acceeration structure transform buffer.\n");
+        }
+    }
+
     std::vector<VkGeometryNV> geometries {};
 
-    for (auto& geo : blas.geometries()) {
+    for (size_t geoIdx = 0; geoIdx < blas.geometries().size(); ++geoIdx) {
+        const RTGeometry& geo = blas.geometries()[geoIdx];
 
         VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
         aabbs.numAABBs = 0;
@@ -2043,9 +2072,8 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
             break;
         }
 
-        // TODO: Add transform data! Somehow.. Maybe a single buffer of transforms & then offsets for each individual geometry?
-        triangles.transformData = VK_NULL_HANDLE;
-        triangles.transformOffset = 0;
+        triangles.transformData = transformBuffer;
+        triangles.transformOffset = geoIdx * singleTransformSize;
 
         VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
         geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV; // "indicates that this geometry does not invoke the any-hit shaders even if present in a hit group."
@@ -2115,6 +2143,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
     });
 
     vmaDestroyBuffer(m_memoryAllocator, scratchBuffer, scratchAllocation);
+    vmaDestroyBuffer(m_memoryAllocator, transformBuffer, transformBufferAllocation);
 
     AccelerationStructureInfo info {};
     info.accelerationStructure = accelerationStructure;
@@ -2514,17 +2543,17 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         for (auto& renderTarget : current->renderTargets()) {
             newRenderTarget(renderTarget);
         }
-        for (auto& bindingSet : current->bindingSets()) {
-            newBindingSet(bindingSet);
-        }
-        for (auto& renderState : current->renderStates()) {
-            newRenderState(renderState);
-        }
         for (auto& bottomLevelAS : current->bottomLevelAS()) {
             newBottomLevelAccelerationStructure(bottomLevelAS);
         }
         for (auto& topLevelAS : current->topLevelAS()) {
             newTopLevelAccelerationStructure(topLevelAS);
+        }
+        for (auto& bindingSet : current->bindingSets()) {
+            newBindingSet(bindingSet);
+        }
+        for (auto& renderState : current->renderStates()) {
+            newRenderState(renderState);
         }
         for (auto& rtState : current->rayTracingStates()) {
             newRayTracingState(rtState);
@@ -2821,7 +2850,7 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
     for (auto& instance : instances) {
         VulkanRTX::GeometryInstance data {};
 
-        data.transform = instance.transform;
+        data.transform = transpose(instance.transform);
 
         const auto& blasInfo = accelerationStructureInfo(instance.blas);
         data.accelerationStructureHandle = blasInfo.handle;
