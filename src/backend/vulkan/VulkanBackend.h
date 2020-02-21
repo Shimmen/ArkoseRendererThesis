@@ -235,6 +235,9 @@ private:
     struct RayTracingStateInfo {
         VkPipelineLayout pipelineLayout {};
         VkPipeline pipeline {};
+
+        VkBuffer sbtBuffer {};
+        VmaAllocation sbtBufferAllocation {};
     };
 
     // (helpers for accessing from *Infos vectors)

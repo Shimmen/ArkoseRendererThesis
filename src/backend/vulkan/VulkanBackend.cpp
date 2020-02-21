@@ -2333,9 +2333,38 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
         LogErrorAndExit("Error creating ray tracing pipeline\n");
     }
 
+    // Create buffer for the shader binding table
+    VkBuffer sbtBuffer;
+    VmaAllocation sbtBufferAllocation;
+    {
+        size_t sbtSize = m_rtx->properties().shaderGroupHandleSize * shaderGroups.size();
+
+        VkBufferCreateInfo scratchBufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
+        scratchBufferCreateInfo.size = sbtSize;
+
+        VmaAllocationCreateInfo scratchAllocCreateInfo = {};
+        scratchAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; // Gpu only is probably perfectly fine, except we need to copy the data using a staging buffer
+
+        if (vmaCreateBuffer(m_memoryAllocator, &scratchBufferCreateInfo, &scratchAllocCreateInfo, &sbtBuffer, &sbtBufferAllocation, nullptr) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create buffer for the shader binding table.\n");
+        }
+
+        std::vector<std::byte> shaderGroupHandles { sbtSize };
+        if (m_rtx->vkGetRayTracingShaderGroupHandlesNV(device(), pipeline, 0, shaderGroups.size(), sbtSize, shaderGroupHandles.data()) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to get shader group handles for the shader binding table.\n");
+        }
+
+        if (!setBufferMemoryUsingMapping(sbtBufferAllocation, shaderGroupHandles.data(), sbtSize)) {
+            LogErrorAndExit("Error trying to copy data to the shader binding table.\n");
+        }
+    }
+
     RayTracingStateInfo rtStateInfo {};
     rtStateInfo.pipelineLayout = pipelineLayout;
     rtStateInfo.pipeline = pipeline;
+    rtStateInfo.sbtBuffer = sbtBuffer;
+    rtStateInfo.sbtBufferAllocation = sbtBufferAllocation;
 
     // TODO: Save textures that we will sample so we can transition their layouts!
 
@@ -2350,6 +2379,7 @@ void VulkanBackend::deleteRayTracingState(const RayTracingState& rtState)
     }
 
     RayTracingStateInfo& rtStateInfo = rayTracingStateInfo(rtState);
+    vmaFreeMemory(m_memoryAllocator, rtStateInfo.sbtBufferAllocation);
     vkDestroyPipeline(device(), rtStateInfo.pipeline, nullptr);
     vkDestroyPipelineLayout(device(), rtStateInfo.pipelineLayout, nullptr);
 
