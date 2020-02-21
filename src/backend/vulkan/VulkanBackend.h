@@ -238,6 +238,9 @@ private:
 
         VkBuffer sbtBuffer {};
         VmaAllocation sbtBufferAllocation {};
+
+        std::vector<const Texture*> sampledTextures {};
+        std::vector<const Texture*> storageImages {};
     };
 
     // (helpers for accessing from *Infos vectors)

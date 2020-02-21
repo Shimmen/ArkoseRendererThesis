@@ -2366,7 +2366,20 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
     rtStateInfo.sbtBuffer = sbtBuffer;
     rtStateInfo.sbtBufferAllocation = sbtBufferAllocation;
 
-    // TODO: Save textures that we will sample so we can transition their layouts!
+    for (auto& set : rtState.bindingSets()) {
+        for (auto& bindingInfo : set->shaderBindings()) {
+            for (auto texture : bindingInfo.textures) {
+                switch (bindingInfo.type) {
+                case ShaderBindingType::TextureSampler:
+                    rtStateInfo.sampledTextures.push_back(texture);
+                    break;
+                case ShaderBindingType::StorageImage:
+                    rtStateInfo.storageImages.push_back(texture);
+                    break;
+                }
+            }
+        }
+    }
 
     size_t index = m_rtStateInfos.add(rtStateInfo);
     rtState.registerBackend(backendBadge(), index);
@@ -2693,6 +2706,16 @@ bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkI
         // ... before allowing any shaders to read the memory
         destinationStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    } else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL) {
+
+        // Wait for all shader memory reads...
+        sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        // ... before allowing any memory writes
+        destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
     } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
 

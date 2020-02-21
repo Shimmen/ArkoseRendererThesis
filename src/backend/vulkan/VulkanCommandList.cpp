@@ -97,6 +97,27 @@ void VulkanCommandList::setRayTracingState(const RayTracingState& rtState)
 
     activeRayTracingState = &rtState;
 
+    // Explicitly transition the layouts of the referenced textures to an optimal layout (if it isn't already)
+    {
+        auto& rtStateInfo = m_backend.rayTracingStateInfo(rtState);
+        
+        for (const Texture* texture : rtStateInfo.sampledTextures) {
+            auto& texInfo = m_backend.textureInfo(*texture);
+            if (texInfo.currentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+                m_backend.transitionImageLayout(texInfo.image, texture->hasDepthFormat(), texInfo.currentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &m_commandBuffer);
+            }
+            texInfo.currentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
+
+        for (const Texture* texture : rtStateInfo.storageImages) {
+            auto& texInfo = m_backend.textureInfo(*texture);
+            if (texInfo.currentLayout != VK_IMAGE_LAYOUT_GENERAL) {
+                m_backend.transitionImageLayout(texInfo.image, texture->hasDepthFormat(), texInfo.currentLayout, VK_IMAGE_LAYOUT_GENERAL, &m_commandBuffer);
+            }
+            texInfo.currentLayout = VK_IMAGE_LAYOUT_GENERAL;
+        }
+    }
+
     auto& rtStateInfo = m_backend.rayTracingStateInfo(rtState);
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, rtStateInfo.pipeline);
 }
