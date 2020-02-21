@@ -364,7 +364,7 @@ private:
 
 struct RTGeometryInstance {
     const BottomLevelAS& blas;
-    mat4 transform;
+    const Transform& transform;
 };
 
 class TopLevelAS : public Resource {

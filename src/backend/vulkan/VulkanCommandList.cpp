@@ -100,7 +100,7 @@ void VulkanCommandList::setRayTracingState(const RayTracingState& rtState)
     // Explicitly transition the layouts of the referenced textures to an optimal layout (if it isn't already)
     {
         auto& rtStateInfo = m_backend.rayTracingStateInfo(rtState);
-        
+
         for (const Texture* texture : rtStateInfo.sampledTextures) {
             auto& texInfo = m_backend.textureInfo(*texture);
             if (texInfo.currentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
@@ -129,7 +129,7 @@ void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
     }
 
     ASSERT(!(activeRenderState && activeRayTracingState));
-    
+
     VkPipelineLayout pipelineLayout;
     VkPipelineBindPoint bindPoint;
 
@@ -178,6 +178,42 @@ void VulkanCommandList::drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, u
     vkCmdDrawIndexed(m_commandBuffer, indexCount, 1, 0, 0, instanceIndex);
 }
 
+void VulkanCommandList::rebuildTopLevelAcceratationStructure(TopLevelAS& tlas)
+{
+    if (!m_backend.m_rtx.has_value()) {
+        LogErrorAndExit("Trying to rebuild a top level acceleration structure but there is no ray tracing support!\n");
+    }
+
+    auto& tlasInfo = m_backend.accelerationStructureInfo(tlas);
+
+    // TODO: Maybe don't throw the allocation away (when building the first time), so we can reuse it here?
+    //  However, it's a different size, though! So maybe not. Or if we use the max(build, rebuild) size?
+    VmaAllocation scratchAllocation;
+    VkBuffer scratchBuffer = m_backend.createScratchBufferForAccelerationStructure(tlasInfo.accelerationStructure, true, scratchAllocation);
+
+    VmaAllocation instanceAllocation;
+    VkBuffer instanceBuffer = m_backend.createRTXInstanceBuffer(tlas.instances(), instanceAllocation);
+
+    VkAccelerationStructureInfoNV buildInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+    buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+    buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
+    buildInfo.instanceCount = tlas.instanceCount();
+    buildInfo.geometryCount = 0;
+    buildInfo.pGeometries = nullptr;
+
+    m_backend.m_rtx->vkCmdBuildAccelerationStructureNV(
+        m_commandBuffer,
+        &buildInfo,
+        instanceBuffer, 0,
+        VK_TRUE,
+        tlasInfo.accelerationStructure,
+        tlasInfo.accelerationStructure,
+        scratchBuffer, 0);
+
+    vmaDestroyBuffer(m_backend.m_memoryAllocator, scratchBuffer, scratchAllocation);
+    vmaDestroyBuffer(m_backend.m_memoryAllocator, instanceBuffer, instanceAllocation);
+}
+
 void VulkanCommandList::traceRays(Extent2D extent)
 {
     if (!activeRayTracingState) {
@@ -202,11 +238,11 @@ void VulkanCommandList::traceRays(Extent2D extent)
     */
 
     m_backend.m_rtx->vkCmdTraceRaysNV(m_commandBuffer,
-        rtStateInfo.sbtBuffer, 0,
-        rtStateInfo.sbtBuffer, 1 * bindingStride, bindingStride,
-        rtStateInfo.sbtBuffer, 2 * bindingStride, bindingStride,
-        VK_NULL_HANDLE, 0, 0,
-        extent.width(), extent.height(), 1);
+                                      rtStateInfo.sbtBuffer, 0,
+                                      rtStateInfo.sbtBuffer, 1 * bindingStride, bindingStride,
+                                      rtStateInfo.sbtBuffer, 2 * bindingStride, bindingStride,
+                                      VK_NULL_HANDLE, 0, 0,
+                                      extent.width(), extent.height(), 1);
 }
 
 void VulkanCommandList::debugBarrier()

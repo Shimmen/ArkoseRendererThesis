@@ -21,7 +21,6 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
 
         std::vector<RTGeometry> geometries {};
         model->forEachMesh([&](const Mesh& mesh) {
-            // TODO: Make sure we get the effect of animations! Maybe that's a TLAS-level thing only though?
             // TODO: We want to specify if the geometry is opaque or not also!
             geometries.push_back({ .vertexBuffer = nodeReg.createBuffer(mesh.positionData(), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
                                    .vertexFormat = mesh.vertexFormat(),
@@ -32,7 +31,7 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
 
         BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure(geometries);
         m_instances.push_back({ .blas = blas,
-                                .transform = model->transform().worldMatrix() });
+                                .transform = model->transform() });
     }
 }
 
@@ -53,6 +52,7 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &bindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
+        cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
         cmdList.bindSet(bindingSet, 0);
         cmdList.traceRays(appState.windowExtent());

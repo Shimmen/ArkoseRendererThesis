@@ -130,7 +130,7 @@ private:
     bool transitionImageLayout(VkImage, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height, bool isDepthImage) const;
 
-    VkBuffer createScratchBufferForAccelerationStructure(VkAccelerationStructureNV, VmaAllocation&) const;
+    VkBuffer createScratchBufferForAccelerationStructure(VkAccelerationStructureNV, bool updateInPlace, VmaAllocation&) const;
     VkBuffer createRTXInstanceBuffer(std::vector<RTGeometryInstance>, VmaAllocation&);
 
     uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const;

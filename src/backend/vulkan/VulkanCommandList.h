@@ -16,6 +16,7 @@ public:
     void draw(Buffer& vertexBuffer, uint32_t vertexCount) override;
     void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, uint32_t instanceIndex) override;
     
+    void rebuildTopLevelAcceratationStructure(TopLevelAS&) override;
     void traceRays(Extent2D) override;
     
     void debugBarrier() override;

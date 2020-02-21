@@ -14,6 +14,7 @@ public:
     virtual void draw(Buffer& vertexBuffer, uint32_t vertexCount) = 0;
     virtual void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, uint32_t instanceIndex = 0) = 0;
 
+    virtual void rebuildTopLevelAcceratationStructure(TopLevelAS&) = 0;
     virtual void traceRays(Extent2D) = 0;
 
     //! A barrier for all commands and memory, which probably only should be used for debug stuff.

@@ -2124,7 +2124,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
     }
 
     VmaAllocation scratchAllocation;
-    VkBuffer scratchBuffer = createScratchBufferForAccelerationStructure(accelerationStructure, scratchAllocation);
+    VkBuffer scratchBuffer = createScratchBufferForAccelerationStructure(accelerationStructure, false, scratchAllocation);
 
     VkAccelerationStructureInfoNV buildInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
@@ -2174,8 +2174,12 @@ void VulkanBackend::newTopLevelAccelerationStructure(const TopLevelAS& tlas)
         LogErrorAndExit("Trying to create a bottom level acceleration structure, but there is no ray tracing support!\n");
     }
 
+    // Something more here maybe? Like fast to build/traverse, can be compacted, etc.
+    VkBuildAccelerationStructureFlagBitsNV flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
+
     VkAccelerationStructureInfoNV accelerationStructureInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     accelerationStructureInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+    accelerationStructureInfo.flags = flags;
     accelerationStructureInfo.instanceCount = tlas.instanceCount();
     accelerationStructureInfo.geometryCount = 0;
 
@@ -2213,13 +2217,14 @@ void VulkanBackend::newTopLevelAccelerationStructure(const TopLevelAS& tlas)
     }
 
     VmaAllocation scratchAllocation;
-    VkBuffer scratchBuffer = createScratchBufferForAccelerationStructure(accelerationStructure, scratchAllocation);
+    VkBuffer scratchBuffer = createScratchBufferForAccelerationStructure(accelerationStructure, false, scratchAllocation);
 
     VmaAllocation instanceAllocation;
     VkBuffer instanceBuffer = createRTXInstanceBuffer(tlas.instances(), instanceAllocation);
 
     VkAccelerationStructureInfoNV buildInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+    buildInfo.flags = flags;
     buildInfo.instanceCount = tlas.instanceCount();
     buildInfo.geometryCount = 0;
     buildInfo.pGeometries = nullptr;
@@ -2811,14 +2816,17 @@ bool VulkanBackend::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t w
     return true;
 }
 
-VkBuffer VulkanBackend::createScratchBufferForAccelerationStructure(VkAccelerationStructureNV accelerationStructure, VmaAllocation& allocation) const
+VkBuffer VulkanBackend::createScratchBufferForAccelerationStructure(VkAccelerationStructureNV accelerationStructure, bool updateInPlace, VmaAllocation& allocation) const
 {
     if (!m_rtx.has_value()) {
         LogErrorAndExit("Trying to create a RTX scratch buffer, but there is no ray tracing support!\n");
     }
 
     VkAccelerationStructureMemoryRequirementsInfoNV memoryRequirementsInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
-    memoryRequirementsInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+    memoryRequirementsInfo.type = updateInPlace
+        ? VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_UPDATE_SCRATCH_NV
+        : VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+   
 
     VkMemoryRequirements2 scratchMemRequirements2;
     memoryRequirementsInfo.accelerationStructure = accelerationStructure;
@@ -2850,7 +2858,7 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
     for (auto& instance : instances) {
         VulkanRTX::GeometryInstance data {};
 
-        data.transform = transpose(instance.transform);
+        data.transform = transpose(instance.transform.worldMatrix());
 
         const auto& blasInfo = accelerationStructureInfo(instance.blas);
         data.accelerationStructureHandle = blasInfo.handle;
@@ -2859,7 +2867,7 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
         data.instanceId = 0; // Relevant for who? Do we get this value in the shaders maybe? Makes sense to me.
         data.mask = 0xff;
         data.instanceOffset = 0;
-        data.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
+        data.flags = 0;// VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
 
         instanceData.push_back(data);
     }
