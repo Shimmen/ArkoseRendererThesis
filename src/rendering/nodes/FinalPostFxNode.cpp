@@ -1,6 +1,7 @@
 #include "FinalPostFxNode.h"
 
 #include "ForwardRenderNode.h"
+#include "RTReflectionsNode.h"
 
 FinalPostFxNode::FinalPostFxNode()
     : RenderGraphNode(FinalPostFxNode::name())
@@ -20,7 +21,8 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     std::vector<vec2> fullScreenTriangle { { -1, -3 }, { -1, 1 }, { 3, 1 } };
     Buffer& vertexBuffer = reg.createBuffer(std::move(fullScreenTriangle), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal);
 
-    const Texture* sourceTexture = reg.getTexture(ForwardRenderNode::name(), "color");
+    //const Texture* sourceTexture = reg.getTexture(ForwardRenderNode::name(), "color");
+    const Texture* sourceTexture = reg.getTexture(RTReflectionsNode::name(), "image");
     if (!sourceTexture) {
         LogError("FinalPostFxNode: could not find the input texture 'forward:color', using test texture\n");
         sourceTexture = &reg.loadTexture2D("assets/test-pattern.png", true, true);

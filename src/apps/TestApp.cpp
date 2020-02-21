@@ -34,8 +34,8 @@ void TestApp::setup(RenderGraph& graph)
 
     graph.addNode<CameraUniformNode>(m_scene.camera());
     graph.addNode<ShadowMapNode>(m_scene);
-    graph.addNode<SlowForwardRenderNode>(m_scene);
     graph.addNode<RTReflectionsNode>(m_scene);
+    graph.addNode<SlowForwardRenderNode>(m_scene);
     graph.addNode<FinalPostFxNode>();
 }
 

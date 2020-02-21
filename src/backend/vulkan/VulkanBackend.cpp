@@ -1627,7 +1627,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 descImageInfo.imageView = texInfo.view;
 
                 //ASSERT(texInfo.currentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                ASSERT(texture.usage() == Texture::Usage::Sampled || texture.usage() == Texture::Usage::AttachAndSample);
+                ASSERT(texture.usage() == Texture::Usage::Sampled || texture.usage() == Texture::Usage::AttachAndSample || texture.usage() == Texture::Usage::StorageAndSample);
                 descImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; //texInfo.currentLayout;
 
                 descImageInfos.push_back(descImageInfo);
@@ -2679,6 +2679,16 @@ bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkI
         // Wait for all color attachment writes ...
         sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
         imageBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        // ... before allowing any shaders to read the memory
+        destinationStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        imageBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    } else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+
+        // Wait for all memory writes ...
+        sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        imageBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 
         // ... before allowing any shaders to read the memory
         destinationStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;

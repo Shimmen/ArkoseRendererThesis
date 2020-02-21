@@ -200,22 +200,35 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Buff
 {
 }
 
-ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Texture* texture)
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Texture* texture, ShaderBindingType type)
     : bindingIndex(index)
     , count(1)
     , shaderStage(shaderStage)
+    , type(type)
     , buffer(nullptr)
     , textures({ texture })
 {
     if (!texture) {
         LogErrorAndExit("ShaderBinding error: null texture\n");
     }
-    if (texture->usage() == Texture::Usage::Sampled || texture->usage() == Texture::Usage::AttachAndSample) {
-        type = ShaderBindingType::TextureSampler;
-    } else if (texture->usage() == Texture::Usage::StorageAndSample) {
-        type = ShaderBindingType::StorageImage; // TODO: We need some better way of differentiating these!!
-    } else {
-        LogErrorAndExit("ShaderBinding error: texture does not have a valid usage for being in a shader binding\n");
+
+    auto usage = texture->usage();
+
+    switch (type) {
+    case ShaderBindingType::TextureSampler:
+        if (usage != Texture::Usage::Sampled && usage != Texture::Usage::AttachAndSample && usage != Texture::Usage::StorageAndSample) {
+            LogErrorAndExit("ShaderBinding error: texture does not have a usage valid for being sampled\n");
+        }
+        break;
+    case ShaderBindingType::StorageImage:
+        if (usage != Texture::Usage::StorageAndSample) {
+            LogErrorAndExit("ShaderBinding error: texture is not a storage image\n");
+        }
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+
     }
 }
 

@@ -22,6 +22,7 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
         std::vector<RTGeometry> geometries {};
         model->forEachMesh([&](const Mesh& mesh) {
             // TODO: Somehow include the mesh.transform().localMatrix() in the geometry data!
+            // TODO: Make sure we get the effect of animations! Maybe that's a TLAS-level thing only though?
             // TODO: We want to specify if the geometry is opaque or not also!
             geometries.push_back({ .vertexBuffer = nodeReg.createBuffer(mesh.positionData(), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
                                    .vertexFormat = VertexFormat::XYZ32F,
@@ -48,7 +49,7 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
 
     // Maybe we want frame-reg TLAS? Since we want to update & compact it, etc.
     BindingSet& bindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, m_tlas },
-                                                    { 1, ShaderStageRTRayGen, &storageImage },
+                                                    { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
                                                     { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
 
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &bindingSet });

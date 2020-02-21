@@ -252,7 +252,7 @@ class TopLevelAS;
 struct ShaderBinding {
 
     ShaderBinding(uint32_t index, ShaderStage, const Buffer*);
-    ShaderBinding(uint32_t index, ShaderStage, const Texture*);
+    ShaderBinding(uint32_t index, ShaderStage, const Texture*, ShaderBindingType = ShaderBindingType::TextureSampler);
     ShaderBinding(uint32_t index, ShaderStage, const TopLevelAS*);
     ShaderBinding(uint32_t index, ShaderStage, const std::vector<const Texture*>&, uint32_t count);
 
