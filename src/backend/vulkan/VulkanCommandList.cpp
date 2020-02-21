@@ -210,6 +210,14 @@ void VulkanCommandList::rebuildTopLevelAcceratationStructure(TopLevelAS& tlas)
         tlasInfo.accelerationStructure,
         scratchBuffer, 0);
 
+    VkMemoryBarrier barrier = { VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NV;
+    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV;
+    vkCmdPipelineBarrier(m_commandBuffer,
+                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_NV,
+                         VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV,
+                         0, 1, &barrier, 0, nullptr, 0, nullptr);
+
     vmaDestroyBuffer(m_backend.m_memoryAllocator, scratchBuffer, scratchAllocation);
     vmaDestroyBuffer(m_backend.m_memoryAllocator, instanceBuffer, instanceAllocation);
 }
