@@ -18,12 +18,7 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
     m_instances.clear();
     m_materials.clear();
 
-    std::vector<RTVertex> allVertices {};
-    std::vector<RTVertex> allIndices {};
-
     for (auto& model : m_scene.models()) {
-
-        std::vector<RTGeometry> geometries {};
         model->forEachMesh([&](const Mesh& mesh) {
             std::vector<RTVertex> vertices {};
             {
@@ -56,17 +51,17 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
             m_materials.push_back(rtMaterial);
 
             // TODO: We want to specify if the geometry is opaque or not also!
-            geometries.push_back({ .vertexBuffer = nodeReg.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                                   .vertexFormat = VertexFormat::XYZ32F,
-                                   .vertexStride = sizeof(RTVertex),
-                                   .indexBuffer = nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
-                                   .indexType = mesh.indexType(),
-                                   .transform = mesh.transform().localMatrix() });
-        });
+            RTGeometry geometry { .vertexBuffer = nodeReg.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
+                                  .vertexFormat = VertexFormat::XYZ32F,
+                                  .vertexStride = sizeof(RTVertex),
+                                  .indexBuffer = nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
+                                  .indexType = mesh.indexType(),
+                                  .transform = mesh.transform().localMatrix() };
 
-        BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure(geometries);
-        m_instances.push_back({ .blas = blas,
-                                .transform = model->transform() });
+            BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure({ geometry });
+            m_instances.push_back({ .blas = blas,
+                                    .transform = model->transform() });
+        });
     }
 }
 
