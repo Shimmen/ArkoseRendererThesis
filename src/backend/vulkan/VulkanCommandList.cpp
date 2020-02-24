@@ -245,20 +245,10 @@ void VulkanCommandList::traceRays(Extent2D extent)
     auto& rtStateInfo = m_backend.rayTracingStateInfo(*activeRayTracingState);
     VkDeviceSize bindingStride = m_backend.m_rtx->properties().shaderGroupHandleSize;
 
-    // TODO: Store the offsets in the rtStateInfo!
-    /*
     m_backend.m_rtx->vkCmdTraceRaysNV(m_commandBuffer,
-        rtStateInfo.sbtBuffer, RAYGEN_OFFSET,
-        rtStateInfo.sbtBuffer, MISS_OFFSET, MISS_STRIDE,
-        rtStateInfo.sbtBuffer, HIT_OFFSET, HIT_STRIDE,
-        VK_NULL_HANDLE, 0, 0,
-        extent.width(), extent.height(), 1);
-    */
-
-    m_backend.m_rtx->vkCmdTraceRaysNV(m_commandBuffer,
-                                      rtStateInfo.sbtBuffer, 0,
-                                      rtStateInfo.sbtBuffer, 1 * bindingStride, bindingStride,
-                                      rtStateInfo.sbtBuffer, 2 * bindingStride, bindingStride,
+                                      rtStateInfo.sbtBuffer, rtStateInfo.sbtRaygenIdx * bindingStride,
+                                      rtStateInfo.sbtBuffer, rtStateInfo.sbtMissIdx * bindingStride, bindingStride,
+                                      rtStateInfo.sbtBuffer, rtStateInfo.sbtClosestHitIdx * bindingStride, bindingStride,
                                       VK_NULL_HANDLE, 0, 0,
                                       extent.width(), extent.height(), 1);
 }

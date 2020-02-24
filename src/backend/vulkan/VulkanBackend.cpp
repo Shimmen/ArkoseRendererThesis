@@ -2420,6 +2420,10 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
     rtStateInfo.sbtBuffer = sbtBuffer;
     rtStateInfo.sbtBufferAllocation = sbtBufferAllocation;
 
+    rtStateInfo.sbtRaygenIdx = shaderIndexRaygen;
+    rtStateInfo.sbtMissIdx = shaderIndexMiss;
+    rtStateInfo.sbtClosestHitIdx = shaderIndexClosestHit;
+
     for (auto& set : rtState.bindingSets()) {
         for (auto& bindingInfo : set->shaderBindings()) {
             for (auto texture : bindingInfo.textures) {
