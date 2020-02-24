@@ -59,5 +59,6 @@ inline void LogError(const char* format, ...)
         fflush(stderr);
         va_end(vaList);
     }
+    __debugbreak();
     exit(123);
 }
