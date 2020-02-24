@@ -14,7 +14,7 @@ public:
     void bindSet(BindingSet&, uint32_t index) override;
 
     void draw(Buffer& vertexBuffer, uint32_t vertexCount) override;
-    void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, uint32_t instanceIndex) override;
+    void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, IndexType, uint32_t instanceIndex) override;
     
     void rebuildTopLevelAcceratationStructure(TopLevelAS&) override;
     void traceRays(Extent2D) override;

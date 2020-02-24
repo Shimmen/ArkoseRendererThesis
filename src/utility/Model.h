@@ -85,7 +85,7 @@ public:
     virtual VertexFormat vertexFormat() const = 0;
     virtual IndexType indexType() const = 0;
 
-    virtual std::vector<uint16_t> indexData() const = 0;
+    virtual std::vector<uint32_t> indexData() const = 0;
     virtual size_t indexCount() const = 0;
     virtual bool isIndexed() const = 0;
 

@@ -14,7 +14,7 @@ std::unique_ptr<Model> GltfModel::load(const std::string& path)
         return nullptr;
     }
 
-        auto entry = s_loadedModels.find(path);
+    auto entry = s_loadedModels.find(path);
     if (entry != s_loadedModels.end()) {
         tinygltf::Model& internal = s_loadedModels[path];
         return std::make_unique<GltfModel>(path, internal);
@@ -170,18 +170,19 @@ Material GltfMesh::material() const
     return material;
 }
 
-const tinygltf::Accessor& GltfMesh::getAccessor(const char* name) const
+const tinygltf::Accessor* GltfMesh::getAccessor(const char* name) const
 {
     auto entry = m_primitive->attributes.find(name);
     if (entry == m_primitive->attributes.end()) {
-        LogErrorAndExit("glTF mesh: primitive is missing attribute of name '%s'\n", name);
+        LogError("glTF mesh: primitive is missing attribute of name '%s'\n", name);
+        return nullptr;
     }
-    return m_model->accessors[entry->second];
+    return &m_model->accessors[entry->second];
 }
 
 std::vector<vec3> GltfMesh::positionData() const
 {
-    const tinygltf::Accessor& accessor = getAccessor("POSITION");
+    const tinygltf::Accessor& accessor = *getAccessor("POSITION");
     ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
     ASSERT(accessor.type == TINYGLTF_TYPE_VEC3);
 
@@ -200,11 +201,15 @@ std::vector<vec3> GltfMesh::positionData() const
 
 std::vector<vec2> GltfMesh::texcoordData() const
 {
-    const tinygltf::Accessor& accessor = getAccessor("TEXCOORD_0");
-    ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-    ASSERT(accessor.type == TINYGLTF_TYPE_VEC2);
+    const tinygltf::Accessor* accessor = getAccessor("TEXCOORD_0");
+    if (accessor == nullptr) {
+        return {};
+    }
 
-    const tinygltf::BufferView& view = m_model->bufferViews[accessor.bufferView];
+    ASSERT(accessor->componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+    ASSERT(accessor->type == TINYGLTF_TYPE_VEC2);
+
+    const tinygltf::BufferView& view = m_model->bufferViews[accessor->bufferView];
     ASSERT(view.byteStride == 0); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
@@ -213,17 +218,21 @@ std::vector<vec2> GltfMesh::texcoordData() const
     auto* first = reinterpret_cast<const vec2*>(start);
 
     // TODO: Cache this maybe?
-    std::vector<vec2> vec { first, first + accessor.count };
+    std::vector<vec2> vec { first, first + accessor->count };
     return vec;
 }
 
 std::vector<vec3> GltfMesh::normalData() const
 {
-    const tinygltf::Accessor& accessor = getAccessor("NORMAL");
-    ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-    ASSERT(accessor.type == TINYGLTF_TYPE_VEC3);
+    const tinygltf::Accessor* accessor = getAccessor("NORMAL");
+    if (accessor == nullptr) {
+        return {};
+    }
 
-    const tinygltf::BufferView& view = m_model->bufferViews[accessor.bufferView];
+    ASSERT(accessor->componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+    ASSERT(accessor->type == TINYGLTF_TYPE_VEC3);
+
+    const tinygltf::BufferView& view = m_model->bufferViews[accessor->bufferView];
     ASSERT(view.byteStride == 0); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
@@ -232,17 +241,21 @@ std::vector<vec3> GltfMesh::normalData() const
     auto* first = reinterpret_cast<const vec3*>(start);
 
     // TODO: Cache this maybe?
-    std::vector<vec3> vec { first, first + accessor.count };
+    std::vector<vec3> vec { first, first + accessor->count };
     return vec;
 }
 
 std::vector<vec4> GltfMesh::tangentData() const
 {
-    const tinygltf::Accessor& accessor = getAccessor("TANGENT");
-    ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
-    ASSERT(accessor.type == TINYGLTF_TYPE_VEC4);
+    const tinygltf::Accessor* accessor = getAccessor("TANGENT");
+    if (accessor == nullptr) {
+        return {};
+    }
 
-    const tinygltf::BufferView& view = m_model->bufferViews[accessor.bufferView];
+    ASSERT(accessor->componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+    ASSERT(accessor->type == TINYGLTF_TYPE_VEC4);
+
+    const tinygltf::BufferView& view = m_model->bufferViews[accessor->bufferView];
     ASSERT(view.byteStride == 0); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
@@ -251,27 +264,45 @@ std::vector<vec4> GltfMesh::tangentData() const
     auto* first = reinterpret_cast<const vec4*>(start);
 
     // TODO: Cache this maybe?
-    std::vector<vec4> vec { first, first + accessor.count };
+    std::vector<vec4> vec { first, first + accessor->count };
     return vec;
 }
 
-std::vector<uint16_t> GltfMesh::indexData() const
+std::vector<uint32_t> GltfMesh::indexData() const
 {
     ASSERT(isIndexed());
     const tinygltf::Accessor& accessor = m_model->accessors[m_primitive->indices];
-    ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
+    //ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
     ASSERT(accessor.type == TINYGLTF_TYPE_SCALAR);
 
     const tinygltf::BufferView& view = m_model->bufferViews[accessor.bufferView];
     ASSERT(view.byteStride == 0); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
-
     const unsigned char* start = buffer.data.data() + view.byteOffset;
-    auto* first = reinterpret_cast<const uint16_t*>(start);
 
-    // TODO: Cache this maybe?
-    std::vector<uint16_t> vec { first, first + accessor.count };
+    std::vector<uint32_t> vec;
+    vec.reserve(accessor.count);
+
+    switch (accessor.componentType) {
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
+        auto* first = reinterpret_cast<const uint16_t*>(start);
+        for (size_t i = 0; i < accessor.count; ++i) {
+            uint32_t val = (uint32_t)(*(first + i));
+            vec.emplace_back(val);
+        }
+        break;
+    }
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT: {
+        auto* first = reinterpret_cast<const uint32_t*>(start);
+        for (size_t i = 0; i < accessor.count; ++i) {
+            uint32_t val = *(first + i);
+            vec.emplace_back(val);
+        }
+        break;
+    }
+    }
+
     return vec;
 }
 
@@ -279,7 +310,6 @@ size_t GltfMesh::indexCount() const
 {
     ASSERT(isIndexed());
     const tinygltf::Accessor& accessor = m_model->accessors[m_primitive->indices];
-    ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
     ASSERT(accessor.type == TINYGLTF_TYPE_SCALAR);
 
     return accessor.count;
@@ -297,5 +327,5 @@ VertexFormat GltfMesh::vertexFormat() const
 
 IndexType GltfMesh::indexType() const
 {
-    return IndexType::UInt16;
+    return IndexType::UInt32;
 }

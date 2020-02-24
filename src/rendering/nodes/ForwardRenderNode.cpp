@@ -158,7 +158,7 @@ RenderGraphNode::ExecuteCallback ForwardRenderNode::constructFrame(Registry& reg
 
         for (int i = 0; i < numDrawables; ++i) {
             const Drawable& drawable = m_drawables[i];
-            cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, i);
+            cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, drawable.mesh->indexType(), i);
         }
     };
 }

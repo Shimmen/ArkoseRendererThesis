@@ -70,7 +70,7 @@ RenderGraphNode::ExecuteCallback ShadowMapNode::constructFrame(Registry& reg) co
 
         for (uint32_t idx = 0; idx < m_drawables.size(); ++idx) {
             auto& drawable = m_drawables[idx];
-            cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, idx);
+            cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, drawable.mesh->indexType(), idx);
         };
     };
 }

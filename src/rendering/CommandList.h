@@ -12,7 +12,7 @@ public:
     virtual void bindSet(BindingSet&, uint32_t index) = 0;
 
     virtual void draw(Buffer& vertexBuffer, uint32_t vertexCount) = 0;
-    virtual void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, uint32_t instanceIndex = 0) = 0;
+    virtual void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, IndexType, uint32_t instanceIndex = 0) = 0;
 
     virtual void rebuildTopLevelAcceratationStructure(TopLevelAS&) = 0;
     virtual void traceRays(Extent2D) = 0;

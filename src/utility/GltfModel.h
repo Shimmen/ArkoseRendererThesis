@@ -19,7 +19,7 @@ public:
     [[nodiscard]] std::vector<vec3> normalData() const override;
     [[nodiscard]] std::vector<vec4> tangentData() const override;
 
-    [[nodiscard]] std::vector<uint16_t> indexData() const override;
+    [[nodiscard]] std::vector<uint32_t> indexData() const override;
     [[nodiscard]] size_t indexCount() const override;
     [[nodiscard]] bool isIndexed() const override;
 
@@ -27,7 +27,7 @@ public:
     IndexType indexType() const override;
 
 private:
-    const tinygltf::Accessor& getAccessor(const char* name) const;
+    const tinygltf::Accessor* getAccessor(const char* name) const;
 
 private:
     std::string m_name;

@@ -161,7 +161,7 @@ void VulkanCommandList::draw(Buffer& vertexBuffer, uint32_t vertexCount)
     vkCmdDraw(m_commandBuffer, vertexCount, 1, 0, 0);
 }
 
-void VulkanCommandList::drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, uint32_t instanceIndex)
+void VulkanCommandList::drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, IndexType indexType, uint32_t instanceIndex)
 {
     if (!activeRenderState) {
         LogErrorAndExit("drawIndexed: no active render state!\n");
@@ -173,8 +173,18 @@ void VulkanCommandList::drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, u
     VkBuffer vertexBuffers[] = { vertBuffer };
     VkDeviceSize offsets[] = { 0 };
 
+    VkIndexType vkIndexType;
+    switch (indexType) {
+    case IndexType::UInt16:
+        vkIndexType = VK_INDEX_TYPE_UINT16;
+        break;
+    case IndexType::UInt32:
+        vkIndexType = VK_INDEX_TYPE_UINT32;
+        break;
+    }
+
     vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, vertexBuffers, offsets);
-    vkCmdBindIndexBuffer(m_commandBuffer, idxBuffer, 0, VK_INDEX_TYPE_UINT16); // TODO: User should specify index type!
+    vkCmdBindIndexBuffer(m_commandBuffer, idxBuffer, 0, vkIndexType);
     vkCmdDrawIndexed(m_commandBuffer, indexCount, 1, 0, 0, instanceIndex);
 }
 

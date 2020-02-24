@@ -138,7 +138,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
             cmdList.updateBufferImmediately(*drawable.objectDataBuffer, &objectData, sizeof(PerForwardObject));
 
             cmdList.bindSet(*drawable.bindingSet, 1);
-            cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount);
+            cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, drawable.mesh->indexType());
         }
     };
 }
