@@ -21,8 +21,11 @@ void TestApp::setup(RenderGraph& graph)
         mathkit::translate(0, -1.6f, 0) * mathkit::axisAngleMatrix({ 0, 1, 0 }, 0.3f) * mathkit::scale(3, 1, 3));
 
     m_boomBox = GltfModel::load("assets/BoomBox/BoomBoxWithAxes.gltf");
+    
+    m_testRoom = GltfModel::load("assets/OrientationTest/OrientationTest.gltf");
+    m_testRoom->transform().setLocalMatrix(mathkit::translate(0, 4.5f, 0) * mathkit::scale(0.1f, 0.1f, 0.1f));
 
-    m_scene = { m_boomBox.get(), m_cube.get() };
+    m_scene = { m_boomBox.get(), m_cube.get(), m_testRoom.get() };
 
     m_scene.camera().lookAt({ 0, 1, 6 }, { 0, 0.5f, 0 });
 

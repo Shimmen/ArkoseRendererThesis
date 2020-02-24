@@ -938,19 +938,11 @@ void VulkanBackend::deleteTexture(const Texture& texture)
     texture.unregisterBackend(backendBadge());
 }
 
-void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
+void VulkanBackend::updateTexture(const TextureUpdate& update)
 {
     if (update.texture().id() == Resource::NullId) {
         LogErrorAndExit("Trying to update an already-deleted or not-yet-created texture\n");
     }
-
-    if (!FileIO::isFileReadable(update.path())) {
-        LogError("VulkanBackend::updateTexture(): there is no file that can be read at path '%s'.\n", update.path().c_str());
-        return;
-    }
-
-    // TODO: Well, if the texture isn't a float texture
-    ASSERT(!stbi_is_hdr(update.path().c_str()));
 
     int numChannels;
     switch (update.texture().format()) {
@@ -971,17 +963,41 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
     }
 
     int width, height;
-    stbi_uc* pixels = stbi_load(update.path().c_str(), &width, &height, nullptr, numChannels);
-    if (!pixels) {
-        LogError("VulkanBackend::updateTexture(): stb_image could not read the contents of '%s'.\n", update.path().c_str());
-        return;
-    }
+    VkDeviceSize pixelsSize;
+    stbi_uc* pixels;
 
-    if (Extent2D(width, height) != update.texture().extent()) {
-        LogErrorAndExit("VulkanBackend::updateTexture(): loaded texture does not match specified extent.\n");
-    }
+    if (update.hasPath()) {
+        if (!FileIO::isFileReadable(update.path())) {
+            LogError("VulkanBackend::updateTexture(): there is no file that can be read at path '%s'.\n", update.path().c_str());
+            return;
+        }
 
-    VkDeviceSize pixelsSize = width * height * numChannels * sizeof(stbi_uc);
+        // TODO: Well, if the texture isn't a float texture
+        ASSERT(!stbi_is_hdr(update.path().c_str()));
+
+        pixels = stbi_load(update.path().c_str(), &width, &height, nullptr, numChannels);
+        if (!pixels) {
+            LogError("VulkanBackend::updateTexture(): stb_image could not read the contents of '%s'.\n", update.path().c_str());
+            return;
+        }
+
+        if (Extent2D(width, height) != update.texture().extent()) {
+            LogErrorAndExit("VulkanBackend::updateTexture(): loaded texture does not match specified extent.\n");
+        }
+
+        pixelsSize = width * height * numChannels * sizeof(stbi_uc);
+    } else {
+        width = 1;
+        height = 1;
+
+        vec4 color = update.pixelValue();
+        pixelsSize = (width * height) * (4 * sizeof(stbi_uc));
+        pixels = (stbi_uc*)malloc(pixelsSize);
+        pixels[0] = (stbi_uc)(mathkit::clamp(color.r, 0.0f, 1.0f) * 255.99f);
+        pixels[1] = (stbi_uc)(mathkit::clamp(color.g, 0.0f, 1.0f) * 255.99f);
+        pixels[2] = (stbi_uc)(mathkit::clamp(color.b, 0.0f, 1.0f) * 255.99f);
+        pixels[3] = (stbi_uc)(mathkit::clamp(color.a, 0.0f, 1.0f) * 255.99f);
+    }
 
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -1004,7 +1020,11 @@ void VulkanBackend::updateTexture(const TextureUpdateFromFile& update)
 
     AT_SCOPE_EXIT([&]() {
         vmaDestroyBuffer(m_memoryAllocator, stagingBuffer, stagingAllocation);
-        stbi_image_free(pixels);
+        if (update.hasPath()) {
+            stbi_image_free(pixels);
+        } else {
+            free(pixels);
+        }
     });
 
     TextureInfo& texInfo = textureInfo(update.texture());
@@ -2826,7 +2846,6 @@ VkBuffer VulkanBackend::createScratchBufferForAccelerationStructure(VkAccelerati
     memoryRequirementsInfo.type = updateInPlace
         ? VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_UPDATE_SCRATCH_NV
         : VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
-   
 
     VkMemoryRequirements2 scratchMemRequirements2;
     memoryRequirementsInfo.accelerationStructure = accelerationStructure;
@@ -2867,7 +2886,7 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
         data.instanceId = 0; // Relevant for who? Do we get this value in the shaders maybe? Makes sense to me.
         data.mask = 0xff;
         data.instanceOffset = 0;
-        data.flags = 0;// VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
+        data.flags = 0; // VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
 
         instanceData.push_back(data);
     }

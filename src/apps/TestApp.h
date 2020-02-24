@@ -10,6 +10,7 @@ public:
     void update(float elapsedTime, float deltaTime) override;
 
 private:
+    std::unique_ptr<Model> m_testRoom {};
     std::unique_ptr<Model> m_boomBox {};
     std::unique_ptr<Model> m_cube {};
     Scene m_scene {};

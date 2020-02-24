@@ -18,6 +18,7 @@ public:
     [[nodiscard]] const RenderTarget& windowRenderTarget();
     [[nodiscard]] RenderTarget& createRenderTarget(std::initializer_list<RenderTarget::Attachment>);
 
+    [[nodiscard]] Texture& createPixelTexture(vec4 pixelValue, bool srgb);
     [[nodiscard]] Texture& loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps);
     [[nodiscard]] Texture& createTexture2D(Extent2D, Texture::Format, Texture::Usage);
 
@@ -53,7 +54,7 @@ public:
     [[nodiscard]] const std::vector<TopLevelAS>& topLevelAS() const;
     [[nodiscard]] const std::vector<RayTracingState>& rayTracingStates() const;
     [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
-    [[nodiscard]] const std::vector<TextureUpdateFromFile>& textureUpdates() const;
+    [[nodiscard]] const std::vector<TextureUpdate>& textureUpdates() const;
 
     [[nodiscard]] Badge<Registry> exchangeBadges(Badge<Backend>) const;
 
@@ -70,14 +71,14 @@ private:
     std::unordered_map<std::string, const Texture*> m_nameTextureMap;
 
     std::vector<BufferUpdate> m_immediateBufferUpdates;
-    std::vector<TextureUpdateFromFile> m_immediateTextureUpdates;
+    std::vector<TextureUpdate> m_immediateTextureUpdates;
 
     // TODO: Maybe just replace all of this below with a large shared memory arena?
 
-    static constexpr int maxNumBuffers { 50 };
+    static constexpr int maxNumBuffers { 200 };
     CapList<Buffer> m_buffers { maxNumBuffers };
 
-    static constexpr int maxNumTextures { 50 };
+    static constexpr int maxNumTextures { 200 };
     CapList<Texture> m_textures { maxNumTextures };
 
     static constexpr int maxNumRenderTargets { 4 };

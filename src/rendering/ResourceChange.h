@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Resources.h"
+#include <variant>
 
 class BufferUpdate {
 public:
@@ -20,37 +21,33 @@ private:
 
 class TextureUpdate {
 public:
-    explicit TextureUpdate(Texture& texture, bool generateMipmaps)
+    TextureUpdate(Texture& texture, std::string path, bool generateMipmaps)
         : m_texture(texture)
         , m_generateMipmaps(generateMipmaps)
+        , m_value(std::move(path))
+    {
+    }
+
+    TextureUpdate(Texture& texture, vec4 pixelValue)
+        : m_texture(texture)
+        , m_generateMipmaps(false)
+        , m_value(pixelValue)
     {
     }
 
     const Texture& texture() const { return m_texture; }
     bool generateMipmaps() const { return m_generateMipmaps; }
 
+    bool hasPath() const { return std::get_if<std::string>(&m_value) != nullptr; }
+    bool hasPixelValue() const { return std::get_if<vec4>(&m_value) != nullptr; }
+
+    std::string path() const { return *std::get_if<std::string>(&m_value); }
+    vec4 pixelValue() const { return *std::get_if<vec4>(&m_value); }
+
 private:
     Texture& m_texture;
     bool m_generateMipmaps;
-};
-
-class TextureUpdateFromFile : public TextureUpdate {
-public:
-    TextureUpdateFromFile(Texture& texture, std::string path, bool generateMipmaps)
-        : TextureUpdate(texture, generateMipmaps)
-        , m_path(std::move(path))
-    {
-    }
-
-    const std::string& path() const { return m_path; }
-
-private:
-    std::string m_path;
-};
-
-class TextureUpdateFromData : public TextureUpdate {
-public:
-    std::vector<char> m_data;
+    std::variant<std::string, vec4> m_value;
 };
 
 class ResourceActions {

@@ -60,6 +60,21 @@ BindingSet& Registry::createBindingSet(std::initializer_list<ShaderBinding> shad
     return m_shaderBindingSets.back();
 }
 
+Texture& Registry::createPixelTexture(vec4 pixelValue, bool srgb)
+{
+    auto format = srgb
+        ? Texture::Format::sRGBA8
+        : Texture::Format::RGBA8;
+    auto usage = Texture::Usage::Sampled;
+
+    m_textures.push_back({ {}, { 1, 1 }, format, usage, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None });
+    Texture& texture = m_textures.back();
+
+    m_immediateTextureUpdates.emplace_back(texture, pixelValue);
+
+    return texture;
+}
+
 Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool generateMipmaps)
 {
     if (!FileIO::isFileReadable(imagePath)) {
@@ -239,7 +254,7 @@ const std::vector<BufferUpdate>& Registry::bufferUpdates() const
     return m_immediateBufferUpdates;
 }
 
-const std::vector<TextureUpdateFromFile>& Registry::textureUpdates() const
+const std::vector<TextureUpdate>& Registry::textureUpdates() const
 {
     return m_immediateTextureUpdates;
 }

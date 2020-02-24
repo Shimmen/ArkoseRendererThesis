@@ -26,15 +26,23 @@ void SlowForwardRenderNode::constructNode(Registry& nodeReg)
                 auto normalData = mesh.normalData();
                 auto tangentData = mesh.tangentData();
 
-                ASSERT(posData.size() == texData.size());
-                ASSERT(posData.size() == normalData.size());
-                ASSERT(posData.size() == tangentData.size());
+                size_t texSize = texData.size();
+                size_t normalSize = normalData.size();
+                size_t tangentSize = tangentData.size();
+                //ASSERT(posData.size() == texData.size());
+                //ASSERT(posData.size() == normalData.size());
+                //ASSERT(posData.size() == tangentData.size());
 
                 for (int i = 0; i < posData.size(); ++i) {
+
+                    vec2 tex = (i < texSize) ? texData[i] : vec2(0.0f);
+                    vec3 norm = (i < normalSize) ? normalData[i] : vec3(0.0f);
+                    vec4 tang = (i < tangentSize) ? tangentData[i] : vec4(0.0f);
+
                     vertices.push_back({ .position = posData[i],
-                                         .texCoord = texData[i],
-                                         .normal = normalData[i],
-                                         .tangent = tangentData[i] });
+                                         .texCoord = tex,
+                                         .normal = norm,
+                                         .tangent = tang });
                 }
             }
 
@@ -47,20 +55,28 @@ void SlowForwardRenderNode::constructNode(Registry& nodeReg)
 
             drawable.objectDataBuffer = &nodeReg.createBuffer(sizeof(PerForwardObject), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
+            const Material& material = mesh.material();
+
             // Create & load textures
-            std::string baseColorPath = mesh.material().baseColor;
-            Texture& baseColorTexture = nodeReg.loadTexture2D(baseColorPath, true, true);
-            std::string normalMapPath = mesh.material().normalMap;
+            std::string baseColorPath = material.baseColor;
+            Texture* baseColorTexture { nullptr };
+            if (baseColorPath.empty()) {
+                baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, true);
+            } else {
+                baseColorTexture = &nodeReg.loadTexture2D(baseColorPath, true, true);
+            }
+
+            std::string normalMapPath = material.normalMap;
             Texture& normalMapTexture = nodeReg.loadTexture2D(normalMapPath, false, true);
-            std::string metallicRoughnessPath = mesh.material().metallicRoughness;
+            std::string metallicRoughnessPath = material.metallicRoughness;
             Texture& metallicRoughnessTexture = nodeReg.loadTexture2D(metallicRoughnessPath, false, true);
-            std::string emissivePath = mesh.material().emissive;
+            std::string emissivePath = material.emissive;
             Texture& emissiveTexture = nodeReg.loadTexture2D(emissivePath, true, true);
 
             // Create binding set
             drawable.bindingSet = &nodeReg.createBindingSet(
                 { { 0, ShaderStageVertex, drawable.objectDataBuffer },
-                  { 1, ShaderStageFragment, &baseColorTexture },
+                  { 1, ShaderStageFragment, baseColorTexture },
                   { 2, ShaderStageFragment, &normalMapTexture },
                   { 3, ShaderStageFragment, &metallicRoughnessTexture },
                   { 4, ShaderStageFragment, &emissiveTexture } });

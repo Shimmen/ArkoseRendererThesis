@@ -66,7 +66,7 @@ GltfModel::GltfModel(std::string path, const tinygltf::Model& model)
                 : mathkit::translate(node.translation[0], node.translation[1], node.translation[2]);
             mat4 rotation = node.rotation.empty()
                 ? mat4(1.0f)
-                : mathkit::rotate(quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]));
+                : mathkit::rotate(quat(node.rotation[3], vec3(node.rotation[0], node.rotation[1], node.rotation[2])));
             mat4 scale = node.scale.empty()
                 ? mat4(1.0f)
                 : mathkit::scale(node.scale[0], node.scale[1], node.scale[2]);
@@ -75,7 +75,7 @@ GltfModel::GltfModel(std::string path, const tinygltf::Model& model)
     };
 
     std::function<void(const tinygltf::Node&, mat4)> findMeshesRecursively = [&](const tinygltf::Node& node, mat4 matrix) {
-        matrix = createMatrix(node) * matrix;
+        matrix = matrix * createMatrix(node);
 
         if (node.mesh != -1) {
             auto& mesh = m_model->meshes[node.mesh];
@@ -98,7 +98,7 @@ GltfModel::GltfModel(std::string path, const tinygltf::Model& model)
 
     for (int nodeIdx : scene.nodes) {
         auto& node = model.nodes[nodeIdx];
-        findMeshesRecursively(node, createMatrix(node));
+        findMeshesRecursively(node, mat4(1.0f));
     }
 }
 
@@ -162,7 +162,13 @@ Material GltfMesh::material() const
 
     // TODO: Cache this maybe?
     Material material {};
-    material.baseColor = textureUri(gltfMaterial.pbrMetallicRoughness.baseColorTexture.index, "assets/default-baseColor.png");
+
+    if (gltfMaterial.pbrMetallicRoughness.baseColorTexture.index != -1) {
+        material.baseColor = textureUri(gltfMaterial.pbrMetallicRoughness.baseColorTexture.index, "assets/default-baseColor.png");
+    }
+    std::vector<double> c = gltfMaterial.pbrMetallicRoughness.baseColorFactor;
+    material.baseColorFactor = vec4(c[0], c[1], c[2], c[3]);
+
     material.normalMap = textureUri(gltfMaterial.normalTexture.index, "assets/default-normal.png");
     material.metallicRoughness = textureUri(gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index, "assets/default-black.png");
     material.emissive = textureUri(gltfMaterial.emissiveTexture.index, "assets/default-black.png");
@@ -285,6 +291,14 @@ std::vector<uint32_t> GltfMesh::indexData() const
     vec.reserve(accessor.count);
 
     switch (accessor.componentType) {
+        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+        auto* first = reinterpret_cast<const uint8_t*>(start);
+        for (size_t i = 0; i < accessor.count; ++i) {
+            uint32_t val = (uint32_t)(*(first + i));
+            vec.emplace_back(val);
+        }
+        break;
+    }
     case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT: {
         auto* first = reinterpret_cast<const uint16_t*>(start);
         for (size_t i = 0; i < accessor.count; ++i) {
@@ -301,6 +315,8 @@ std::vector<uint32_t> GltfMesh::indexData() const
         }
         break;
     }
+    default:
+        ASSERT_NOT_REACHED();
     }
 
     return vec;
