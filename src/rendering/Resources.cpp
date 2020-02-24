@@ -345,14 +345,6 @@ const std::vector<const BindingSet*>& RenderStateBuilder::bindingSets() const
     return m_bindingSets;
 }
 
-uint32_t RTGeometry::vertexStride() const
-{
-    switch (vertexFormat) {
-    case VertexFormat::XYZ32F:
-        return 3 * 4;
-    }
-}
-
 BottomLevelAS::BottomLevelAS(Badge<Registry>, std::vector<RTGeometry> geometries)
     : m_geometries(geometries)
 {

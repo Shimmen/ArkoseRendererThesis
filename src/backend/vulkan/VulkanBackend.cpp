@@ -2071,7 +2071,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
 
         triangles.vertexData = bufferInfo(geo.vertexBuffer).buffer;
         triangles.vertexOffset = 0;
-        triangles.vertexStride = geo.vertexStride();
+        triangles.vertexStride = geo.vertexStride;
         triangles.vertexCount = geo.vertexBuffer.size() / triangles.vertexStride;
         switch (geo.vertexFormat) {
         case VertexFormat::XYZ32F:

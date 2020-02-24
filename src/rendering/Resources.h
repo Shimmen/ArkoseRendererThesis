@@ -341,13 +341,12 @@ private:
 struct RTGeometry {
     const Buffer& vertexBuffer;
     VertexFormat vertexFormat;
+    size_t vertexStride;
 
     const Buffer& indexBuffer;
     IndexType indexType;
 
     mat4 transform;
-
-    [[nodiscard]] uint32_t vertexStride() const;
 };
 
 class BottomLevelAS : public Resource {

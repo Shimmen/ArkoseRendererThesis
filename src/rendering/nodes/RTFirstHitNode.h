@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../RenderGraphNode.h"
+#include "RTData.h"
 #include "utility/Model.h"
 
 class RTFirstHitNode final : public RenderGraphNode {
@@ -16,4 +17,7 @@ public:
 private:
     const Scene& m_scene;
     std::vector<RTGeometryInstance> m_instances {};
+
+    std::vector<Texture*> m_textures {};
+    std::vector<RTMaterial> m_materials {};
 };

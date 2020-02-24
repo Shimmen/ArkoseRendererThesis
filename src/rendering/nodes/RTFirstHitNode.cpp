@@ -16,14 +16,49 @@ std::string RTFirstHitNode::name()
 void RTFirstHitNode::constructNode(Registry& nodeReg)
 {
     m_instances.clear();
+    m_materials.clear();
+
+    std::vector<RTVertex> allVertices {};
+    std::vector<RTVertex> allIndices {};
 
     for (auto& model : m_scene.models()) {
 
         std::vector<RTGeometry> geometries {};
         model->forEachMesh([&](const Mesh& mesh) {
+            std::vector<RTVertex> vertices {};
+            {
+                auto posData = mesh.positionData();
+                auto normalData = mesh.normalData();
+                auto texCoordData = mesh.texcoordData();
+
+                ASSERT(posData.size() == normalData.size());
+                ASSERT(posData.size() == texCoordData.size());
+
+                for (int i = 0; i < posData.size(); ++i) {
+                    vertices.push_back({ .position = posData[i],
+                                         .normal = normalData[i],
+                                         .texCoord = texCoordData[i] });
+                }
+            }
+
+            const Material& material = mesh.material();
+            Texture* baseColorTexture { nullptr };
+            if (material.baseColor.empty()) {
+                baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, true);
+            } else {
+                baseColorTexture = &nodeReg.loadTexture2D(material.baseColor, true, true);
+            }
+
+            size_t texIndex = m_textures.size();
+            m_textures.push_back(baseColorTexture);
+
+            RTMaterial rtMaterial { .baseColor = (int)texIndex };
+            m_materials.push_back(rtMaterial);
+
             // TODO: We want to specify if the geometry is opaque or not also!
-            geometries.push_back({ .vertexBuffer = nodeReg.createBuffer(mesh.positionData(), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                                   .vertexFormat = mesh.vertexFormat(),
+            geometries.push_back({ .vertexBuffer = nodeReg.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
+                                   .vertexFormat = VertexFormat::XYZ32F,
+                                   .vertexStride = sizeof(RTVertex),
                                    .indexBuffer = nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
                                    .indexType = mesh.indexType(),
                                    .transform = mesh.transform().localMatrix() });
