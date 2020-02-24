@@ -13,19 +13,12 @@
 
 void TestApp::setup(RenderGraph& graph)
 {
-    // Here we can do stuff like CPU work and GPU stuff that is fully or mostly static,
-    // e.g. load textures, load meshes, set vertex buffers.
-
-    m_cube = GltfModel::load("assets/Cube/Cube.gltf");
-    m_cube->transform().setLocalMatrix(
-        mathkit::translate(0, -1.6f, 0) * mathkit::axisAngleMatrix({ 0, 1, 0 }, 0.3f) * mathkit::scale(3, 1, 3));
+    m_testRoom = GltfModel::load("assets/CornellBox/CornellBox.gltf");
+    m_testRoom->transform().setLocalMatrix(mathkit::axisAngleMatrix({ 0, 1, 0 }, 0.3f) * mathkit::scale(3, 3, 3));
 
     m_boomBox = GltfModel::load("assets/BoomBox/BoomBoxWithAxes.gltf");
-    
-    m_testRoom = GltfModel::load("assets/OrientationTest/OrientationTest.gltf");
-    m_testRoom->transform().setLocalMatrix(mathkit::translate(0, 4.5f, 0) * mathkit::scale(0.1f, 0.1f, 0.1f));
 
-    m_scene = { m_boomBox.get(), m_cube.get(), m_testRoom.get() };
+    m_scene = { m_boomBox.get(), m_testRoom.get() };
 
     m_scene.camera().lookAt({ 0, 1, 6 }, { 0, 0.5f, 0 });
 
@@ -54,6 +47,6 @@ void TestApp::update(float elapsedTime, float deltaTime)
     const Input& input = Input::instance();
     m_scene.camera().update(input, GlobalState::get().windowExtent(), deltaTime);
 
-    mat4 matrix = mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(75);
+    mat4 matrix = mathkit::translate(1.4f, 2.2f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(50);
     m_boomBox->transform().setLocalMatrix(matrix);
 }
