@@ -120,7 +120,7 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
     // Create the projection matrix
 
     float aspectRatio = float(screenExtent.width()) / float(screenExtent.height());
-    m_projectionFromView = mathkit::infinitePerspective(m_fieldOfView, aspectRatio, zNear);
+    m_projectionFromView = mathkit::perspective(m_fieldOfView, aspectRatio, zNear, 10000.0f);
 }
 
 void FpsCamera::lookAt(const vec3& position, const vec3& target, const vec3& up)

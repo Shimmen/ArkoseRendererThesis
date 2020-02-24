@@ -100,6 +100,13 @@ inline mat4 rotate(quat quaternion)
     return glm::toMat4(quaternion);
 }
 
+inline mat4 perspective(float fieldOfViewY, float aspectRatio, float zNear, float zFar)
+{
+    mat4 matrix = glm::perspective(fieldOfViewY, aspectRatio, zNear, zFar);
+    matrix[1][1] *= -1.0f; // (flip for OpenGL -> Vulkan conventions)
+    return matrix;
+}
+
 inline mat4 infinitePerspective(float fieldOfViewY, float aspectRatio, float zNear)
 {
     mat4 matrix = glm::infinitePerspective(fieldOfViewY, aspectRatio, zNear);

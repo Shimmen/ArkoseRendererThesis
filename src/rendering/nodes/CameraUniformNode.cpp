@@ -19,10 +19,15 @@ CameraUniformNode::ExecuteCallback CameraUniformNode::constructFrame(Registry& r
     reg.publish("buffer", cameraUniformBuffer);
 
     return [&](const AppState& appState, CommandList& cmdList) {
+
+        mat4 projectionFromView = m_fpsCamera->projectionMatrix();
+        mat4 viewFromWorld = m_fpsCamera->viewMatrix();
+
         CameraState cameraState {
-            .projectionFromView = m_fpsCamera->projectionMatrix(),
-            .viewFromWorld = m_fpsCamera->viewMatrix(),
-            .worldFromView = inverse(m_fpsCamera->viewMatrix()),
+            .projectionFromView = projectionFromView,
+            .viewFromProjection = inverse(projectionFromView),
+            .viewFromWorld = viewFromWorld,
+            .worldFromView = inverse(viewFromWorld),
         };
         cmdList.updateBufferImmediately(cameraUniformBuffer, &cameraState, sizeof(CameraState));
     };
