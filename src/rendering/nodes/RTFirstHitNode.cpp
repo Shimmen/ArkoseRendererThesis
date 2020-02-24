@@ -1,19 +1,19 @@
-#include "RTReflectionsNode.h"
+#include "RTFirstHitNode.h"
 
 #include "CameraUniformNode.h"
 
-RTReflectionsNode::RTReflectionsNode(const Scene& scene)
-    : RenderGraphNode(RTReflectionsNode::name())
+RTFirstHitNode::RTFirstHitNode(const Scene& scene)
+    : RenderGraphNode(RTFirstHitNode::name())
     , m_scene(scene)
 {
 }
 
-std::string RTReflectionsNode::name()
+std::string RTFirstHitNode::name()
 {
-    return "rt-reflections";
+    return "rt-firsthit";
 }
 
-void RTReflectionsNode::constructNode(Registry& nodeReg)
+void RTFirstHitNode::constructNode(Registry& nodeReg)
 {
     m_instances.clear();
 
@@ -35,14 +35,14 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
     }
 }
 
-RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg) const
+RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) const
 {
     Texture& storageImage = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
     reg.publish("image", storageImage);
 
-    ShaderFile raygen = ShaderFile("rt-reflections/raygen.rgen", ShaderFileType::RTRaygen);
-    ShaderFile miss = ShaderFile("rt-reflections/miss.rmiss", ShaderFileType::RTMiss);
-    ShaderFile closestHit = ShaderFile("rt-reflections/closestHit.rchit", ShaderFileType::RTClosestHit);
+    ShaderFile raygen = ShaderFile("rt-firsthit/raygen.rgen", ShaderFileType::RTRaygen);
+    ShaderFile miss = ShaderFile("rt-firsthit/miss.rmiss", ShaderFileType::RTMiss);
+    ShaderFile closestHit = ShaderFile("rt-firsthit/closestHit.rchit", ShaderFileType::RTClosestHit);
 
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
     BindingSet& bindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },

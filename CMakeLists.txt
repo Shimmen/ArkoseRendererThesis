@@ -21,7 +21,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/ForwardRenderNode.cpp
         src/rendering/nodes/SlowForwardRenderNode.cpp
         src/rendering/nodes/ShadowMapNode.cpp
-        src/rendering/nodes/RTReflectionsNode.cpp
+        src/rendering/nodes/RTFirstHitNode.cpp
         src/utility/GlobalState.cpp
         src/utility/GltfModel.cpp
         src/utility/FpsCamera.cpp

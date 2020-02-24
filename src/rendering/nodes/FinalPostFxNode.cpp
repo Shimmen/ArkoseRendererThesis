@@ -1,7 +1,7 @@
 #include "FinalPostFxNode.h"
 
 #include "ForwardRenderNode.h"
-#include "RTReflectionsNode.h"
+#include "RTFirstHitNode.h"
 #include "imgui.h"
 
 FinalPostFxNode::FinalPostFxNode()
@@ -23,7 +23,7 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     Buffer& vertexBuffer = reg.createBuffer(std::move(fullScreenTriangle), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal);
 
     const Texture* sourceTexture = reg.getTexture(ForwardRenderNode::name(), "color");
-    const Texture* sourceTextureRt = reg.getTexture(RTReflectionsNode::name(), "image");
+    const Texture* sourceTextureRt = reg.getTexture(RTFirstHitNode::name(), "image");
 
     if (!sourceTexture) {
         LogError("FinalPostFxNode: could not find the input texture 'forward:color', using test texture\n");
