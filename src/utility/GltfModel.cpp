@@ -193,7 +193,7 @@ std::vector<vec3> GltfMesh::positionData() const
     ASSERT(accessor.type == TINYGLTF_TYPE_VEC3);
 
     const tinygltf::BufferView& view = m_model->bufferViews[accessor.bufferView];
-    ASSERT(view.byteStride == 0); // (i.e. tightly packed)
+    ASSERT(view.byteStride == 0 || view.byteStride == 12); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
@@ -216,7 +216,7 @@ std::vector<vec2> GltfMesh::texcoordData() const
     ASSERT(accessor->type == TINYGLTF_TYPE_VEC2);
 
     const tinygltf::BufferView& view = m_model->bufferViews[accessor->bufferView];
-    ASSERT(view.byteStride == 0); // (i.e. tightly packed)
+    ASSERT(view.byteStride == 0 || view.byteStride == 8); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
@@ -239,7 +239,7 @@ std::vector<vec3> GltfMesh::normalData() const
     ASSERT(accessor->type == TINYGLTF_TYPE_VEC3);
 
     const tinygltf::BufferView& view = m_model->bufferViews[accessor->bufferView];
-    ASSERT(view.byteStride == 0); // (i.e. tightly packed)
+    ASSERT(view.byteStride == 0 || view.byteStride == 12); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
@@ -262,7 +262,7 @@ std::vector<vec4> GltfMesh::tangentData() const
     ASSERT(accessor->type == TINYGLTF_TYPE_VEC4);
 
     const tinygltf::BufferView& view = m_model->bufferViews[accessor->bufferView];
-    ASSERT(view.byteStride == 0); // (i.e. tightly packed)
+    ASSERT(view.byteStride == 0 || view.byteStride == 16); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
