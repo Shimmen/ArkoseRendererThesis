@@ -39,11 +39,25 @@ void TestApp::setup(RenderGraph& graph)
 
 void TestApp::update(float elapsedTime, float deltaTime)
 {
-    ImGui::Begin("TestApp");
-    {
-        ImGui::ColorEdit3("Sun color", value_ptr(m_scene.sun().color));
-        ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 20.0f);
+    static bool showMetrics = false;
+
+    ImGui::BeginMainMenuBar();
+    if (ImGui::BeginMenu("Tools")) {
+        ImGui::MenuItem("Show metrics", nullptr, &showMetrics);
+        ImGui::EndMenu();
     }
+    ImGui::EndMainMenuBar();
+
+    if (showMetrics) {
+        ImGui::Begin("Metrics");
+        float ms = deltaTime * 1000.0f;
+        ImGui::Text("Frame time: %.3f ms/frame", ms);
+        ImGui::End();
+    }
+
+    ImGui::Begin("TestApp");
+    ImGui::ColorEdit3("Sun color", value_ptr(m_scene.sun().color));
+    ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 20.0f);
     ImGui::End();
 
     const Input& input = Input::instance();
