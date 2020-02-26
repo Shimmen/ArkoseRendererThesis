@@ -21,9 +21,10 @@ void TestApp::setup(RenderGraph& graph)
 
     m_scene = { m_boomBox.get(), m_testRoom.get() };
 
-    m_scene.camera().lookAt({ 0, 1, 6 }, { 0, 0.5f, 0 });
+    m_scene.camera().lookAt({ 0, 4, 8 }, { 0, 3, 0 });
 
     m_scene.setEnvironmentMap("assets/environments/tiergarten_2k.hdr");
+    m_scene.environmentMultiplier() = 25.0f;
 
     m_scene.sun().color = { 1, 1, 1 };
     m_scene.sun().intensity = 10.0f;
@@ -60,6 +61,7 @@ void TestApp::update(float elapsedTime, float deltaTime)
     ImGui::Begin("TestApp");
     ImGui::ColorEdit3("Sun color", value_ptr(m_scene.sun().color));
     ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 20.0f);
+    ImGui::SliderFloat("Environment", &m_scene.environmentMultiplier(), 0.0f, 100.0f);
     ImGui::End();
 
     const Input& input = Input::instance();

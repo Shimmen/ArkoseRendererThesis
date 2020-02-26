@@ -172,10 +172,14 @@ public:
     void setEnvironmentMap(std::string path) { m_environmentMap = std::move(path); }
     const std::string& environmentMap() const { return m_environmentMap; }
 
+    float environmentMultiplier() const { return m_environmentMultiplier; }
+    float& environmentMultiplier() { return m_environmentMultiplier; }
+
 private:
     std::vector<Model*> m_models;
     FpsCamera m_camera;
     SunLight m_sunLight;
 
     std::string m_environmentMap {};
+    float m_environmentMultiplier { 1.0f };
 };

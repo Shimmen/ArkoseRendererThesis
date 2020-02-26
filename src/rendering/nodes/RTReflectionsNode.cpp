@@ -93,6 +93,8 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
     Texture& reflections = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
     reg.publish("reflections", reflections);
 
+    Buffer& envFactorBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+
     ShaderFile raygen = ShaderFile("rt-reflections/raygen.rgen", ShaderFileType::RTRaygen);
     ShaderFile miss = ShaderFile("rt-reflections/miss.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-reflections/closestHit.rchit", ShaderFileType::RTClosestHit);
@@ -103,14 +105,19 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
                                                          { 2, ShaderStageRTRayGen, gBufferColor, ShaderBindingType::TextureSampler },
                                                          { 3, ShaderStageRTRayGen, gBufferNormal, ShaderBindingType::TextureSampler },
                                                          { 4, ShaderStageRTRayGen, gBufferDepth, ShaderBindingType::TextureSampler },
-                                                         { 5, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
+                                                         { 5, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") },
+                                                         { 6, ShaderStageRTMiss, &envFactorBuffer } });
 
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
+
+        float envMultiplier = m_scene.environmentMultiplier();
+        cmdList.updateBufferImmediately(envFactorBuffer, &envMultiplier, sizeof(float));
         cmdList.bindSet(frameBindingSet, 0);
+
         cmdList.bindSet(*m_objectDataBindingSet, 1);
         cmdList.traceRays(appState.windowExtent());
     };
