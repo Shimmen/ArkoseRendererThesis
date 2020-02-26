@@ -73,7 +73,7 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
     }
 
     Texture& environmentTexture = nodeReg.loadTexture2D(m_scene.environmentMap(), true, false);
-    m_environmentBindingSet = &nodeReg.createBindingSet({ {0, ShaderStageRTMiss, &environmentTexture } });
+    m_environmentBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTMiss, &environmentTexture } });
 
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
@@ -91,17 +91,24 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
     ShaderFile miss = ShaderFile("rt-firsthit/miss.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-firsthit/closestHit.rchit", ShaderFileType::RTClosestHit);
 
+    Buffer& timeBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
                                                          { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
-                                                         { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
+                                                         { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") },
+                                                         { 3, ShaderStageRTMiss, &timeBuffer } });
 
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, m_environmentBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
+
+        float time = appState.elapsedTime();
+        cmdList.updateBufferImmediately(timeBuffer, &time, sizeof(time));
         cmdList.bindSet(frameBindingSet, 0);
+
         cmdList.bindSet(*m_objectDataBindingSet, 1);
         cmdList.bindSet(*m_environmentBindingSet, 2);
         cmdList.traceRays(appState.windowExtent());
