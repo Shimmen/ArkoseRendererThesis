@@ -85,11 +85,12 @@ void main()
 
     vec3 V = -normalize(vPosition);
 
-    vec3 color = emissive;
+    vec3 ambient = 0.4 * baseColor; // TODO!
+    vec3 color = emissive + ambient;
 
     // TODO: Evaluate ALL lights that will have an effect on this pixel/tile/cluster or whatever we go with
     color += evaluateDirectionalLight(dirLight, V, N, baseColor, roughness, metallic);
 
     oColor = vec4(color, 1.0);
-    oNormal = vec4(N * 0.5 + 0.5, 0.0);
+    oNormal = vec4(N, 0.0);
 }

@@ -2,6 +2,7 @@
 
 #include "ForwardRenderNode.h"
 #include "RTFirstHitNode.h"
+#include "RTReflectionsNode.h"
 #include "imgui.h"
 
 FinalPostFxNode::FinalPostFxNode()
@@ -30,12 +31,16 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         sourceTexture = &reg.loadTexture2D("assets/test-pattern.png", true, true);
     }
 
-    BindingSet& bindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTexture } });
-    BindingSet& bindingSetRt = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTextureRt } });
+    BindingSet& sourceImage = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTexture } });
+    BindingSet& sourceImageRt = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTextureRt } });
+
+    const Texture* reflections = reg.getTexture(RTReflectionsNode::name(), "reflections");
+    BindingSet& reflectionsSet = reg.createBindingSet({ { 0, ShaderStageFragment, reflections } });
 
     RenderStateBuilder renderStateBuilder { reg.windowRenderTarget(), shader, vertexLayout };
-    renderStateBuilder.addBindingSet(bindingSet);
-    renderStateBuilder.addBindingSet(bindingSetRt);
+    renderStateBuilder.addBindingSet(sourceImage);
+    renderStateBuilder.addBindingSet(sourceImageRt);
+    renderStateBuilder.addBindingSet(reflectionsSet); 
     RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
@@ -45,7 +50,8 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         }
 
         cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
-        cmdList.bindSet(useRt ? bindingSetRt : bindingSet, 0);
+        cmdList.bindSet(useRt ? sourceImageRt : sourceImage, 0);
+        cmdList.bindSet(reflectionsSet, 1);
         cmdList.draw(vertexBuffer, 3);
     };
 }
