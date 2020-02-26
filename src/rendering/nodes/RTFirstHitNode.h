@@ -18,9 +18,5 @@ private:
     const Scene& m_scene;
     std::vector<RTGeometryInstance> m_instances {};
 
-    std::vector<const Buffer*> m_vertexBuffers {};
-    std::vector<const Buffer*> m_indexBuffers {};
-    std::vector<RTMesh> m_rtMeshes {};
-
-    BindingSet* m_textureBindingSet {};
+    BindingSet* m_objectDataBindingSet {};
 };

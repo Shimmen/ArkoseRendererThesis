@@ -11,8 +11,7 @@ hitAttributeNV vec3 attribs;
 layout(binding = 0, set = 1, scalar) buffer readonly Meshes   { RTMesh meshes[]; };
 layout(binding = 1, set = 1, scalar) buffer readonly Vertices { RTVertex x[]; } vertices[];
 layout(binding = 2, set = 1)         buffer readonly Indices  { uint idx[]; }  indices[];
-
-layout(binding = 0, set = 2) uniform sampler2D baseColorSamplers[RT_MAX_TEXTURES];
+layout(binding = 3, set = 1) uniform sampler2D baseColorSamplers[RT_MAX_TEXTURES];
 
 void unpack(out RTMesh mesh, out RTVertex v0, out RTVertex v1, out RTVertex v2)
 {

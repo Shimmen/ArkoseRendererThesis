@@ -16,12 +16,11 @@ std::string RTFirstHitNode::name()
 void RTFirstHitNode::constructNode(Registry& nodeReg)
 {
     m_instances.clear();
-    m_rtMeshes.clear();
 
-    m_vertexBuffers.clear();
-    m_indexBuffers.clear();
-
-    std::vector<const Texture*> allTextures;
+    std::vector<const Buffer*> vertexBuffers {};
+    std::vector<const Buffer*> indexBuffers {};
+    std::vector<RTMesh> rtMeshes {};
+    std::vector<const Texture*> allTextures {};
 
     for (auto& model : m_scene.models()) {
         model->forEachMesh([&](const Mesh& mesh) {
@@ -52,12 +51,12 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
             size_t texIndex = allTextures.size();
             allTextures.push_back(baseColorTexture);
 
-            m_rtMeshes.push_back({ .objectId = (int)m_instances.size(),
-                                   .baseColor = (int)texIndex });
+            rtMeshes.push_back({ .objectId = (int)m_instances.size(),
+                                 .baseColor = (int)texIndex });
 
             // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
-            m_vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-            m_indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+            vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+            indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
 
             RTGeometry geometry { .vertexBuffer = nodeReg.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
                                   .vertexFormat = VertexFormat::XYZ32F,
@@ -73,7 +72,11 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
         });
     }
 
-    m_textureBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
+    Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
+    m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
+                                                         { 1, ShaderStageRTClosestHit, vertexBuffers },
+                                                         { 2, ShaderStageRTClosestHit, indexBuffers },
+                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
 }
 
 RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) const
@@ -86,24 +89,17 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
     ShaderFile closestHit = ShaderFile("rt-firsthit/closestHit.rchit", ShaderFileType::RTClosestHit);
 
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
-    BindingSet& bindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
-                                                    { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
-                                                    { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
+    BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
+                                                         { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
+                                                         { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
 
-    // These two can probably be node resources..?
-    Buffer& meshBuffer = reg.createBuffer((std::byte*)m_rtMeshes.data(), m_rtMeshes.size() * sizeof(RTMesh), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
-    BindingSet& objectDataSet = reg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
-                                                       { 1, ShaderStageRTClosestHit, m_vertexBuffers },
-                                                       { 2, ShaderStageRTClosestHit, m_indexBuffers } });
-
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &bindingSet, &objectDataSet, m_textureBindingSet });
+    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
-        cmdList.bindSet(bindingSet, 0);
-        cmdList.bindSet(objectDataSet, 1);
-        cmdList.bindSet(*m_textureBindingSet, 2);
+        cmdList.bindSet(frameBindingSet, 0);
+        cmdList.bindSet(*m_objectDataBindingSet, 1);
         cmdList.traceRays(appState.windowExtent());
     };
 }
