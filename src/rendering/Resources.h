@@ -165,6 +165,7 @@ struct Buffer : public Resource {
         Vertex,
         Index,
         UniformBuffer,
+        StorageBuffer,
     };
 
     enum class MemoryHint {
@@ -242,9 +243,11 @@ enum ShaderStage : uint8_t {
 
 enum class ShaderBindingType {
     UniformBuffer,
+    StorageBuffer,
     StorageImage,
     TextureSampler,
     TextureSamplerArray,
+    StorageBufferArray,
     RTAccelerationStructure,
 };
 
@@ -252,10 +255,20 @@ class TopLevelAS;
 
 struct ShaderBinding {
 
-    ShaderBinding(uint32_t index, ShaderStage, const Buffer*);
+    // Single uniform or storage buffer
+    ShaderBinding(uint32_t index, ShaderStage, const Buffer*, ShaderBindingType = ShaderBindingType::UniformBuffer);
+
+    // Single sampled texture or storage image
     ShaderBinding(uint32_t index, ShaderStage, const Texture*, ShaderBindingType = ShaderBindingType::TextureSampler);
+
+    // Single top level acceleration structures
     ShaderBinding(uint32_t index, ShaderStage, const TopLevelAS*);
+
+    // Multiple sampled textures in an array of fixed size (count)
     ShaderBinding(uint32_t index, ShaderStage, const std::vector<const Texture*>&, uint32_t count);
+
+    // Multiple storage buffers in a dynamic array
+    ShaderBinding(uint32_t index, ShaderStage, const std::vector<const Buffer*>&);
 
     uint32_t bindingIndex;
     uint32_t count;
@@ -263,8 +276,8 @@ struct ShaderBinding {
     ShaderStage shaderStage;
 
     ShaderBindingType type;
-    const Buffer* buffer;
     const TopLevelAS* tlas;
+    std::vector<const Buffer*> buffers;
     std::vector<const Texture*> textures;
 };
 

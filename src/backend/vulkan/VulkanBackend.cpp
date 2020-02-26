@@ -620,6 +620,11 @@ void VulkanBackend::newBuffer(const Buffer& buffer)
     case Buffer::Usage::UniformBuffer:
         usageFlags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
         break;
+    case Buffer::Usage::StorageBuffer:
+        usageFlags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
     }
 
     VmaAllocationCreateInfo allocCreateInfo = {};
@@ -1462,6 +1467,10 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
             case ShaderBindingType::UniformBuffer:
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 break;
+            case ShaderBindingType::StorageBuffer:
+            case ShaderBindingType::StorageBufferArray:
+                binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                break;
             case ShaderBindingType::StorageImage:
                 binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                 break;
@@ -1525,6 +1534,10 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 switch (bindingInfo.type) {
                 case ShaderBindingType::UniformBuffer:
                     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    break;
+                case ShaderBindingType::StorageBuffer:
+                case ShaderBindingType::StorageBufferArray:
+                    poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                     break;
                 case ShaderBindingType::StorageImage:
                     poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -1591,8 +1604,9 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
             switch (bindingInfo.type) {
             case ShaderBindingType::UniformBuffer: {
 
-                ASSERT(bindingInfo.buffer);
-                const BufferInfo& bufInfo = bufferInfo(*bindingInfo.buffer);
+                ASSERT(bindingInfo.buffers.size() == 1);
+                ASSERT(bindingInfo.buffers[0]);
+                const BufferInfo& bufInfo = bufferInfo(*bindingInfo.buffers[0]);
 
                 VkDescriptorBufferInfo descBufferInfo {};
                 descBufferInfo.offset = 0;
@@ -1604,6 +1618,53 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 
                 write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+
+            case ShaderBindingType::StorageBuffer: {
+
+                ASSERT(bindingInfo.buffers.size() == 1);
+                ASSERT(bindingInfo.buffers[0]);
+                const BufferInfo& bufInfo = bufferInfo(*bindingInfo.buffers[0]);
+
+                VkDescriptorBufferInfo descBufferInfo {};
+                descBufferInfo.offset = 0;
+                descBufferInfo.range = VK_WHOLE_SIZE;
+                descBufferInfo.buffer = bufInfo.buffer;
+
+                descBufferInfos.push_back(descBufferInfo);
+                write.pBufferInfo = &descBufferInfos.back();
+                write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+
+                write.descriptorCount = 1;
+                write.dstArrayElement = 0;
+
+                break;
+            }
+
+            case ShaderBindingType::StorageBufferArray: {
+
+                ASSERT(bindingInfo.count == bindingInfo.buffers.size());
+                for (const Buffer* buffer : bindingInfo.buffers) {
+
+                    ASSERT(buffer);
+                    ASSERT(buffer->usage() == Buffer::Usage::StorageBuffer);
+                    const BufferInfo& bufInfo = bufferInfo(*buffer);
+
+                    VkDescriptorBufferInfo descBufferInfo {};
+                    descBufferInfo.offset = 0;
+                    descBufferInfo.range = VK_WHOLE_SIZE;
+                    descBufferInfo.buffer = bufInfo.buffer;
+
+                    descBufferInfos.push_back(descBufferInfo);
+                }
+
+                // NOTE: This should point at the first VkDescriptorBufferInfo
+                write.pBufferInfo = &descBufferInfos.back() - (bindingInfo.count - 1);
+                write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                write.descriptorCount = bindingInfo.count;
                 write.dstArrayElement = 0;
 
                 break;
@@ -1695,7 +1756,7 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
             case ShaderBindingType::RTAccelerationStructure: {
 
                 ASSERT(bindingInfo.textures.empty());
-                ASSERT(bindingInfo.buffer == nullptr);
+                ASSERT(bindingInfo.buffers.empty());
                 ASSERT(bindingInfo.tlas != nullptr);
 
                 const TopLevelAS& tlas = *bindingInfo.tlas;
@@ -2434,6 +2495,8 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
                 case ShaderBindingType::StorageImage:
                     rtStateInfo.storageImages.push_back(texture);
                     break;
+                default:
+                    ASSERT_NOT_REACHED();
                 }
             }
         }
@@ -2878,7 +2941,9 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
     }
 
     std::vector<VulkanRTX::GeometryInstance> instanceData {};
-    for (auto& instance : instances) {
+
+    for (size_t instanceIdx = 0; instanceIdx < instances.size(); ++instanceIdx) {
+        auto& instance = instances[instanceIdx];
         VulkanRTX::GeometryInstance data {};
 
         data.transform = transpose(instance.transform.worldMatrix());
@@ -2886,11 +2951,10 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
         const auto& blasInfo = accelerationStructureInfo(instance.blas);
         data.accelerationStructureHandle = blasInfo.handle;
 
-        // TODO: This probably needs to be adjusted!
-        data.instanceId = 0; // Relevant for who? Do we get this value in the shaders maybe? Makes sense to me.
+        data.instanceId = instanceIdx;
         data.mask = 0xff;
         data.instanceOffset = 0;
-        data.flags = 0; // VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
+        data.flags = 0;
 
         instanceData.push_back(data);
     }

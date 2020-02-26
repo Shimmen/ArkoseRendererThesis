@@ -251,6 +251,15 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     VkPhysicalDeviceFeatures requestedDeviceFeatures = {};
     requestedDeviceFeatures.samplerAnisotropy = VK_TRUE;
     requestedDeviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+    requestedDeviceFeatures.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
+
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
+    indexingFeatures.pNext = nullptr;
+    indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+    indexingFeatures.runtimeDescriptorArray = VK_TRUE;
+
+    VkPhysicalDeviceDescriptorIndexingFeatures requestedDescIndexingFeatures = {};
+    requestedDescIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
 
     std::vector<const char*> deviceExtensions {};
     deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -271,6 +280,7 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     deviceCreateInfo.pEnabledFeatures = &requestedDeviceFeatures;
+    deviceCreateInfo.pNext = &indexingFeatures;
 
     VkDevice device;
     if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {

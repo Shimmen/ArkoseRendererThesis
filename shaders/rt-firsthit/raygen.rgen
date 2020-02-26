@@ -2,12 +2,13 @@
 #extension GL_NV_ray_tracing : require
 
 #include "shared/CameraState.h"
+#include "shared/RTData.h"
 
 layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
 layout(binding = 1, set = 0, rgba16f) uniform image2D u_image;
 layout(binding = 2, set = 0) uniform CameraStateBlock
 {
-    CameraState camera;
+	CameraState camera;
 };
 
 layout(location = 0) rayPayloadNV vec3 hitValue;
@@ -22,7 +23,7 @@ void main()
 	vec4 target = camera.viewFromProjection * vec4(d.x, d.y, 1.0, 1.0);
 	vec4 direction = camera.worldFromView * vec4(normalize(target.xyz / target.w), 0.0);
 
-	uint rayFlags = gl_RayFlagsOpaqueNV;
+	uint rayFlags = gl_RayFlagsOpaqueNV | gl_RayFlagsCullBackFacingTrianglesNV;
 	uint cullMask = 0xff;
 	float tmin = 0.001;
 	float tmax = 10000.0;

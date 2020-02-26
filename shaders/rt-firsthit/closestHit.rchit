@@ -1,12 +1,40 @@
 #version 460
 #extension GL_NV_ray_tracing : require
-#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_scalar_block_layout : require
+
+#include "shared/RTData.h"
 
 layout(location = 0) rayPayloadInNV vec3 hitValue;
 hitAttributeNV vec3 attribs;
 
+layout(binding = 0, set = 1, scalar) buffer Meshes   { RTMesh meshes[]; };
+layout(binding = 1, set = 1, scalar) buffer Vertices { RTVertex x[]; } vertices[];
+layout(binding = 2, set = 1)         buffer Indices  { uint idx[]; }  indices[];
+
+void unpack(out RTVertex v0, out RTVertex v1, out RTVertex v2)
+{
+	uint objId = meshes[gl_InstanceID].objectId;
+	
+	ivec3 idx = ivec3(indices[objId].idx[3 * gl_PrimitiveID + 0],
+					  indices[objId].idx[3 * gl_PrimitiveID + 1],
+					  indices[objId].idx[3 * gl_PrimitiveID + 2]);
+
+	v0 = vertices[objId].x[idx.x];
+	v1 = vertices[objId].x[idx.y];
+	v2 = vertices[objId].x[idx.z];
+}
+
 void main()
 {
-  const vec3 barycentricCoords = vec3(1.0f - attribs.x - attribs.y, attribs.x, attribs.y);
-  hitValue = barycentricCoords;
+	RTVertex v0, v1, v2;
+	unpack(v0, v1, v2);
+
+	const vec3 b = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+
+	vec3 N = normalize(v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z);
+	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
+
+	//hitValue = N * 0.5 + 0.5;
+	hitValue = vec3(uv, 0.0);
 }

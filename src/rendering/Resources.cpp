@@ -190,14 +190,17 @@ Buffer::Buffer(Badge<Registry>, size_t size, Usage usage, MemoryHint memoryHint)
 {
 }
 
-ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Buffer* buffer)
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Buffer* buffer, ShaderBindingType type)
     : bindingIndex(index)
     , count(1)
     , shaderStage(shaderStage)
-    , type(ShaderBindingType::UniformBuffer) // TODO: Technically this could be some other type of buffer here (e.g. shader storage buffer)
-    , buffer(buffer)
+    , type(type)
+    , buffers({ buffer })
     , textures()
 {
+    if (type != ShaderBindingType::UniformBuffer && type != ShaderBindingType::StorageBuffer) {
+        LogErrorAndExit("ShaderBinding error: invalid shader binding type for buffer\n");
+    }
 }
 
 ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Texture* texture, ShaderBindingType type)
@@ -205,7 +208,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Text
     , count(1)
     , shaderStage(shaderStage)
     , type(type)
-    , buffer(nullptr)
+    , buffers()
     , textures({ texture })
 {
     if (!texture) {
@@ -228,7 +231,6 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Text
     default:
         ASSERT_NOT_REACHED();
         break;
-
     }
 }
 
@@ -238,7 +240,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const TopL
     , shaderStage(shaderStage)
     , type(ShaderBindingType::RTAccelerationStructure)
     , tlas(tlas)
-    , buffer()
+    , buffers()
     , textures()
 {
     if (!tlas) {
@@ -251,7 +253,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std:
     , count(count)
     , shaderStage(shaderStage)
     , type(ShaderBindingType::TextureSamplerArray)
-    , buffer(nullptr)
+    , buffers()
     , textures(textures)
 {
     if (count < textures.size()) {
@@ -264,6 +266,28 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std:
         }
         if (texture->usage() != Texture::Usage::Sampled && texture->usage() != Texture::Usage::AttachAndSample) {
             LogErrorAndExit("ShaderBinding error: texture in list does not support sampling\n");
+        }
+    }
+}
+
+ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std::vector<const Buffer*>& buffers)
+    : bindingIndex(index)
+    , count(buffers.size())
+    , shaderStage(shaderStage)
+    , type(ShaderBindingType::StorageBufferArray)
+    , buffers(buffers)
+    , textures()
+{
+    if (count < 1) {
+        LogErrorAndExit("ShaderBinding error: too few buffers in list\n");
+    }
+
+    for (auto buffer : buffers) {
+        if (!buffer) {
+            LogErrorAndExit("ShaderBinding error: null buffer in list\n");
+        }
+        if (buffer->usage() != Buffer::Usage::StorageBuffer) {
+            LogErrorAndExit("ShaderBinding error: buffer in list is not a storage buffer\n");
         }
     }
 }

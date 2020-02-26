@@ -16,7 +16,10 @@ std::string RTFirstHitNode::name()
 void RTFirstHitNode::constructNode(Registry& nodeReg)
 {
     m_instances.clear();
-    m_materials.clear();
+    m_rtMeshes.clear();
+
+    m_vertexBuffers.clear();
+    m_indexBuffers.clear();
 
     for (auto& model : m_scene.models()) {
         model->forEachMesh([&](const Mesh& mesh) {
@@ -30,9 +33,9 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                 ASSERT(posData.size() == texCoordData.size());
 
                 for (int i = 0; i < posData.size(); ++i) {
-                    vertices.push_back({ .position = posData[i],
-                                         .normal = normalData[i],
-                                         .texCoord = texCoordData[i] });
+                    vertices.push_back({ .position = vec4(posData[i], 0.0f),
+                                         .normal = vec4(normalData[i], 0.0f),
+                                         .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
                 }
             }
 
@@ -47,10 +50,13 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
             size_t texIndex = m_textures.size();
             m_textures.push_back(baseColorTexture);
 
-            RTMaterial rtMaterial { .baseColor = (int)texIndex };
-            m_materials.push_back(rtMaterial);
+            m_rtMeshes.push_back({ .objectId = (int)m_instances.size(),
+                                   .baseColor = (int)texIndex });
 
-            // TODO: We want to specify if the geometry is opaque or not also!
+            // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
+            m_vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+            m_indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+
             RTGeometry geometry { .vertexBuffer = nodeReg.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
                                   .vertexFormat = VertexFormat::XYZ32F,
                                   .vertexStride = sizeof(RTVertex),
@@ -58,6 +64,7 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                                   .indexType = mesh.indexType(),
                                   .transform = mesh.transform().localMatrix() };
 
+            // TODO: Later we probably want to keep all meshes of a model in a single BLAS, but that requires some fancy SBT stuff which I don't wanna mess with now.
             BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure({ geometry });
             m_instances.push_back({ .blas = blas,
                                     .transform = model->transform() });
@@ -79,12 +86,19 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
                                                     { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
                                                     { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
 
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &bindingSet });
+    // These two can probably be node resources..?
+    Buffer& meshBuffer = reg.createBuffer((std::byte*)m_rtMeshes.data(), m_rtMeshes.size() * sizeof(RTMesh), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
+    BindingSet& objectDataSet = reg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
+                                                       { 1, ShaderStageRTClosestHit, m_vertexBuffers },
+                                                       { 2, ShaderStageRTClosestHit, m_indexBuffers } });
+
+    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &bindingSet, &objectDataSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
         cmdList.bindSet(bindingSet, 0);
+        cmdList.bindSet(objectDataSet, 1);
         cmdList.traceRays(appState.windowExtent());
     };
 }

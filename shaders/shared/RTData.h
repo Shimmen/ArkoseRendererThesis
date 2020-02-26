@@ -1,16 +1,18 @@
 #ifndef RTDATA_H
 #define RTDATA_H
 
-struct RTMaterial {
+struct RTMesh {
+    int objectId;
     int baseColor;
-    int pad0, pad1, pad2;
+
+    //int pad0, pad1;
 };
 
 struct RTVertex {
-    vec3 position;
-    vec3 normal;
-    vec2 texCoord;
-    float pad0; // TODO: Check if this is needed!
+    // TODO: we could fit the tex coord data in .w of position & normal!
+    vec4 position;
+    vec4 normal;
+    vec4 texCoord;
 };
 
 #endif // RTDATA_H
