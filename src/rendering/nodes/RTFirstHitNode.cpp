@@ -21,6 +21,8 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
     m_vertexBuffers.clear();
     m_indexBuffers.clear();
 
+    std::vector<const Texture*> allTextures;
+
     for (auto& model : m_scene.models()) {
         model->forEachMesh([&](const Mesh& mesh) {
             std::vector<RTVertex> vertices {};
@@ -47,8 +49,8 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                 baseColorTexture = &nodeReg.loadTexture2D(material.baseColor, true, true);
             }
 
-            size_t texIndex = m_textures.size();
-            m_textures.push_back(baseColorTexture);
+            size_t texIndex = allTextures.size();
+            allTextures.push_back(baseColorTexture);
 
             m_rtMeshes.push_back({ .objectId = (int)m_instances.size(),
                                    .baseColor = (int)texIndex });
@@ -70,6 +72,8 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                                     .transform = model->transform() });
         });
     }
+
+    m_textureBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
 }
 
 RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) const
@@ -92,13 +96,14 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
                                                        { 1, ShaderStageRTClosestHit, m_vertexBuffers },
                                                        { 2, ShaderStageRTClosestHit, m_indexBuffers } });
 
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &bindingSet, &objectDataSet });
+    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &bindingSet, &objectDataSet, m_textureBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
         cmdList.bindSet(bindingSet, 0);
         cmdList.bindSet(objectDataSet, 1);
+        cmdList.bindSet(*m_textureBindingSet, 2);
         cmdList.traceRays(appState.windowExtent());
     };
 }

@@ -2490,6 +2490,7 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
             for (auto texture : bindingInfo.textures) {
                 switch (bindingInfo.type) {
                 case ShaderBindingType::TextureSampler:
+                case ShaderBindingType::TextureSamplerArray:
                     rtStateInfo.sampledTextures.push_back(texture);
                     break;
                 case ShaderBindingType::StorageImage:
@@ -2954,7 +2955,7 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
         data.instanceId = instanceIdx;
         data.mask = 0xff;
         data.instanceOffset = 0;
-        data.flags = 0;
+        data.flags = 0; //VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
 
         instanceData.push_back(data);
     }

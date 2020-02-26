@@ -8,13 +8,16 @@
 layout(location = 0) rayPayloadInNV vec3 hitValue;
 hitAttributeNV vec3 attribs;
 
-layout(binding = 0, set = 1, scalar) buffer Meshes   { RTMesh meshes[]; };
-layout(binding = 1, set = 1, scalar) buffer Vertices { RTVertex x[]; } vertices[];
-layout(binding = 2, set = 1)         buffer Indices  { uint idx[]; }  indices[];
+layout(binding = 0, set = 1, scalar) buffer readonly Meshes   { RTMesh meshes[]; };
+layout(binding = 1, set = 1, scalar) buffer readonly Vertices { RTVertex x[]; } vertices[];
+layout(binding = 2, set = 1)         buffer readonly Indices  { uint idx[]; }  indices[];
 
-void unpack(out RTVertex v0, out RTVertex v1, out RTVertex v2)
+layout(binding = 0, set = 2) uniform sampler2D baseColorSamplers[RT_MAX_TEXTURES];
+
+void unpack(out RTMesh mesh, out RTVertex v0, out RTVertex v1, out RTVertex v2)
 {
-	uint objId = meshes[gl_InstanceID].objectId;
+	mesh = meshes[gl_InstanceID];
+	uint objId = mesh.objectId;
 	
 	ivec3 idx = ivec3(indices[objId].idx[3 * gl_PrimitiveID + 0],
 					  indices[objId].idx[3 * gl_PrimitiveID + 1],
@@ -27,14 +30,18 @@ void unpack(out RTVertex v0, out RTVertex v1, out RTVertex v2)
 
 void main()
 {
+	RTMesh mesh;
 	RTVertex v0, v1, v2;
-	unpack(v0, v1, v2);
+	unpack(mesh, v0, v1, v2);
 
 	const vec3 b = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
 	vec3 N = normalize(v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z);
 	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
 
+	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
+
 	//hitValue = N * 0.5 + 0.5;
-	hitValue = vec3(uv, 0.0);
+	//hitValue = vec3(uv, 0.0);
+	hitValue = baseColor;
 }

@@ -21,5 +21,6 @@ private:
     std::vector<const Buffer*> m_vertexBuffers {};
     std::vector<const Buffer*> m_indexBuffers {};
     std::vector<RTMesh> m_rtMeshes {};
-    std::vector<Texture*> m_textures {};
+
+    BindingSet* m_textureBindingSet {};
 };

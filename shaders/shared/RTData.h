@@ -1,6 +1,8 @@
 #ifndef RTDATA_H
 #define RTDATA_H
 
+#define RT_MAX_TEXTURES 64
+
 struct RTMesh {
     int objectId;
     int baseColor;
