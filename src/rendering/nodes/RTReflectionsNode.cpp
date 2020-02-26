@@ -73,11 +73,14 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
         });
     }
 
+    Texture& environmentTexture = nodeReg.loadTexture2D(m_scene.environmentMap(), true, false);
+
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
-                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
+                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
+                                                         { 4, ShaderStageRTMiss, &environmentTexture } });
 }
 
 RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg) const

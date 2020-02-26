@@ -169,8 +169,13 @@ public:
     const SunLight& sun() const { return m_sunLight; }
     SunLight& sun() { return m_sunLight; }
 
+    void setEnvironmentMap(std::string path) { m_environmentMap = std::move(path); }
+    const std::string& environmentMap() const { return m_environmentMap; }
+
 private:
     std::vector<Model*> m_models;
     FpsCamera m_camera;
     SunLight m_sunLight;
+
+    std::string m_environmentMap {};
 };

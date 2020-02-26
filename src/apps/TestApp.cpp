@@ -23,6 +23,8 @@ void TestApp::setup(RenderGraph& graph)
 
     m_scene.camera().lookAt({ 0, 1, 6 }, { 0, 0.5f, 0 });
 
+    m_scene.setEnvironmentMap("assets/environments/tiergarten_2k.hdr");
+
     m_scene.sun().color = { 1, 1, 1 };
     m_scene.sun().intensity = 10.0f;
     m_scene.sun().direction = normalize(vec3(-1.0f, -1.0f, 0.0f));

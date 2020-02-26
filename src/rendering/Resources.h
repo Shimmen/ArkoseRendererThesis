@@ -54,10 +54,10 @@ struct Texture : public Resource {
 
     enum class Format {
         Unknown,
-        RGB8,
         RGBA8,
         sRGBA8,
         RGBA16F,
+        RGBA32F,
         Depth32F
     };
 

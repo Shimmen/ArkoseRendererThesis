@@ -721,9 +721,6 @@ void VulkanBackend::newTexture(const Texture& texture)
 {
     VkFormat format;
     switch (texture.format()) {
-    case Texture::Format::RGB8:
-        format = VK_FORMAT_R8G8B8_UNORM;
-        break;
     case Texture::Format::RGBA8:
         format = VK_FORMAT_R8G8B8A8_UNORM;
         break;
@@ -733,11 +730,16 @@ void VulkanBackend::newTexture(const Texture& texture)
     case Texture::Format::RGBA16F:
         format = VK_FORMAT_R16G16B16A16_SFLOAT;
         break;
+    case Texture::Format::RGBA32F:
+        format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        break;
     case Texture::Format::Depth32F:
         format = VK_FORMAT_D32_SFLOAT;
         break;
     case Texture::Format::Unknown:
         LogErrorAndExit("Trying to create new texture with format Unknown, which is not allowed!\n");
+    default:
+        ASSERT_NOT_REACHED();
     }
 
     const VkImageUsageFlags attachmentFlags = texture.hasDepthFormat() ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -951,12 +953,10 @@ void VulkanBackend::updateTexture(const TextureUpdate& update)
 
     int numChannels;
     switch (update.texture().format()) {
-    case Texture::Format::RGB8:
-        numChannels = 3;
-        break;
     case Texture::Format::RGBA8:
     case Texture::Format::sRGBA8:
     case Texture::Format::RGBA16F:
+    case Texture::Format::RGBA32F:
         numChannels = 4;
         break;
     case Texture::Format::Depth32F:
@@ -969,7 +969,10 @@ void VulkanBackend::updateTexture(const TextureUpdate& update)
 
     int width, height;
     VkDeviceSize pixelsSize;
-    stbi_uc* pixels;
+
+    bool isHdr = false;
+    stbi_uc* pixels { nullptr };
+    float* hdrPixels { nullptr };
 
     if (update.hasPath()) {
         if (!FileIO::isFileReadable(update.path())) {
@@ -977,11 +980,17 @@ void VulkanBackend::updateTexture(const TextureUpdate& update)
             return;
         }
 
-        // TODO: Well, if the texture isn't a float texture
-        ASSERT(!stbi_is_hdr(update.path().c_str()));
+        isHdr = stbi_is_hdr(update.path().c_str());
 
-        pixels = stbi_load(update.path().c_str(), &width, &height, nullptr, numChannels);
-        if (!pixels) {
+        if (isHdr) {
+            hdrPixels = stbi_loadf(update.path().c_str(), &width, &height, nullptr, numChannels);
+            pixelsSize = width * height * numChannels * sizeof(float);
+        } else {
+            pixels = stbi_load(update.path().c_str(), &width, &height, nullptr, numChannels);
+            pixelsSize = width * height * numChannels * sizeof(stbi_uc);
+        }
+
+        if ((isHdr && !hdrPixels) || (!isHdr && !pixels)) {
             LogError("VulkanBackend::updateTexture(): stb_image could not read the contents of '%s'.\n", update.path().c_str());
             return;
         }
@@ -990,7 +999,6 @@ void VulkanBackend::updateTexture(const TextureUpdate& update)
             LogErrorAndExit("VulkanBackend::updateTexture(): loaded texture does not match specified extent.\n");
         }
 
-        pixelsSize = width * height * numChannels * sizeof(stbi_uc);
     } else {
         width = 1;
         height = 1;
@@ -1018,7 +1026,7 @@ void VulkanBackend::updateTexture(const TextureUpdate& update)
         LogError("VulkanBackend::updateTexture(): could not create staging buffer.\n");
     }
 
-    if (!setBufferMemoryUsingMapping(stagingAllocation, pixels, pixelsSize)) {
+    if (!setBufferMemoryUsingMapping(stagingAllocation, isHdr ? (void*)hdrPixels : (void*)pixels, pixelsSize)) {
         LogError("VulkanBackend::updateTexture(): could set the buffer memory for the staging buffer.\n");
         return;
     }
@@ -1028,7 +1036,11 @@ void VulkanBackend::updateTexture(const TextureUpdate& update)
         if (update.hasPath()) {
             stbi_image_free(pixels);
         } else {
-            free(pixels);
+            if (isHdr) {
+                stbi_image_free(hdrPixels);
+            } else {
+                stbi_image_free(pixels);
+            }
         }
     });
 

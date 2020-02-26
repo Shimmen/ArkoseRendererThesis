@@ -1,9 +1,15 @@
 #version 460
 #extension GL_NV_ray_tracing : require
 
+#include "spherical.glsl"
+
 layout(location = 0) rayPayloadInNV vec3 hitValue;
+
+layout(binding = 4, set = 1) uniform sampler2D environmentMap;
 
 void main()
 {
-    hitValue = vec3(0.58, 0.69, 0.73);
+    vec2 sampleUv = sphericalUvFromDirection(gl_WorldRayDirectionNV);
+    vec3 skyColor = texture(environmentMap, sampleUv).rgb;
+    hitValue = skyColor;
 }

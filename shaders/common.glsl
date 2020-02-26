@@ -29,29 +29,6 @@ float saturate(float x)
     return clamp(x, 0.0, 1.0);
 }
 
-vec2 sphericalUvFromDirection(vec3 direction)
-{
-    float phi = atan(direction.z, direction.x);
-    float theta = acos(clamp(direction.y, -1.0, +1.0));
-
-    if (phi < 0.0) phi += TWO_PI;
-    return vec2(phi / TWO_PI, theta / PI);
-}
-
-vec3 directionFromSphericalUv(vec2 uv)
-{
-    float phi = uv.x * TWO_PI;
-    float theta = uv.y * PI;
-
-    float sinTheta = sin(theta);
-
-    return vec3(
-        cos(phi) * sinTheta,
-        cos(theta),
-        sin(phi) * sinTheta
-    );
-}
-
 void reortogonalize(in vec3 v0, inout vec3 v1)
 {
     // Perform Gram-Schmidt's re-ortogonalization process to make v1 orthagonal to v0

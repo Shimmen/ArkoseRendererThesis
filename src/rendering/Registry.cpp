@@ -83,23 +83,20 @@ Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool g
 
     int width, height, componentCount;
     stbi_info(imagePath.c_str(), &width, &height, &componentCount);
+    bool hdr = stbi_is_hdr(imagePath.c_str());
 
     Texture::Format format;
     switch (componentCount) {
     case 3:
-        // NOTE: sRGB (without alpha) is often not supported, so we don't support it in ArkoseRenderer
-        format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGB8;
-
-        // TODO: I think this is just temporary.. why is that not supported??
-        if (format == Texture::Format::RGB8) {
-            format = Texture::Format::RGBA8;
+    case 4:
+        if (hdr) {
+            format = Texture::Format::RGBA32F;
+        } else {
+            format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGBA8;
         }
         break;
-    case 4:
-        format = (srgb) ? Texture::Format::sRGBA8 : Texture::Format::RGBA8;
-        break;
     default:
-        LogErrorAndExit("Currently no support for other than (s)RGB and (s)RGBA texture loading!\n");
+        LogErrorAndExit("Currently no support for other than (s)RGB(F) and (s)RGBA(F) texture loading!\n");
     }
 
     // TODO: Maybe we want to allow more stuff..?

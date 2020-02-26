@@ -72,6 +72,9 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
         });
     }
 
+    Texture& environmentTexture = nodeReg.loadTexture2D(m_scene.environmentMap(), true, false);
+    m_environmentBindingSet = &nodeReg.createBindingSet({ {0, ShaderStageRTMiss, &environmentTexture } });
+
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
@@ -93,13 +96,14 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
                                                          { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
                                                          { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") } });
 
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet });
+    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, m_environmentBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
         cmdList.bindSet(frameBindingSet, 0);
         cmdList.bindSet(*m_objectDataBindingSet, 1);
+        cmdList.bindSet(*m_environmentBindingSet, 2);
         cmdList.traceRays(appState.windowExtent());
     };
 }

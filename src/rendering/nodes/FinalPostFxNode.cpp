@@ -27,8 +27,11 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     const Texture* sourceTextureRt = reg.getTexture(RTFirstHitNode::name(), "image");
 
     if (!sourceTexture) {
-        LogError("FinalPostFxNode: could not find the input texture 'forward:color', using test texture\n");
         sourceTexture = &reg.loadTexture2D("assets/test-pattern.png", true, true);
+    }
+
+    if (!sourceTextureRt) {
+        sourceTextureRt = &reg.loadTexture2D("assets/test-pattern.png", true, true);
     }
 
     BindingSet& sourceImage = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTexture } });
