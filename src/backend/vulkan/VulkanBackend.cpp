@@ -15,6 +15,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
+#include <spirv_cross.hpp>
 #include <stb_image.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -1906,16 +1907,8 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     // Create pipeline layout
     //
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts {};
-    for (auto& set : renderState.bindingSets()) {
-        // TODO: Maybe we should also separate the layouts from the binding infos? Here we might have 100 binding infos all of the same layout,
-        //  but since they are the same concept in the backend they will have different layout objects so it will count them all here..
-        //  This could in theory be supported by the backend as is if it figures out what binding sets have the same layouts and reuse them! I think.
-        BindingSetInfo bindingInfo = bindingSetInfo(*set);
-        descriptorSetLayouts.push_back(bindingInfo.descriptorSetLayout);
-    }
-
+    
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = createDescriptorSetLayoutForShader(renderState.shader());
     pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
     pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
 
@@ -1926,6 +1919,11 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     VkPipelineLayout pipelineLayout {};
     if (vkCreatePipelineLayout(device(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         LogErrorAndExit("Error trying to create pipeline layout\n");
+    }
+
+    // (it's *probably* safe to delete these after creating the pipeline layout! no layers are complaining)
+    for (VkDescriptorSetLayout& layout : descriptorSetLayouts) {
+        vkDestroyDescriptorSetLayout(device(), layout, nullptr);
     }
 
     //
@@ -2992,6 +2990,120 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
     }
 
     return instanceBuffer;
+}
+
+std::vector<VkDescriptorSetLayout> VulkanBackend::createDescriptorSetLayoutForShader(const Shader& shader) const
+{
+    using namespace spirv_cross;
+
+    uint32_t maxSetId = 0;
+    std::unordered_map<uint32_t, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>> sets;
+
+    for (auto& file : shader.files()) {
+
+        VkShaderStageFlags stageFlag;
+        switch (file.type()) {
+        case ShaderFileType::Vertex:
+            stageFlag = VK_SHADER_STAGE_VERTEX_BIT;
+            break;
+        case ShaderFileType::Fragment:
+            stageFlag = VK_SHADER_STAGE_FRAGMENT_BIT;
+            break;
+        case ShaderFileType::Compute:
+            stageFlag = VK_SHADER_STAGE_COMPUTE_BIT;
+            break;
+        case ShaderFileType::RTRaygen:
+            stageFlag = VK_SHADER_STAGE_RAYGEN_BIT_NV;
+            break;
+        case ShaderFileType::RTClosestHit:
+            stageFlag = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
+            break;
+        case ShaderFileType::RTMiss:
+            stageFlag = VK_SHADER_STAGE_MISS_BIT_NV;
+            break;
+        default:
+            ASSERT_NOT_REACHED();
+        }
+
+        const auto& spv = ShaderManager::instance().spirv(file.path());
+        spirv_cross::Compiler compiler { spv };
+        spirv_cross::ShaderResources resources = compiler.get_shader_resources();
+
+        auto add = [&](const spirv_cross::Resource& res, VkDescriptorType descriptorType) {
+            uint32_t setId = compiler.get_decoration(res.id, spv::Decoration::DecorationDescriptorSet);
+            auto& set = sets[setId];
+
+            maxSetId = std::max(maxSetId, setId);
+
+            uint32_t bindingId = compiler.get_decoration(res.id, spv::Decoration::DecorationBinding);
+            auto entry = set.find(bindingId);
+            if (entry == set.end()) {
+
+                uint32_t arrayCount = 1; // i.e. not an array
+                const spirv_cross::SPIRType& type = compiler.get_type(res.type_id);
+                if (!type.array.empty()) {
+                    ASSERT(type.array.size() == 1); // i.e. no multidimensional arrays
+                    arrayCount = type.array[0];
+                }
+
+                VkDescriptorSetLayoutBinding binding {};
+                binding.binding = bindingId;
+                binding.stageFlags = stageFlag;
+                binding.descriptorCount = arrayCount;
+                binding.descriptorType = descriptorType;
+                binding.pImmutableSamplers = nullptr;
+
+                set[bindingId] = binding;
+
+            } else {
+                set[bindingId].stageFlags |= stageFlag;
+            }
+        };
+
+        for (auto& ubo : resources.uniform_buffers) {
+            add(ubo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+        }
+        for (auto& sbo : resources.storage_buffers) {
+            add(sbo, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        }
+        for (auto& sampledImage : resources.sampled_images) {
+            add(sampledImage, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        }
+        for (auto& storageImage : resources.storage_images) {
+            add(storageImage, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        }
+        for (auto& accelerationStructure : resources.acceleration_structures) {
+            add(accelerationStructure, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV);
+        }
+    }
+
+    std::vector<VkDescriptorSetLayout> setLayouts { maxSetId + 1 };
+    for (uint32_t setId = 0; setId <= maxSetId; ++setId) {
+
+        VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+        std::vector<VkDescriptorSetLayoutBinding> layoutBindings {};
+
+        // There can be no gaps in the list of set layouts when creating a pipeline layout, so we fill them in here
+        descriptorSetLayoutCreateInfo.bindingCount = 0;
+        descriptorSetLayoutCreateInfo.pBindings = nullptr;
+
+        auto entry = sets.find(setId);
+        if (entry != sets.end()) {
+
+            for (auto& [id, binding] : entry->second) {
+                layoutBindings.push_back(binding);
+            }
+
+            descriptorSetLayoutCreateInfo.bindingCount = layoutBindings.size();
+            descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();
+        }
+
+        if (vkCreateDescriptorSetLayout(device(), &descriptorSetLayoutCreateInfo, nullptr, &setLayouts[setId]) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create descriptor set layout from shader\n");
+        }
+    }
+
+    return setLayouts;
 }
 
 uint32_t VulkanBackend::findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const
