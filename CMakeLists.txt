@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 project(ArkoseRenderer)
 
+include(FetchContent)
+
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 add_executable(ArkoseRenderer
@@ -22,6 +24,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/SlowForwardRenderNode.cpp
         src/rendering/nodes/ShadowMapNode.cpp
         src/rendering/nodes/RTFirstHitNode.cpp
+        src/rendering/nodes/RTReflectionsNode.cpp
         src/utility/GlobalState.cpp
         src/utility/GltfModel.cpp
         src/utility/FpsCamera.cpp
@@ -37,8 +40,6 @@ if (MSVC)
     add_compile_options(/Wall)
     target_compile_options(ArkoseRenderer PRIVATE /MT)
     target_compile_options(ArkoseRenderer PRIVATE /Wall)
-    #set_target_properties(ArkoseRenderer PROPERTIES 
-    #    VS_DEBUGGER_WORKING_DIRECTORY "C:\\Users\\simon.moos\\Developer\\ArkoseRenderer")
 else()
     target_compile_options(ArkoseRenderer PRIVATE -Wall)
     target_compile_options(ArkoseRenderer PRIVATE -Wimplicit-fallthrough)
@@ -49,6 +50,17 @@ target_include_directories(ArkoseRenderer PRIVATE shaders/shared)
 
 target_include_directories(ArkoseRenderer PRIVATE deps/glm-0.9.9.6)
 target_include_directories(ArkoseRenderer PRIVATE deps/nlohmann_json)
+
+FetchContent_Declare(spirvcross
+    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Cross.git
+    GIT_TAG        "2020-02-26"
+  )
+FetchContent_GetProperties(spirvcross)
+if(NOT spirvcross_POPULATED)
+    FetchContent_Populate(spirvcross)
+    add_subdirectory(${spirvcross_SOURCE_DIR} ${spirvcross_BINARY_DIR})
+endif()
+target_link_libraries(ArkoseRenderer spirv-cross-core spirv-cross-glsl spirv-cross-reflect)
 
 # TODO: Look into using https://github.com/Kitware/CMake/blob/master/Modules/FetchContent.cmake
 #  here instead! I tried but there was something weird, possibly with the newer gltf source..
