@@ -99,8 +99,12 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     Texture& depthTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::Depth32F, Texture::Usage::AttachAndSample);
     reg.publish("depth", depthTexture);
 
+    Texture& baseColorTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::AttachAndSample);
+    reg.publish("baseColor", baseColorTexture);
+
     RenderTarget& renderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Color0, &colorTexture },
                                                           { RenderTarget::AttachmentType::Color1, &normalTexture },
+                                                          { RenderTarget::AttachmentType::Color2, &baseColorTexture },
                                                           { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
     const Buffer* cameraUniformBuffer = reg.getBuffer(CameraUniformNode::name(), "buffer");

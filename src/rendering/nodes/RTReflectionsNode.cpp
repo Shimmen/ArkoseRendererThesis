@@ -86,7 +86,7 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
 
 RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg) const
 {
-    const Texture* gBufferColor = reg.getTexture(ForwardRenderNode::name(), "color");
+    const Texture* gBufferColor = reg.getTexture(ForwardRenderNode::name(), "baseColor");
     const Texture* gBufferNormal = reg.getTexture(ForwardRenderNode::name(), "normal");
     const Texture* gBufferDepth = reg.getTexture(ForwardRenderNode::name(), "depth");
     ASSERT(gBufferNormal && gBufferDepth);

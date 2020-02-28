@@ -29,6 +29,7 @@ layout(set = 2, binding = 1) uniform DirLightBlock
 
 layout(location = 0) out vec4 oColor;
 layout(location = 1) out vec4 oNormal;
+layout(location = 2) out vec4 oBaseColor;
 
 // TODO: Move to some general location!
 
@@ -93,4 +94,5 @@ void main()
 
     oColor = vec4(color, 1.0);
     oNormal = vec4(N, 0.0);
+    oBaseColor = vec4(baseColor, 0.0);
 }
