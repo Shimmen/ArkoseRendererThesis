@@ -125,6 +125,9 @@ RenderGraphNode::ExecuteCallback ForwardRenderNode::constructFrame(Registry& reg
     rasterState.frontFace = TriangleWindingOrder::CounterClockwise;
     rasterState.backfaceCullingEnabled = true;
 
+    DepthState depthState;
+    depthState.writeDepth = true;
+
     Texture& colorTexture = reg.createTexture2D(windowTarget.extent(), Texture::Format::RGBA8, Texture::Usage::AttachAndSample);
     reg.publish("color", colorTexture);
 
@@ -136,7 +139,7 @@ RenderGraphNode::ExecuteCallback ForwardRenderNode::constructFrame(Registry& reg
                                                           { RenderTarget::AttachmentType::Color1, &normalTexture },
                                                           { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-    RenderState& renderState = reg.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState);
+    RenderState& renderState = reg.createRenderState(renderTarget, vertexLayout, shader, { &bindingSet }, viewport, blendState, rasterState, depthState);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.setRenderState(renderState, ClearColor(0.1f, 0.1f, 0.1f), 1.0f);

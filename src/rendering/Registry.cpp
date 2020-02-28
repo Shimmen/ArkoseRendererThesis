@@ -115,15 +115,15 @@ Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool g
 RenderState& Registry::createRenderState(const RenderStateBuilder& builder)
 {
     return createRenderState(builder.renderTarget, builder.vertexLayout, builder.shader,
-                             builder.bindingSets(), builder.viewport(), builder.blendState(), builder.rasterState());
+                             builder.bindingSets(), builder.viewport(), builder.blendState(), builder.rasterState(), builder.depthState() );
 }
 
 RenderState& Registry::createRenderState(
     const RenderTarget& renderTarget, const VertexLayout& vertexLayout,
     const Shader& shader, std::vector<const BindingSet*> shaderBindingSets,
-    const Viewport& viewport, const BlendState& blendState, const RasterState& rasterState)
+    const Viewport& viewport, const BlendState& blendState, const RasterState& rasterState, const DepthState& depthState)
 {
-    RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSets, viewport, blendState, rasterState };
+    RenderState renderState = { {}, renderTarget, vertexLayout, shader, shaderBindingSets, viewport, blendState, rasterState, depthState };
     m_renderStates.push_back(renderState);
     return m_renderStates.back();
 }

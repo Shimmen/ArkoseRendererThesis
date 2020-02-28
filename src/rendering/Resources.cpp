@@ -358,6 +358,15 @@ RasterState RenderStateBuilder::rasterState() const
     return state;
 }
 
+DepthState RenderStateBuilder::depthState() const
+{
+    DepthState state{
+        .writeDepth = writeDepth,
+        .testDepth = testDepth,
+    };
+    return state;
+}
+
 RenderStateBuilder& RenderStateBuilder::addBindingSet(const BindingSet& bindingSet)
 {
     m_bindingSets.emplace_back(&bindingSet);

@@ -2015,9 +2015,11 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     colorBlending.attachmentCount = colorBlendAttachments.size();
     colorBlending.pAttachments = colorBlendAttachments.data();
 
+    const DepthState& depthState = renderState.depthState();
+
     VkPipelineDepthStencilStateCreateInfo depthStencilState = { VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-    depthStencilState.depthTestEnable = VK_TRUE;
-    depthStencilState.depthWriteEnable = VK_TRUE;
+    depthStencilState.depthTestEnable = depthState.testDepth;
+    depthStencilState.depthWriteEnable = depthState.writeDepth;
     depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencilState.depthBoundsTestEnable = VK_FALSE;
     depthStencilState.minDepthBounds = 0.0f;

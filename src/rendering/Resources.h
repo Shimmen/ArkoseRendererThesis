@@ -209,6 +209,11 @@ struct BlendState {
     bool enabled { false };
 };
 
+struct DepthState {
+    bool writeDepth { true };
+    bool testDepth { true };
+};
+
 enum class TriangleWindingOrder {
     Clockwise,
     CounterClockwise
@@ -295,7 +300,7 @@ public:
     RenderState(Badge<Registry>,
                 const RenderTarget& renderTarget, VertexLayout vertexLayout,
                 Shader shader, const std::vector<const BindingSet*>& shaderBindingSets,
-                Viewport viewport, BlendState blendState, RasterState rasterState)
+                Viewport viewport, BlendState blendState, RasterState rasterState, DepthState depthState)
         : m_renderTarget(renderTarget)
         , m_vertexLayout(vertexLayout)
         , m_shader(shader)
@@ -303,6 +308,7 @@ public:
         , m_viewport(viewport)
         , m_blendState(blendState)
         , m_rasterState(rasterState)
+        , m_depthState(depthState)
     {
         ASSERT(shader.type() == ShaderType::Raster);
     }
@@ -316,6 +322,7 @@ public:
     const Viewport& fixedViewport() const { return m_viewport; }
     const BlendState& blendState() const { return m_blendState; }
     const RasterState& rasterState() const { return m_rasterState; }
+    const DepthState& depthState() const { return m_depthState; }
 
 private:
     const RenderTarget& m_renderTarget;
@@ -327,6 +334,7 @@ private:
     Viewport m_viewport;
     BlendState m_blendState;
     RasterState m_rasterState;
+    DepthState m_depthState;
 };
 
 class RenderStateBuilder {
@@ -337,9 +345,13 @@ public:
     const VertexLayout& vertexLayout;
     const Shader& shader;
 
+    bool writeDepth { true };
+    bool testDepth { true };
+
     [[nodiscard]] Viewport viewport() const;
     [[nodiscard]] BlendState blendState() const;
     [[nodiscard]] RasterState rasterState() const;
+    [[nodiscard]] DepthState depthState() const;
 
     RenderStateBuilder& addBindingSet(const BindingSet&);
     [[nodiscard]] const std::vector<const BindingSet*>& bindingSets() const;
