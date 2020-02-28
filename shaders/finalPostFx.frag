@@ -1,20 +1,36 @@
-#version 450
+#version 460
 #extension GL_ARB_separate_shader_objects : enable
 
 #include "aces.glsl"
+#include "spherical.glsl"
 
 layout(location = 0) in vec2 vTexCoord;
+layout(location = 1) in vec3 vViewRay;
 
 layout(binding = 0, set = 0) uniform sampler2D uTexture;
+
 layout(binding = 0, set = 1) uniform sampler2D uReflections;
+
+layout(binding = 1, set = 2) uniform sampler2D uEnvironment;
+layout(binding = 2, set = 2) uniform sampler2D uDepth;
+layout(binding = 3, set = 2) uniform EnvBlock { float envMultiplier; };
 
 layout(location = 0) out vec4 oColor;
 
 void main()
 {
-    vec3 hdrColor = texture(uTexture, vTexCoord).rgb;
-    vec3 reflection = texture(uReflections, vTexCoord).rgb;
-    hdrColor = mix(hdrColor, reflection, 0.25);
+    vec3 hdrColor;
+
+    float depth = texture(uDepth, vTexCoord).r;
+    if (depth >= 1.0 - 1e-6) {
+        vec2 sampleUv = sphericalUvFromDirection(normalize(vViewRay));
+        hdrColor = texture(uEnvironment, sampleUv).rgb;
+        hdrColor *= envMultiplier;
+    } else {
+        hdrColor = texture(uTexture, vTexCoord).rgb;
+        vec3 reflection = texture(uReflections, vTexCoord).rgb;
+        hdrColor = mix(hdrColor, reflection, 0.25);
+    }
 
     vec3 ldrColor = ACES_tonemap(hdrColor);
     ldrColor = pow(ldrColor, vec3(1.0 / 2.2));

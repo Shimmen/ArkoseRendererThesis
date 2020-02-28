@@ -1,12 +1,14 @@
 #include "FinalPostFxNode.h"
 
+#include "CameraUniformNode.h"
 #include "ForwardRenderNode.h"
 #include "RTFirstHitNode.h"
 #include "RTReflectionsNode.h"
 #include "imgui.h"
 
-FinalPostFxNode::FinalPostFxNode()
+FinalPostFxNode::FinalPostFxNode(const Scene& scene)
     : RenderGraphNode(FinalPostFxNode::name())
+    , m_scene(scene)
 {
 }
 
@@ -37,13 +39,19 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     BindingSet& sourceImage = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTexture } });
     BindingSet& sourceImageRt = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTextureRt } });
 
-    const Texture* reflections = reg.getTexture(RTReflectionsNode::name(), "reflections");
-    BindingSet& reflectionsSet = reg.createBindingSet({ { 0, ShaderStageFragment, reflections } });
+    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
+
+    Buffer& envDataBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+    BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(CameraUniformNode::name(), "buffer") },
+                                                       { 1, ShaderStageFragment, &reg.loadTexture2D(m_scene.environmentMap(), true, false) },
+                                                       { 2, ShaderStageFragment, reg.getTexture(ForwardRenderNode::name(), "depth") },
+                                                       { 3, ShaderStageFragment, &envDataBuffer } });
 
     RenderStateBuilder renderStateBuilder { reg.windowRenderTarget(), shader, vertexLayout };
-    renderStateBuilder.addBindingSet(sourceImage);
-    renderStateBuilder.addBindingSet(sourceImageRt);
-    renderStateBuilder.addBindingSet(reflectionsSet); 
+    renderStateBuilder.addBindingSet(sourceImage).addBindingSet(sourceImageRt).addBindingSet(etcBindingSet).addBindingSet(envBindingSet);
+    renderStateBuilder.writeDepth = false;
+    renderStateBuilder.testDepth = false;
+
     RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
@@ -54,7 +62,12 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
 
         cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
         cmdList.bindSet(useRt ? sourceImageRt : sourceImage, 0);
-        cmdList.bindSet(reflectionsSet, 1);
+        cmdList.bindSet(etcBindingSet, 1);
+
+        float envMultiplier = m_scene.environmentMultiplier();
+        cmdList.updateBufferImmediately(envDataBuffer, &envMultiplier, sizeof(envMultiplier));
+        cmdList.bindSet(envBindingSet, 2);
+
         cmdList.draw(vertexBuffer, 3);
     };
 }

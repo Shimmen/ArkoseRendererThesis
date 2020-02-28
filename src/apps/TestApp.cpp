@@ -24,7 +24,7 @@ void TestApp::setup(RenderGraph& graph)
     m_scene.camera().lookAt({ 0, 4, 8 }, { 0, 3, 0 });
 
     m_scene.setEnvironmentMap("assets/environments/tiergarten_2k.hdr");
-    m_scene.environmentMultiplier() = 25.0f;
+    m_scene.environmentMultiplier() = 4.0f;
 
     m_scene.sun().color = { 1, 1, 1 };
     m_scene.sun().intensity = 10.0f;
@@ -37,7 +37,7 @@ void TestApp::setup(RenderGraph& graph)
     graph.addNode<RTFirstHitNode>(m_scene);
     graph.addNode<SlowForwardRenderNode>(m_scene);
     graph.addNode<RTReflectionsNode>(m_scene);
-    graph.addNode<FinalPostFxNode>();
+    graph.addNode<FinalPostFxNode>(m_scene);
 }
 
 void TestApp::update(float elapsedTime, float deltaTime)
@@ -61,7 +61,7 @@ void TestApp::update(float elapsedTime, float deltaTime)
     ImGui::Begin("TestApp");
     ImGui::ColorEdit3("Sun color", value_ptr(m_scene.sun().color));
     ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 20.0f);
-    ImGui::SliderFloat("Environment", &m_scene.environmentMultiplier(), 0.0f, 100.0f);
+    ImGui::SliderFloat("Environment", &m_scene.environmentMultiplier(), 0.0f, 20.0f);
     ImGui::End();
 
     const Input& input = Input::instance();
