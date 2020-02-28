@@ -33,7 +33,7 @@ void unpack(out RTMesh mesh, out RTVertex v0, out RTVertex v1, out RTVertex v2)
 	v2 = vertices[objId].x[idx.z];
 }
 
-bool hitPointInShadow(vec3 N)
+bool hitPointInShadow()
 {
 	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 
@@ -69,7 +69,7 @@ void main()
 
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
 
-	float shadowFactor = hitPointInShadow(N) ? 0.0 : 1.0;
+	float shadowFactor = hitPointInShadow() ? 0.0 : 1.0;
 	baseColor *= shadowFactor;
 
 	//hitValue = N * 0.5 + 0.5;
