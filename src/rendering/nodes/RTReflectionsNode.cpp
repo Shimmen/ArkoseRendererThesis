@@ -2,6 +2,7 @@
 
 #include "CameraUniformNode.h"
 #include "ForwardRenderNode.h"
+#include "LightData.h"
 
 RTReflectionsNode::RTReflectionsNode(const Scene& scene)
     : RenderGraphNode(RTReflectionsNode::name())
@@ -97,18 +98,23 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
 
     ShaderFile raygen = ShaderFile("rt-reflections/raygen.rgen", ShaderFileType::RTRaygen);
     ShaderFile miss = ShaderFile("rt-reflections/miss.rmiss", ShaderFileType::RTMiss);
+    ShaderFile shadowMiss = ShaderFile("rt-reflections/shadow.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-reflections/closestHit.rchit", ShaderFileType::RTClosestHit);
 
+    Buffer& dirLightUniformBuffer = reg.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
-    BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
+    BindingSet& frameBindingSet = reg.createBindingSet({ { 0, (ShaderStage)(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
                                                          { 1, ShaderStageRTRayGen, &reflections, ShaderBindingType::StorageImage },
                                                          { 2, ShaderStageRTRayGen, gBufferColor, ShaderBindingType::TextureSampler },
                                                          { 3, ShaderStageRTRayGen, gBufferNormal, ShaderBindingType::TextureSampler },
                                                          { 4, ShaderStageRTRayGen, gBufferDepth, ShaderBindingType::TextureSampler },
                                                          { 5, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") },
-                                                         { 6, ShaderStageRTMiss, &envFactorBuffer } });
+                                                         { 6, ShaderStageRTMiss, &envFactorBuffer },
+                                                         { 7, ShaderStageRTClosestHit, &dirLightUniformBuffer } });
 
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet });
+    uint32_t maxRecursionDepth = 2;
+    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, shadowMiss, closestHit }, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
@@ -116,6 +122,15 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
 
         float envMultiplier = m_scene.environmentMultiplier();
         cmdList.updateBufferImmediately(envFactorBuffer, &envMultiplier, sizeof(float));
+
+        DirectionalLight dirLight {
+            .colorAndIntensity = { m_scene.sun().color, m_scene.sun().intensity },
+            .worldSpaceDirection = normalize(vec4(m_scene.sun().direction, 0.0)),
+            .viewSpaceDirection = m_scene.camera().viewMatrix() * normalize(vec4(m_scene.sun().direction, 0.0)),
+            .lightProjectionFromWorld = m_scene.sun().lightProjection()
+        };
+        cmdList.updateBufferImmediately(dirLightUniformBuffer, &dirLight, sizeof(DirectionalLight));
+
         cmdList.bindSet(frameBindingSet, 0);
 
         cmdList.bindSet(*m_objectDataBindingSet, 1);

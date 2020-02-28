@@ -99,7 +99,8 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
                                                          { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") },
                                                          { 3, ShaderStageRTMiss, &timeBuffer } });
 
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, m_environmentBindingSet });
+    uint32_t maxRecursionDepth = 1;
+    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, m_environmentBindingSet }, maxRecursionDepth);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);

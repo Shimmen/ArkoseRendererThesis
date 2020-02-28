@@ -2419,7 +2419,12 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
             break;
         case ShaderFileType::RTMiss:
             stageCreateInfo.stage = VK_SHADER_STAGE_MISS_BIT_NV;
-            shaderIndexMiss = idx;
+            
+            // TODO: Create proper SBT stuff! Since we (in rt-reflections) have two miss shaders, one for shadows, and we want the first miss shader
+            //  to be the base one. So by doing this we ensure that for now. But soon enough we need a proper SBT abstraction.
+            if (shaderIndexMiss == -1) {
+                shaderIndexMiss = idx;
+            }
 
             shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
             shaderGroup.generalShader = idx;

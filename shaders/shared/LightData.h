@@ -3,7 +3,8 @@
 
 struct DirectionalLight {
     vec4 colorAndIntensity;
-    vec4 viewSpaceDirection; // (or maybe easier to do world space?)
+    vec4 worldSpaceDirection;
+    vec4 viewSpaceDirection;
     mat4 lightProjectionFromWorld;
 };
 

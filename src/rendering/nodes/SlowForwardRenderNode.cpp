@@ -140,6 +140,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
 
         DirectionalLight dirLight {
             .colorAndIntensity = { m_scene.sun().color, m_scene.sun().intensity },
+            .worldSpaceDirection = normalize(vec4(m_scene.sun().direction, 0.0)),
             .viewSpaceDirection = m_scene.camera().viewMatrix() * normalize(vec4(m_scene.sun().direction, 0.0)),
             .lightProjectionFromWorld = m_scene.sun().lightProjection()
         };

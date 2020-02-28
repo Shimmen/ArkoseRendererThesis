@@ -35,7 +35,7 @@ public:
     [[nodiscard]] BottomLevelAS& createBottomLevelAccelerationStructure(std::vector<RTGeometry>);
     [[nodiscard]] TopLevelAS& createTopLevelAccelerationStructure(std::vector<RTGeometryInstance>);
 
-    [[nodiscard]] RayTracingState& createRayTracingState(const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*>);
+    [[nodiscard]] RayTracingState& createRayTracingState(const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*>, uint32_t maxRecursionDepth);
 
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture&);

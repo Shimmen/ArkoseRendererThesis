@@ -4,9 +4,15 @@
 #extension GL_EXT_scalar_block_layout : require
 
 #include "shared/RTData.h"
+#include "shared/LightData.h"
 
 layout(location = 0) rayPayloadInNV vec3 hitValue;
 hitAttributeNV vec3 attribs;
+
+layout(location = 1) rayPayloadNV bool inShadow;
+
+layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
+layout(binding = 7, set = 0) uniform DirLightBlock { DirectionalLight dirLight; };
 
 layout(binding = 0, set = 1, scalar) buffer readonly Meshes   { RTMesh meshes[]; };
 layout(binding = 1, set = 1, scalar) buffer readonly Vertices { RTVertex x[]; } vertices[];
@@ -27,6 +33,29 @@ void unpack(out RTMesh mesh, out RTVertex v0, out RTVertex v1, out RTVertex v2)
 	v2 = vertices[objId].x[idx.z];
 }
 
+bool hitPointInShadow(vec3 N)
+{
+	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
+
+	vec3 hitPoint = gl_WorldRayOriginNV + gl_HitTNV * gl_WorldRayDirectionNV;
+	uint flags = gl_RayFlagsTerminateOnFirstHitNV | gl_RayFlagsSkipClosestHitShaderNV | gl_RayFlagsOpaqueNV;
+	uint cullMask = 0xff;
+
+	const int shadowPayloadIdx = 1;
+
+	// Assume we are in shadow, and if the shadow miss shader activates we are *not* in shadow
+	inShadow = true;
+
+	traceNV(topLevelAS, flags, cullMask,
+			0, // sbtRecordOffset
+			0, // sbtRecordStride
+			1, // missIndex
+			hitPoint, 0.001, L, 1000.0,
+			shadowPayloadIdx);
+
+	return inShadow;
+}
+
 void main()
 {
 	RTMesh mesh;
@@ -39,6 +68,9 @@ void main()
 	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
 
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
+
+	float shadowFactor = hitPointInShadow(N) ? 0.0 : 1.0;
+	baseColor *= shadowFactor;
 
 	//hitValue = N * 0.5 + 0.5;
 	//hitValue = vec3(uv, 0.0);
