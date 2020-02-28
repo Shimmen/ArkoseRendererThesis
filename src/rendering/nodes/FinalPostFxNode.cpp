@@ -4,6 +4,7 @@
 #include "ForwardRenderNode.h"
 #include "RTFirstHitNode.h"
 #include "RTReflectionsNode.h"
+#include "RTDiffuseGINode.h"
 #include "imgui.h"
 
 FinalPostFxNode::FinalPostFxNode(const Scene& scene)
@@ -39,7 +40,8 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     BindingSet& sourceImage = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTexture } });
     BindingSet& sourceImageRt = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTextureRt } });
 
-    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
+    //BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
+    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTDiffuseGINode::name(), "diffuseGI") } });
 
     BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                        { 1, ShaderStageFragment, reg.getTexture(SceneUniformNode::name(), "environmentMap") },

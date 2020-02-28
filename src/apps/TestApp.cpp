@@ -2,6 +2,7 @@
 
 #include "rendering/nodes/FinalPostFxNode.h"
 #include "rendering/nodes/ForwardRenderNode.h"
+#include "rendering/nodes/RTDiffuseGINode.h"
 #include "rendering/nodes/RTFirstHitNode.h"
 #include "rendering/nodes/RTReflectionsNode.h"
 #include "rendering/nodes/SceneUniformNode.h"
@@ -34,9 +35,10 @@ void TestApp::setup(RenderGraph& graph)
 
     graph.addNode<SceneUniformNode>(m_scene);
     graph.addNode<ShadowMapNode>(m_scene);
-    graph.addNode<RTFirstHitNode>(m_scene);
+    //graph.addNode<RTFirstHitNode>(m_scene);
     graph.addNode<SlowForwardRenderNode>(m_scene);
     graph.addNode<RTReflectionsNode>(m_scene);
+    graph.addNode<RTDiffuseGINode>(m_scene);
     graph.addNode<FinalPostFxNode>(m_scene);
 }
 
