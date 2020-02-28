@@ -1,8 +1,8 @@
 #include "SlowForwardRenderNode.h"
 
-#include "CameraUniformNode.h"
 #include "ForwardRenderNode.h"
 #include "LightData.h"
+#include "SceneUniformNode.h"
 #include "ShadowMapNode.h"
 #include <imgui.h>
 
@@ -107,12 +107,11 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
                                                           { RenderTarget::AttachmentType::Color2, &baseColorTexture },
                                                           { RenderTarget::AttachmentType::Depth, &depthTexture } });
 
-    const Buffer* cameraUniformBuffer = reg.getBuffer(CameraUniformNode::name(), "buffer");
+    const Buffer* cameraUniformBuffer = reg.getBuffer(SceneUniformNode::name(), "camera");
     BindingSet& fixedBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageVertex | ShaderStageFragment), cameraUniformBuffer } });
 
-    const Texture* dirLightShadowMap = reg.getTexture(ShadowMapNode::name(), "directional");
-    Buffer& dirLightUniformBuffer = reg.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-    BindingSet& dirLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, dirLightShadowMap }, { 1, ShaderStageFragment, &dirLightUniformBuffer } });
+    BindingSet& dirLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(ShadowMapNode::name(), "directional") },
+                                                            { 1, ShaderStageFragment, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
 
     Shader shader = Shader::createBasic("forwardSlow.vert", "forwardSlow.frag");
     VertexLayout vertexLayout = VertexLayout {
@@ -141,14 +140,6 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
 
         cmdList.setRenderState(renderState, ClearColor(clearRgb), 1.0f);
         cmdList.bindSet(fixedBindingSet, 0);
-
-        DirectionalLight dirLight {
-            .colorAndIntensity = { m_scene.sun().color, m_scene.sun().intensity },
-            .worldSpaceDirection = normalize(vec4(m_scene.sun().direction, 0.0)),
-            .viewSpaceDirection = m_scene.camera().viewMatrix() * normalize(vec4(m_scene.sun().direction, 0.0)),
-            .lightProjectionFromWorld = m_scene.sun().lightProjection()
-        };
-        cmdList.updateBufferImmediately(dirLightUniformBuffer, &dirLight, sizeof(DirectionalLight));
         cmdList.bindSet(dirLightBindingSet, 2);
 
         for (const Drawable& drawable : m_drawables) {

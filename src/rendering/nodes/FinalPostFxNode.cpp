@@ -1,6 +1,6 @@
 #include "FinalPostFxNode.h"
 
-#include "CameraUniformNode.h"
+#include "SceneUniformNode.h"
 #include "ForwardRenderNode.h"
 #include "RTFirstHitNode.h"
 #include "RTReflectionsNode.h"
@@ -42,7 +42,7 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
 
     Buffer& envDataBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-    BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(CameraUniformNode::name(), "buffer") },
+    BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                        { 1, ShaderStageFragment, &reg.loadTexture2D(m_scene.environmentMap(), true, false) },
                                                        { 2, ShaderStageFragment, reg.getTexture(ForwardRenderNode::name(), "depth") },
                                                        { 3, ShaderStageFragment, &envDataBuffer } });

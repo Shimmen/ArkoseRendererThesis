@@ -1,6 +1,6 @@
 #include "RTFirstHitNode.h"
 
-#include "CameraUniformNode.h"
+#include "SceneUniformNode.h"
 
 RTFirstHitNode::RTFirstHitNode(const Scene& scene)
     : RenderGraphNode(RTFirstHitNode::name())
@@ -96,7 +96,7 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
                                                          { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
-                                                         { 2, ShaderStageRTRayGen, reg.getBuffer(CameraUniformNode::name(), "buffer") },
+                                                         { 2, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                          { 3, ShaderStageRTMiss, &timeBuffer } });
 
     uint32_t maxRecursionDepth = 1;

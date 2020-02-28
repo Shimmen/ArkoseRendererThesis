@@ -18,7 +18,7 @@ add_executable(ArkoseRenderer
         src/rendering/Resources.cpp
         src/rendering/RenderGraphNode.cpp
         src/rendering/RenderGraph.cpp
-        src/rendering/nodes/CameraUniformNode.cpp
+        src/rendering/nodes/SceneUniformNode.cpp
         src/rendering/nodes/FinalPostFxNode.cpp
         src/rendering/nodes/ForwardRenderNode.cpp
         src/rendering/nodes/SlowForwardRenderNode.cpp

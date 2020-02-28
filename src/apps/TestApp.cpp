@@ -1,10 +1,10 @@
 #include "TestApp.h"
 
-#include "rendering/nodes/CameraUniformNode.h"
 #include "rendering/nodes/FinalPostFxNode.h"
 #include "rendering/nodes/ForwardRenderNode.h"
 #include "rendering/nodes/RTFirstHitNode.h"
 #include "rendering/nodes/RTReflectionsNode.h"
+#include "rendering/nodes/SceneUniformNode.h"
 #include "rendering/nodes/ShadowMapNode.h"
 #include "rendering/nodes/SlowForwardRenderNode.h"
 #include "utility/GlobalState.h"
@@ -32,7 +32,7 @@ void TestApp::setup(RenderGraph& graph)
     m_scene.sun().shadowMapSize = { 2048, 2048 };
     m_scene.sun().worldExtent = 18.0f;
 
-    graph.addNode<CameraUniformNode>(m_scene.camera());
+    graph.addNode<SceneUniformNode>(m_scene);
     graph.addNode<ShadowMapNode>(m_scene);
     graph.addNode<RTFirstHitNode>(m_scene);
     graph.addNode<SlowForwardRenderNode>(m_scene);

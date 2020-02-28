@@ -1,6 +1,6 @@
 #include "ForwardRenderNode.h"
 
-#include "CameraUniformNode.h"
+#include "SceneUniformNode.h"
 
 std::string ForwardRenderNode::name()
 {
@@ -104,7 +104,7 @@ RenderGraphNode::ExecuteCallback ForwardRenderNode::constructFrame(Registry& reg
     size_t materialBufferSize = m_materials.size() * sizeof(ForwardMaterial);
     Buffer& materialBuffer = reg.createBuffer(materialBufferSize, Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
-    ShaderBinding cameraUniformBufferBinding = { 0, ShaderStageVertex, reg.getBuffer(CameraUniformNode::name(), "buffer") };
+    ShaderBinding cameraUniformBufferBinding = { 0, ShaderStageVertex, reg.getBuffer(SceneUniformNode::name(), "camera") };
     ShaderBinding perObjectBufferBinding = { 1, ShaderStageVertex, &perObjectBuffer };
     ShaderBinding materialBufferBinding = { 2, ShaderStageFragment, &materialBuffer };
     ShaderBinding textureSamplerBinding = { 3, ShaderStageFragment, m_textures, FORWARD_MAX_TEXTURES };

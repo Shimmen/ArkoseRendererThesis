@@ -198,6 +198,10 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const Buff
     , buffers({ buffer })
     , textures()
 {
+    if (!buffer) {
+        LogErrorAndExit("ShaderBinding error: null buffer\n");
+    }
+
     if (type != ShaderBindingType::UniformBuffer && type != ShaderBindingType::StorageBuffer) {
         LogErrorAndExit("ShaderBinding error: invalid shader binding type for buffer\n");
     }
