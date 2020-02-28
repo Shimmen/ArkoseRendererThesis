@@ -124,7 +124,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
 
     RenderStateBuilder renderStateBuilder { renderTarget, shader, vertexLayout };
 
-    // TODO: These have to be provided in order of the descriptor sets & of the correct amounts etc..
+    // TODO: Clean up, we no longer have the same constraints as before
     renderStateBuilder
         .addBindingSet(fixedBindingSet)
         .addBindingSet(*m_drawables[0].bindingSet)

@@ -6,7 +6,7 @@
 layout(location = 0) rayPayloadInNV vec3 hitValue;
 
 layout(binding = 6, set = 0) uniform EnvBlock { float envMultiplier; };
-layout(binding = 4, set = 1) uniform sampler2D environmentMap;
+layout(binding = 7, set = 0) uniform sampler2D environmentMap;
 
 void main()
 {

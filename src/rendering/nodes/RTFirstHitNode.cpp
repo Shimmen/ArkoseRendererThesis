@@ -72,9 +72,6 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
         });
     }
 
-    Texture& environmentTexture = nodeReg.loadTexture2D(m_scene.environmentMap(), true, false);
-    m_environmentBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTMiss, &environmentTexture } });
-
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
@@ -93,6 +90,8 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
 
     Buffer& timeBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
+    BindingSet& environmentBindingSet = reg.createBindingSet({ { 0, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") } });
+
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
                                                          { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
@@ -100,7 +99,7 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
                                                          { 3, ShaderStageRTMiss, &timeBuffer } });
 
     uint32_t maxRecursionDepth = 1;
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, m_environmentBindingSet }, maxRecursionDepth);
+    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
@@ -111,7 +110,7 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
         cmdList.bindSet(frameBindingSet, 0);
 
         cmdList.bindSet(*m_objectDataBindingSet, 1);
-        cmdList.bindSet(*m_environmentBindingSet, 2);
+        cmdList.bindSet(environmentBindingSet, 2);
         cmdList.traceRays(appState.windowExtent());
     };
 }

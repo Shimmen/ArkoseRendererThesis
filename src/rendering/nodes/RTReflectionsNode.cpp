@@ -74,14 +74,11 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
         });
     }
 
-    Texture& environmentTexture = nodeReg.loadTexture2D(m_scene.environmentMap(), true, false);
-
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
-                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
-                                                         { 4, ShaderStageRTMiss, &environmentTexture } });
+                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
 }
 
 RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg) const
@@ -89,12 +86,10 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
     const Texture* gBufferColor = reg.getTexture(ForwardRenderNode::name(), "baseColor");
     const Texture* gBufferNormal = reg.getTexture(ForwardRenderNode::name(), "normal");
     const Texture* gBufferDepth = reg.getTexture(ForwardRenderNode::name(), "depth");
-    ASSERT(gBufferNormal && gBufferDepth);
+    ASSERT(gBufferColor && gBufferNormal && gBufferDepth);
 
     Texture& reflections = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
     reg.publish("reflections", reflections);
-
-    Buffer& envFactorBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
 
     ShaderFile raygen = ShaderFile("rt-reflections/raygen.rgen", ShaderFileType::RTRaygen);
     ShaderFile miss = ShaderFile("rt-reflections/miss.rmiss", ShaderFileType::RTMiss);
@@ -108,8 +103,9 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
                                                          { 3, ShaderStageRTRayGen, gBufferNormal, ShaderBindingType::TextureSampler },
                                                          { 4, ShaderStageRTRayGen, gBufferDepth, ShaderBindingType::TextureSampler },
                                                          { 5, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
-                                                         { 6, ShaderStageRTMiss, &envFactorBuffer },
-                                                         { 7, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
+                                                         { 6, ShaderStageRTMiss, reg.getBuffer(SceneUniformNode::name(), "environmentData") },
+                                                         { 7, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
+                                                         { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
 
     uint32_t maxRecursionDepth = 2;
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, shadowMiss, closestHit }, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
@@ -118,12 +114,9 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
 
-        float envMultiplier = m_scene.environmentMultiplier();
-        cmdList.updateBufferImmediately(envFactorBuffer, &envMultiplier, sizeof(float));
-
         cmdList.bindSet(frameBindingSet, 0);
-
         cmdList.bindSet(*m_objectDataBindingSet, 1);
+
         cmdList.traceRays(appState.windowExtent());
     };
 }

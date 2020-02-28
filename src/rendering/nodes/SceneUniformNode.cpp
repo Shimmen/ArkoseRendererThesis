@@ -22,6 +22,14 @@ SceneUniformNode::ExecuteCallback SceneUniformNode::constructFrame(Registry& reg
     Buffer& cameraUniformBuffer = reg.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     reg.publish("camera", cameraUniformBuffer);
 
+    Buffer& envDataBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+    reg.publish("environmentData", envDataBuffer);
+
+    Texture& envTexture = m_scene.environmentMap().empty()
+        ? reg.createPixelTexture(vec4(1.0f), true)
+        : reg.loadTexture2D(m_scene.environmentMap(), true, false);
+    reg.publish("environmentMap", envTexture);
+
     Buffer& dirLightBuffer = reg.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     reg.publish("directionalLight", dirLightBuffer);
 
@@ -36,6 +44,10 @@ SceneUniformNode::ExecuteCallback SceneUniformNode::constructFrame(Registry& reg
             .worldFromView = inverse(viewFromWorld),
         };
         cmdList.updateBufferImmediately(cameraUniformBuffer, &cameraState, sizeof(CameraState));
+
+        // Environment mapping uniforms
+        float envMultiplier = m_scene.environmentMultiplier();
+        cmdList.updateBufferImmediately(envDataBuffer, &envMultiplier, sizeof(envMultiplier));
 
         // Directional light uniforms
         DirectionalLight dirLightData {

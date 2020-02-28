@@ -41,11 +41,10 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
 
     BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
 
-    Buffer& envDataBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(SceneUniformNode::name(), "camera") },
-                                                       { 1, ShaderStageFragment, &reg.loadTexture2D(m_scene.environmentMap(), true, false) },
+                                                       { 1, ShaderStageFragment, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
                                                        { 2, ShaderStageFragment, reg.getTexture(ForwardRenderNode::name(), "depth") },
-                                                       { 3, ShaderStageFragment, &envDataBuffer } });
+                                                       { 3, ShaderStageFragment, reg.getBuffer(SceneUniformNode::name(), "environmentData") } });
 
     RenderStateBuilder renderStateBuilder { reg.windowRenderTarget(), shader, vertexLayout };
     renderStateBuilder.addBindingSet(sourceImage).addBindingSet(sourceImageRt).addBindingSet(etcBindingSet).addBindingSet(envBindingSet);
@@ -63,9 +62,6 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
         cmdList.bindSet(useRt ? sourceImageRt : sourceImage, 0);
         cmdList.bindSet(etcBindingSet, 1);
-
-        float envMultiplier = m_scene.environmentMultiplier();
-        cmdList.updateBufferImmediately(envDataBuffer, &envMultiplier, sizeof(envMultiplier));
         cmdList.bindSet(envBindingSet, 2);
 
         cmdList.draw(vertexBuffer, 3);
