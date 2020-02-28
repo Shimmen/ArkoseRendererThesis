@@ -5,6 +5,7 @@
 
 #include "shared/RTData.h"
 #include "shared/LightData.h"
+#include "brdf.glsl"
 
 layout(location = 0) rayPayloadInNV vec3 hitValue;
 hitAttributeNV vec3 attribs;
@@ -56,6 +57,20 @@ bool hitPointInShadow()
 	return inShadow;
 }
 
+vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseColor, float roughness, float metallic)
+{
+    vec3 lightColor = light.colorAndIntensity.a * light.colorAndIntensity.rgb;
+    vec3 L = -normalize(light.worldSpaceDirection.xyz);
+
+    float shadowFactor = hitPointInShadow() ? 0.0 : 1.0;
+    vec3 directLight = lightColor * shadowFactor;
+
+    vec3 brdf = evaluateBRDF(L, V, N, baseColor, roughness, metallic);
+    float LdotN = max(dot(L, N), 0.0);
+
+    return brdf * LdotN * directLight;
+}
+
 void main()
 {
 	RTMesh mesh;
@@ -69,10 +84,12 @@ void main()
 
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
 
-	float shadowFactor = hitPointInShadow() ? 0.0 : 1.0;
-	baseColor *= shadowFactor;
+	float metallic = 0.0;
+	float roughness = 0.0;
+	vec3 V = -normalize(gl_WorldRayDirectionNV);
+	vec3 color = evaluateDirectionalLight(dirLight, V, N, baseColor, roughness, metallic);
 
 	//hitValue = N * 0.5 + 0.5;
 	//hitValue = vec3(uv, 0.0);
-	hitValue = baseColor;
+	hitValue = color;
 }
