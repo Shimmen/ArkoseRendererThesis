@@ -96,8 +96,12 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ShaderFile shadowMiss = ShaderFile("rt-diffuseGI/shadow.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-diffuseGI/closestHit.rchit", ShaderFileType::RTClosestHit);
 
+    constexpr size_t numSphereSamples = 1000; // TODO: Currently must match up with shader definitions!
+    constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4);
+    Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
+
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
-    BindingSet& frameBindingSet = reg.createBindingSet({ { 0, (ShaderStage)(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
+    BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
                                                          { 1, ShaderStageRTRayGen, &diffuseGI, ShaderBindingType::StorageImage },
                                                          { 2, ShaderStageRTRayGen, gBufferColor, ShaderBindingType::TextureSampler },
                                                          { 3, ShaderStageRTRayGen, gBufferNormal, ShaderBindingType::TextureSampler },
@@ -105,12 +109,36 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
                                                          { 5, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                          { 6, ShaderStageRTMiss, reg.getBuffer(SceneUniformNode::name(), "environmentData") },
                                                          { 7, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
-                                                         { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
+                                                         { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") },
+                                                         { 9, ShaderStageRTRayGen, &sphereSampleBuffer, ShaderBindingType::StorageBuffer } });
 
     uint32_t maxRecursionDepth = 2;
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, shadowMiss, closestHit }, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
 
     return [&](const AppState& appState, CommandList& cmdList) {
+        std::vector<float> sphereSamples;
+        sphereSamples.resize(4u * numSphereSamples);
+        for (size_t i = 0; i < numSphereSamples; ++i) {
+
+            float x, y, z;
+            float lengthSquared;
+
+            do {
+                // TODO: Use better random stuff, but it also have to be quick!
+                x = (2.0f * float(rand()) / float(RAND_MAX)) - 1.0f;
+                y = (2.0f * float(rand()) / float(RAND_MAX)) - 1.0f;
+                z = (2.0f * float(rand()) / float(RAND_MAX)) - 1.0f;
+                lengthSquared = x * x + y * y + z * z;
+            } while (lengthSquared > 1.0f);
+
+            sphereSamples[4 * i + 0] = x;
+            sphereSamples[4 * i + 1] = y;
+            sphereSamples[4 * i + 2] = z;
+        }
+        // TODO: It's quite slow to transfer all this data every frame. Probably better to instead upload a bunch initially
+        //  and then just index into it & update every once in a while. Or something like that..
+        cmdList.updateBufferImmediately(sphereSampleBuffer, sphereSamples.data(), totalSphereSamplesSize);
+
         cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
 

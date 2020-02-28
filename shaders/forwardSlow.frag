@@ -86,7 +86,7 @@ void main()
 
     vec3 V = -normalize(vPosition);
 
-    vec3 ambient = 0.4 * baseColor; // TODO!
+    vec3 ambient = 0.0 * baseColor; // TODO!
     vec3 color = emissive + ambient;
 
     // TODO: Evaluate ALL lights that will have an effect on this pixel/tile/cluster or whatever we go with

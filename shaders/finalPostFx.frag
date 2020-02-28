@@ -9,7 +9,7 @@ layout(location = 1) in vec3 vViewRay;
 
 layout(binding = 0, set = 0) uniform sampler2D uTexture;
 
-layout(binding = 0, set = 1) uniform sampler2D uReflections;
+layout(binding = 0, set = 1) uniform sampler2D uDiffuseGI;
 
 layout(binding = 1, set = 2) uniform sampler2D uEnvironment;
 layout(binding = 2, set = 2) uniform sampler2D uDepth;
@@ -28,8 +28,7 @@ void main()
         hdrColor *= envMultiplier;
     } else {
         hdrColor = texture(uTexture, vTexCoord).rgb;
-        vec3 reflection = texture(uReflections, vTexCoord).rgb;
-        hdrColor = mix(hdrColor, reflection, 0.25);
+        hdrColor += texture(uDiffuseGI, vTexCoord).rgb;
     }
 
     vec3 ldrColor = ACES_tonemap(hdrColor);

@@ -71,4 +71,8 @@ void TestApp::update(float elapsedTime, float deltaTime)
 
     mat4 matrix = mathkit::translate(1.4f, 2.4f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(50);
     m_boomBox->transform().setLocalMatrix(matrix);
+
+    float st = 0.4f * elapsedTime;
+    vec3 lightPosition = vec3(cosf(st), 2.0f, sinf(st));
+    m_scene.sun().direction = -normalize(lightPosition);
 }
