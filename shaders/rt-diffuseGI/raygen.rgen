@@ -17,10 +17,8 @@ layout(location = 0) rayPayloadNV vec3 hitValue;
 
 uint randomIndex(uint i, uint n, uvec2 base)
 {
-	const uint sampleCount = 1000; // TODO
 	uint baseIdx = n * (base.x + 12345 * base.y);
-	uint index = (baseIdx + i) % sampleCount;
-
+	uint index = (baseIdx + i) % sphereSamples.length();
 	return index;
 }
 

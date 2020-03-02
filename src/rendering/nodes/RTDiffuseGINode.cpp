@@ -96,7 +96,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ShaderFile shadowMiss = ShaderFile("rt-diffuseGI/shadow.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-diffuseGI/closestHit.rchit", ShaderFileType::RTClosestHit);
 
-    constexpr size_t numSphereSamples = 1000; // TODO: Currently must match up with shader definitions!
+    constexpr size_t numSphereSamples = 10 * 256;
     constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4);
     Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
 
@@ -130,9 +130,10 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
                 lengthSquared = x * x + y * y + z * z;
             } while (lengthSquared > 1.0f);
 
-            sphereSamples[4 * i + 0] = x;
-            sphereSamples[4 * i + 1] = y;
-            sphereSamples[4 * i + 2] = z;
+            float length = std::sqrt(lengthSquared);
+            sphereSamples[4 * i + 0] = x / length;
+            sphereSamples[4 * i + 1] = y / length;
+            sphereSamples[4 * i + 2] = z / length;
         }
         // TODO: It's quite slow to transfer all this data every frame. Probably better to instead upload a bunch initially
         //  and then just index into it & update every once in a while. Or something like that..

@@ -62,7 +62,7 @@ void TestApp::update(float elapsedTime, float deltaTime)
 
     ImGui::Begin("TestApp");
     ImGui::ColorEdit3("Sun color", value_ptr(m_scene.sun().color));
-    ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 20.0f);
+    ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 50.0f);
     ImGui::SliderFloat("Environment", &m_scene.environmentMultiplier(), 0.0f, 20.0f);
     ImGui::End();
 
