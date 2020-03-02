@@ -1907,7 +1907,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     // Create pipeline layout
     //
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    
+
     std::vector<VkDescriptorSetLayout> descriptorSetLayouts = createDescriptorSetLayoutForShader(renderState.shader());
     pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
     pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
@@ -2419,7 +2419,7 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
             break;
         case ShaderFileType::RTMiss:
             stageCreateInfo.stage = VK_SHADER_STAGE_MISS_BIT_NV;
-            
+
             // TODO: Create proper SBT stuff! Since we (in rt-reflections) have two miss shaders, one for shadows, and we want the first miss shader
             //  to be the base one. So by doing this we ensure that for now. But soon enough we need a proper SBT abstraction.
             if (shaderIndexMiss == -1) {
@@ -3151,7 +3151,8 @@ void VulkanBackend::submitQueue(uint32_t imageIndex, VkSemaphore* waitFor, VkSem
         LogError("VulkanBackend::submitQueue(): error resetting in-flight frame fence (index %u).\n", imageIndex);
     }
 
-    if (vkQueueSubmit(m_graphicsQueue.queue, 1, &submitInfo, *inFlight) != VK_SUCCESS) {
+    VkResult submitStatus = vkQueueSubmit(m_graphicsQueue.queue, 1, &submitInfo, *inFlight);
+    if (submitStatus != VK_SUCCESS) {
         LogError("VulkanBackend::submitQueue(): could not submit the graphics queue (index %u).\n", imageIndex);
     }
 }

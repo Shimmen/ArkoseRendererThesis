@@ -10,13 +10,25 @@ VulkanCommandList::VulkanCommandList(VulkanBackend& backend, VkCommandBuffer com
 
 void VulkanCommandList::updateBufferImmediately(Buffer& buffer, void* data, size_t size)
 {
-    if (buffer.memoryHint() == Buffer::MemoryHint::TransferOptimal) {
-        auto& bufInfo = m_backend.bufferInfo(buffer);
+    auto& bufInfo = m_backend.bufferInfo(buffer);
+
+    switch (buffer.memoryHint()) {
+    case Buffer::MemoryHint::TransferOptimal: {
         if (!m_backend.setBufferMemoryUsingMapping(bufInfo.allocation, data, size)) {
             LogError("updateBuffer(): could not update the buffer memory through mapping.\n");
         }
-    } else {
-        LogError("updateBuffer(): can't update buffer with GpuOnly or GpuOptimal memory hint on the command list, ignoring\n");
+        break;
+    }
+    case Buffer::MemoryHint::GpuOptimal: {
+        // TODO: We probably want to do it on our main command buffer and then add a barrier, right?
+        //  The problem is that I get weird errors when I do that, and this works fine (i.e. using a one-off cmd buffer)
+        if (!m_backend.setBufferDataUsingStagingBuffer(bufInfo.buffer, data, size)) {
+            LogError("updateBuffer(): could not update the buffer memory through staging buffer.\n");
+        }
+        break;
+    }
+    default:
+        LogError("updateBuffer(): can't update buffer with GpuOnly memory hint, ignoring\n");
     }
 }
 

@@ -98,7 +98,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
     constexpr size_t numSphereSamples = 10 * 256;
     constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4);
-    Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
+    Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
 
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
