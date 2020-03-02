@@ -124,10 +124,9 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
             float lengthSquared;
 
             do {
-                // TODO: Use better random stuff, but it also have to be quick!
-                x = (2.0f * float(rand()) / float(RAND_MAX)) - 1.0f;
-                y = (2.0f * float(rand()) / float(RAND_MAX)) - 1.0f;
-                z = (2.0f * float(rand()) / float(RAND_MAX)) - 1.0f;
+                x = m_bilateral(m_randomGenerator);
+                y = m_bilateral(m_randomGenerator);
+                z = m_bilateral(m_randomGenerator);
                 lengthSquared = x * x + y * y + z * z;
             } while (lengthSquared > 1.0f);
 

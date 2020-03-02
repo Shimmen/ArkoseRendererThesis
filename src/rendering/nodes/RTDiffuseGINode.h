@@ -3,6 +3,7 @@
 #include "../RenderGraphNode.h"
 #include "RTData.h"
 #include "utility/Model.h"
+#include <random>
 
 class RTDiffuseGINode final : public RenderGraphNode {
 public:
@@ -16,7 +17,10 @@ public:
 
 private:
     const Scene& m_scene;
-    std::vector<RTGeometryInstance> m_instances {};
 
+    mutable std::mt19937_64 m_randomGenerator;
+    mutable std::uniform_real_distribution<float> m_bilateral { -1.0f, +1.0f };
+
+    std::vector<RTGeometryInstance> m_instances {};
     BindingSet* m_objectDataBindingSet {};
 };
