@@ -132,7 +132,7 @@ private:
     VkBuffer createScratchBufferForAccelerationStructure(VkAccelerationStructureNV, bool updateInPlace, VmaAllocation&) const;
     VkBuffer createRTXInstanceBuffer(std::vector<RTGeometryInstance>, VmaAllocation&);
 
-    std::vector<VkDescriptorSetLayout> createDescriptorSetLayoutForShader(const Shader&) const;
+    std::pair<std::vector<VkDescriptorSetLayout>, std::optional<VkPushConstantRange>> createDescriptorSetLayoutForShader(const Shader&) const;
 
     uint32_t findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 

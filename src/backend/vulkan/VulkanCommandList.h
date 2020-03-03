@@ -12,6 +12,7 @@ public:
     void setRayTracingState(const RayTracingState&) override;
 
     void bindSet(BindingSet&, uint32_t index) override;
+    void pushConstants(ShaderStage, void*, size_t) override;
 
     void draw(Buffer& vertexBuffer, uint32_t vertexCount) override;
     void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, IndexType, uint32_t instanceIndex) override;

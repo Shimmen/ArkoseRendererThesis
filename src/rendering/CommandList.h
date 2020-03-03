@@ -10,6 +10,7 @@ public:
     virtual void setRayTracingState(const RayTracingState&) = 0;
 
     virtual void bindSet(BindingSet&, uint32_t index) = 0;
+    virtual void pushConstants(ShaderStage, void*, size_t) = 0;
 
     virtual void draw(Buffer& vertexBuffer, uint32_t vertexCount) = 0;
     virtual void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, IndexType, uint32_t instanceIndex = 0) = 0;

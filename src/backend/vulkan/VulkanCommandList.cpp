@@ -158,6 +158,40 @@ void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
     vkCmdBindDescriptorSets(m_commandBuffer, bindPoint, pipelineLayout, index, 1, &bindInfo.descriptorSet, 0, nullptr);
 }
 
+void VulkanCommandList::pushConstants(ShaderStage shaderStage, void* data, size_t size)
+{
+    if (!activeRenderState && !activeRayTracingState) {
+        LogErrorAndExit("pushConstants: no active render or ray tracing state to bind to!\n");
+    }
+
+    ASSERT(!(activeRenderState && activeRayTracingState));
+
+    VkPipelineLayout pipelineLayout;
+    if (activeRenderState) {
+        pipelineLayout = m_backend.renderStateInfo(*activeRenderState).pipelineLayout;
+    }
+    if (activeRayTracingState) {
+        pipelineLayout = m_backend.rayTracingStateInfo(*activeRayTracingState).pipelineLayout;
+    }
+
+    // TODO: This isn't the only occurance of this shady table. We probably want a function for doing this translation!
+    VkShaderStageFlags stageFlags = 0u;
+    if (shaderStage & ShaderStageVertex)
+        stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
+    if (shaderStage & ShaderStageFragment)
+        stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+    if (shaderStage & ShaderStageCompute)
+        stageFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
+    if (shaderStage & ShaderStageRTRayGen)
+        stageFlags |= VK_SHADER_STAGE_RAYGEN_BIT_NV;
+    if (shaderStage & ShaderStageRTMiss)
+        stageFlags |= VK_SHADER_STAGE_MISS_BIT_NV;
+    if (shaderStage & ShaderStageRTClosestHit)
+        stageFlags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
+
+    vkCmdPushConstants(m_commandBuffer, pipelineLayout, stageFlags, 0, size, data);
+}
+
 void VulkanCommandList::draw(Buffer& vertexBuffer, uint32_t vertexCount)
 {
     if (!activeRenderState) {

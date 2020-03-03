@@ -1908,13 +1908,18 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     //
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts = createDescriptorSetLayoutForShader(renderState.shader());
+    const auto& [descriptorSetLayouts, pushConstantRange] = createDescriptorSetLayoutForShader(renderState.shader());
+
     pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
     pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
 
-    // TODO: Support push constants!
-    pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-    pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+    if (pushConstantRange.has_value()) {
+        pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+        pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange.value();
+    } else {
+        pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+        pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+    }
 
     VkPipelineLayout pipelineLayout {};
     if (vkCreatePipelineLayout(device(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
@@ -1922,7 +1927,7 @@ void VulkanBackend::newRenderState(const RenderState& renderState)
     }
 
     // (it's *probably* safe to delete these after creating the pipeline layout! no layers are complaining)
-    for (VkDescriptorSetLayout& layout : descriptorSetLayouts) {
+    for (const VkDescriptorSetLayout& layout : descriptorSetLayouts) {
         vkDestroyDescriptorSetLayout(device(), layout, nullptr);
     }
 
@@ -2999,12 +3004,12 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
     return instanceBuffer;
 }
 
-std::vector<VkDescriptorSetLayout> VulkanBackend::createDescriptorSetLayoutForShader(const Shader& shader) const
+std::pair<std::vector<VkDescriptorSetLayout>, std::optional<VkPushConstantRange>> VulkanBackend::createDescriptorSetLayoutForShader(const Shader& shader) const
 {
-    using namespace spirv_cross;
-
     uint32_t maxSetId = 0;
     std::unordered_map<uint32_t, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>> sets;
+
+    std::optional<VkPushConstantRange> pushConstantRange;
 
     for (auto& file : shader.files()) {
 
@@ -3082,6 +3087,26 @@ std::vector<VkDescriptorSetLayout> VulkanBackend::createDescriptorSetLayoutForSh
         for (auto& accelerationStructure : resources.acceleration_structures) {
             add(accelerationStructure, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV);
         }
+
+        if (!resources.push_constant_buffers.empty()) {
+            ASSERT(resources.push_constant_buffers.size() == 1);
+            const spirv_cross::Resource& res = resources.push_constant_buffers[0];
+            const spirv_cross::SPIRType& type = compiler.get_type(res.type_id);
+            size_t pushConstantSize = compiler.get_declared_struct_size(type);
+
+            if (!pushConstantRange.has_value()) {
+                VkPushConstantRange range {};
+                range.stageFlags = stageFlag;
+                range.size = pushConstantSize;
+                range.offset = 0;
+                pushConstantRange = range;
+            } else {
+                if (pushConstantRange.value().size != pushConstantSize) {
+                    LogErrorAndExit("Different push constant sizes in the different shader files!\n");
+                }
+                pushConstantRange.value().stageFlags |= stageFlag;
+            }
+        }
     }
 
     std::vector<VkDescriptorSetLayout> setLayouts { maxSetId + 1 };
@@ -3110,7 +3135,7 @@ std::vector<VkDescriptorSetLayout> VulkanBackend::createDescriptorSetLayoutForSh
         }
     }
 
-    return setLayouts;
+    return { setLayouts, pushConstantRange };
 }
 
 uint32_t VulkanBackend::findAppropriateMemory(uint32_t typeBits, VkMemoryPropertyFlags properties) const
