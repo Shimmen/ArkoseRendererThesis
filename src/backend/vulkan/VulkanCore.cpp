@@ -250,6 +250,7 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
 
     VkPhysicalDeviceFeatures requestedDeviceFeatures = {};
     requestedDeviceFeatures.samplerAnisotropy = VK_TRUE;
+    requestedDeviceFeatures.fillModeNonSolid = VK_TRUE;
     requestedDeviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
     requestedDeviceFeatures.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
 

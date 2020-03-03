@@ -357,7 +357,7 @@ RasterState RenderStateBuilder::rasterState() const
     RasterState state {
         .backfaceCullingEnabled = true,
         .frontFace = TriangleWindingOrder::CounterClockwise,
-        .polygonMode = PolygonMode::Filled
+        .polygonMode = polygonMode
     };
     return state;
 }

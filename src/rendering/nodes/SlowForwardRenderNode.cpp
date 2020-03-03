@@ -123,6 +123,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     };
 
     RenderStateBuilder renderStateBuilder { renderTarget, shader, vertexLayout };
+    renderStateBuilder.polygonMode = PolygonMode::Filled;
 
     // TODO: Clean up, we no longer have the same constraints as before
     renderStateBuilder

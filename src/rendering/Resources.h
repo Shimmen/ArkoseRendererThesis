@@ -347,6 +347,7 @@ public:
 
     bool writeDepth { true };
     bool testDepth { true };
+    PolygonMode polygonMode { PolygonMode::Filled };
 
     [[nodiscard]] Viewport viewport() const;
     [[nodiscard]] BlendState blendState() const;
