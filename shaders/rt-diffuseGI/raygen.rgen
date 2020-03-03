@@ -2,6 +2,7 @@
 #extension GL_NV_ray_tracing : require
 
 #include "common.glsl"
+#include "brdf.glsl"
 #include "shared/CameraState.h"
 #include "shared/RTData.h"
 
@@ -49,8 +50,8 @@ void main()
 
 	
 	vec3 diffuse = vec3(0.0);
-
 	const uint numSamples = 256;
+
 	for (uint i = 0; i < numSamples; ++i) {
 		uint idx = randomIndex(i, numSamples, gl_LaunchIDNV.xy);
 		vec3 sphereSample = sphereSamples[idx].xyz;
@@ -58,11 +59,14 @@ void main()
 		vec3 rayDirection = normalize(N + sphereSample);
 		float pdf = dot(rayDirection, N) / PI;
 
+		float LdotN = max(0.0, dot(N, rayDirection));
+
 		traceNV(topLevelAS, rayFlags, cullMask, 0, 0, 0, rayOrigin, tmin, rayDirection, tmax, 0);
-		diffuse += (firstHitColor * hitValue) / pdf;
+		diffuse += LdotN * hitValue / pdf;
 	}
 
-	diffuse /= float(numSamples) * PI;
+	diffuse /= float(numSamples);
+	diffuse = firstHitColor * diffuse * diffuseBRDF();
 	
 	imageStore(resultImage, ivec2(gl_LaunchIDNV.xy), vec4(diffuse, 0.0));
 }
