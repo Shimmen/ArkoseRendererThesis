@@ -75,22 +75,22 @@ private:
 
     // TODO: Maybe just replace all of this below with a large shared memory arena?
 
-    static constexpr int maxNumBuffers { 200 };
+    static constexpr int maxNumBuffers { 10000 };
     CapList<Buffer> m_buffers { maxNumBuffers };
 
-    static constexpr int maxNumTextures { 200 };
+    static constexpr int maxNumTextures { 10000 };
     CapList<Texture> m_textures { maxNumTextures };
 
     static constexpr int maxNumRenderTargets { 4 };
     CapList<RenderTarget> m_renderTargets { maxNumRenderTargets };
 
-    static constexpr int maxNumShaderBindingSets { 128 };
+    static constexpr int maxNumShaderBindingSets { 1280 };
     CapList<BindingSet> m_shaderBindingSets { maxNumShaderBindingSets };
 
     static constexpr int maxNumRenderStates { 10 };
     CapList<RenderState> m_renderStates { maxNumRenderStates };
 
-    static constexpr int maxNumBottomLevelAS { 50 };
+    static constexpr int maxNumBottomLevelAS { 1000 };
     CapList<BottomLevelAS> m_bottomLevelAS { maxNumBottomLevelAS };
 
     static constexpr int maxNumTopLevelAS { 10 };

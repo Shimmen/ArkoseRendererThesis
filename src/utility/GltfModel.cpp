@@ -197,7 +197,7 @@ std::vector<vec3> GltfMesh::positionData() const
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
-    const unsigned char* start = buffer.data.data() + view.byteOffset;
+    const unsigned char* start = buffer.data.data() + view.byteOffset + accessor.byteOffset;
     auto* first = reinterpret_cast<const vec3*>(start);
 
     // TODO: Cache this maybe?
@@ -220,7 +220,7 @@ std::vector<vec2> GltfMesh::texcoordData() const
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
-    const unsigned char* start = buffer.data.data() + view.byteOffset;
+    const unsigned char* start = buffer.data.data() + view.byteOffset + accessor->byteOffset;
     auto* first = reinterpret_cast<const vec2*>(start);
 
     // TODO: Cache this maybe?
@@ -243,7 +243,7 @@ std::vector<vec3> GltfMesh::normalData() const
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
-    const unsigned char* start = buffer.data.data() + view.byteOffset;
+    const unsigned char* start = buffer.data.data() + view.byteOffset + accessor->byteOffset;
     auto* first = reinterpret_cast<const vec3*>(start);
 
     // TODO: Cache this maybe?
@@ -266,7 +266,7 @@ std::vector<vec4> GltfMesh::tangentData() const
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
 
-    const unsigned char* start = buffer.data.data() + view.byteOffset;
+    const unsigned char* start = buffer.data.data() + view.byteOffset + accessor->byteOffset;
     auto* first = reinterpret_cast<const vec4*>(start);
 
     // TODO: Cache this maybe?
@@ -278,14 +278,13 @@ std::vector<uint32_t> GltfMesh::indexData() const
 {
     ASSERT(isIndexed());
     const tinygltf::Accessor& accessor = m_model->accessors[m_primitive->indices];
-    //ASSERT(accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT);
     ASSERT(accessor.type == TINYGLTF_TYPE_SCALAR);
 
     const tinygltf::BufferView& view = m_model->bufferViews[accessor.bufferView];
     ASSERT(view.byteStride == 0); // (i.e. tightly packed)
 
     const tinygltf::Buffer& buffer = m_model->buffers[view.buffer];
-    const unsigned char* start = buffer.data.data() + view.byteOffset;
+    const unsigned char* start = buffer.data.data() + view.byteOffset + accessor.byteOffset;
 
     std::vector<uint32_t> vec;
     vec.reserve(accessor.count);

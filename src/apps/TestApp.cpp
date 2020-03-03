@@ -15,12 +15,15 @@
 
 void TestApp::setup(RenderGraph& graph)
 {
-    m_testRoom = GltfModel::load("assets/CornellBox/CornellBoxFilled.gltf");
-    m_testRoom->transform().setLocalMatrix(mathkit::axisAngleMatrix({ 0, 1, 0 }, 0.3f) * mathkit::scale(3, 3, 3));
+    //m_testRoom = GltfModel::load("assets/CornellBox/CornellBoxFilled.gltf");
+    //m_testRoom->transform().setLocalMatrix(mathkit::axisAngleMatrix({ 0, 1, 0 }, 0.3f) * mathkit::scale(3, 3, 3));
 
-    m_boomBox = GltfModel::load("assets/BoomBox/BoomBoxWithAxes.gltf");
+    //m_boomBox = GltfModel::load("assets/BoomBox/BoomBoxWithAxes.gltf");
 
-    m_scene = { m_boomBox.get(), m_testRoom.get() };
+    //m_scene = { m_boomBox.get(), m_testRoom.get() };
+
+    m_testRoom = GltfModel::load("assets/PicaPicaPalletStack/scene.gltf");
+    m_scene = { m_testRoom.get() }; // , m_boomBox.get()
 
     m_scene.camera().lookAt({ 0, 4, 8 }, { 0, 3, 0 });
 
@@ -37,7 +40,7 @@ void TestApp::setup(RenderGraph& graph)
     graph.addNode<ShadowMapNode>(m_scene);
     //graph.addNode<RTFirstHitNode>(m_scene);
     graph.addNode<SlowForwardRenderNode>(m_scene);
-    graph.addNode<RTReflectionsNode>(m_scene);
+    //graph.addNode<RTReflectionsNode>(m_scene);
     graph.addNode<RTDiffuseGINode>(m_scene);
     graph.addNode<FinalPostFxNode>(m_scene);
 }
@@ -69,8 +72,10 @@ void TestApp::update(float elapsedTime, float deltaTime)
     const Input& input = Input::instance();
     m_scene.camera().update(input, GlobalState::get().windowExtent(), deltaTime);
 
-    mat4 matrix = mathkit::translate(1.4f, 2.4f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(50);
-    m_boomBox->transform().setLocalMatrix(matrix);
+    if (m_boomBox) {
+        mat4 matrix = mathkit::translate(1.4f, 2.4f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(50);
+        m_boomBox->transform().setLocalMatrix(matrix);
+    }
 
     float st = 0.4f * elapsedTime;
     vec3 lightPosition = vec3(cosf(st), 2.0f, sinf(st));
