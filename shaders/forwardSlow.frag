@@ -31,6 +31,10 @@ layout(location = 0) out vec4 oColor;
 layout(location = 1) out vec4 oNormal;
 layout(location = 2) out vec4 oBaseColor;
 
+layout(push_constant) uniform PushConstants {
+	bool writeColor;
+};
+
 // TODO: Move to some general location!
 
 float evaluateShadow(sampler2D shadowMap, mat4 lightProjectionFromView, vec3 viewSpacePos)
@@ -86,11 +90,11 @@ void main()
 
     vec3 V = -normalize(vPosition);
 
-    vec3 ambient = 0.0 * baseColor; // TODO!
+    vec3 ambient = 0.0 * (writeColor ? baseColor : vec3(1.0)); // TODO!
     vec3 color = emissive + ambient;
 
     // TODO: Evaluate ALL lights that will have an effect on this pixel/tile/cluster or whatever we go with
-    color += evaluateDirectionalLight(dirLight, V, N, baseColor, roughness, metallic);
+    color += evaluateDirectionalLight(dirLight, V, N, writeColor ? baseColor : vec3(1.0), roughness, metallic);
 
     oColor = vec4(color, 1.0);
     oNormal = vec4(N, 0.0);

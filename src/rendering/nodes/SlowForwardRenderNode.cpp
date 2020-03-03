@@ -134,12 +134,12 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        static float clearRgb[3] = { 0.58f, 0.69f, 0.73f };
+        static bool writeColor = true;
         if (ImGui::CollapsingHeader("Forward")) {
-            ImGui::ColorPicker3("Clear color", clearRgb);
+            ImGui::Checkbox("Write color", &writeColor);
         }
 
-        cmdList.setRenderState(renderState, ClearColor(clearRgb), 1.0f);
+        cmdList.setRenderState(renderState, ClearColor(0, 0, 0, 0), 1.0f);
         cmdList.bindSet(fixedBindingSet, 0);
         cmdList.bindSet(dirLightBindingSet, 2);
 
@@ -153,6 +153,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
             cmdList.updateBufferImmediately(*drawable.objectDataBuffer, &objectData, sizeof(PerForwardObject));
 
             cmdList.bindSet(*drawable.bindingSet, 1);
+            cmdList.pushConstants(ShaderStageFragment, &writeColor, 4);
             cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, drawable.mesh->indexType());
         }
     };
