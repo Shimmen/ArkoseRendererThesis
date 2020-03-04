@@ -4,6 +4,8 @@
 
 void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float dt)
 {
+    m_didModify = false;
+
     // Apply acceleration from input
 
     vec3 acceleration { 0.0f };
@@ -53,9 +55,12 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
         m_velocity = normalize(m_velocity) * speed;
 
         m_position += m_velocity * dt;
+        m_didModify = true;
     }
 
     // Calculate rotation velocity from input
+
+    vec3 prevPitchYawRoll = m_pitchYawRoll;
 
     // Make rotations less sensitive when zoomed in
     float fovMultiplier = 0.2f + ((m_fieldOfView - minFieldOfView) / (maxFieldOfView - minFieldOfView)) * 0.8f;
@@ -95,6 +100,10 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
 
     m_pitchYawRoll *= pow(rotationDampening, dt);
 
+    if (length(m_pitchYawRoll - prevPitchYawRoll) > 1e-6f) {
+        m_didModify = true;
+    }
+
     // Apply rotation
 
     m_orientation = angleAxis(m_pitchYawRoll.y, right) * m_orientation;
@@ -107,7 +116,11 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
         m_targetFieldOfView += -input.scrollDelta() * zoomSensitivity;
         m_targetFieldOfView = mathkit::clamp(m_targetFieldOfView, minFieldOfView, maxFieldOfView);
     }
-    m_fieldOfView = mathkit::mix(m_fieldOfView, m_targetFieldOfView, 1.0f - pow(0.01f, dt));
+    float fov = mathkit::mix(m_fieldOfView, m_targetFieldOfView, 1.0f - pow(0.01f, dt));
+    if (abs(fov - m_fieldOfView) > 1e-6f) {
+        m_didModify = true;
+    }
+    m_fieldOfView = fov;
 
     // Create the view matrix
 
@@ -123,6 +136,11 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
     float height = screenExtent.height();
     float aspectRatio = (height > 1e-6f) ? (width / height) : 1.0f;
     m_projectionFromView = mathkit::perspective(m_fieldOfView, aspectRatio, zNear, 10000.0f);
+}
+
+bool FpsCamera::didModifyOnLastUpdate() const
+{
+    return m_didModify;
 }
 
 void FpsCamera::lookAt(const vec3& position, const vec3& target, const vec3& up)

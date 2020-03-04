@@ -10,6 +10,7 @@ public:
     ~FpsCamera() = default;
 
     void update(const Input&, const Extent2D& screenExtent, float deltaTime);
+    bool didModifyOnLastUpdate() const;
 
     void lookAt(const vec3& position, const vec3& target, const vec3& up = mathkit::globalY);
 
@@ -30,6 +31,8 @@ private:
     mat4 m_viewFromWorld {};
     mat4 m_projectionFromView {};
 
+    bool m_didModify { true };
+
     static constexpr float zNear { 0.25f };
 
     static constexpr float maxSpeed { 10.0f };
@@ -45,6 +48,4 @@ private:
     static constexpr float maxFieldOfView { mathkit::radians(60.0f) };
 
     static constexpr float baselineBankAngle { mathkit::radians(30.0f) };
-
-    //
 };
