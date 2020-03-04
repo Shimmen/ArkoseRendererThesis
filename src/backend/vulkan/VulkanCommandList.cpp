@@ -213,7 +213,7 @@ void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
     vkCmdBindDescriptorSets(m_commandBuffer, bindPoint, pipelineLayout, index, 1, &bindInfo.descriptorSet, 0, nullptr);
 }
 
-void VulkanCommandList::pushConstants(ShaderStage shaderStage, void* data, size_t size)
+void VulkanCommandList::pushConstants(ShaderStage shaderStage, void* data, size_t size, size_t byteOffset)
 {
     if (!activeRenderState && !activeRayTracingState && !activeComputeState) {
         LogErrorAndExit("pushConstants: no active render or compute or ray tracing state to bind to!\n");
@@ -247,7 +247,7 @@ void VulkanCommandList::pushConstants(ShaderStage shaderStage, void* data, size_
     if (shaderStage & ShaderStageRTClosestHit)
         stageFlags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
 
-    vkCmdPushConstants(m_commandBuffer, pipelineLayout, stageFlags, 0, size, data);
+    vkCmdPushConstants(m_commandBuffer, pipelineLayout, stageFlags, byteOffset, size, data);
 }
 
 void VulkanCommandList::draw(Buffer& vertexBuffer, uint32_t vertexCount)

@@ -15,7 +15,7 @@ public:
     void setComputeState(const ComputeState&) override;
 
     void bindSet(BindingSet&, uint32_t index) override;
-    void pushConstants(ShaderStage, void*, size_t) override;
+    void pushConstants(ShaderStage, void*, size_t size, size_t byteOffset = 0u) override;
 
     void draw(Buffer& vertexBuffer, uint32_t vertexCount) override;
     void drawIndexed(Buffer& vertexBuffer, Buffer& indexBuffer, uint32_t indexCount, IndexType, uint32_t instanceIndex) override;
