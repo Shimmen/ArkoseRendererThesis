@@ -85,6 +85,9 @@ private:
     void newRayTracingState(const RayTracingState&);
     void deleteRayTracingState(const RayTracingState&);
 
+    void newComputeState(const ComputeState&);
+    void deleteComputeState(const ComputeState&);
+
     ///////////////////////////////////////////////////////////////////////////
     /// Drawing
 
@@ -250,6 +253,13 @@ private:
         std::vector<const Texture*> storageImages {};
     };
 
+    struct ComputeStateInfo {
+        VkPipelineLayout pipelineLayout {};
+        VkPipeline pipeline {};
+
+        std::vector<const Texture*> storageImages {};
+    };
+
     // (helpers for accessing from *Infos vectors)
     BufferInfo& bufferInfo(const Buffer&);
     TextureInfo& textureInfo(const Texture&);
@@ -259,6 +269,7 @@ private:
     AccelerationStructureInfo& accelerationStructureInfo(const BottomLevelAS&);
     AccelerationStructureInfo& accelerationStructureInfo(const TopLevelAS&);
     RayTracingStateInfo& rayTracingStateInfo(const RayTracingState&);
+    ComputeStateInfo& computeStateInfo(const ComputeState&);
 
     PersistentIndexedList<BufferInfo> m_bufferInfos {};
     PersistentIndexedList<TextureInfo> m_textureInfos {};
@@ -267,6 +278,7 @@ private:
     PersistentIndexedList<RenderStateInfo> m_renderStateInfos {};
     PersistentIndexedList<AccelerationStructureInfo> m_accStructInfos {};
     PersistentIndexedList<RayTracingStateInfo> m_rtStateInfos {};
+    PersistentIndexedList<ComputeStateInfo> m_computeStateInfos {};
 
     std::vector<Texture> m_swapchainMockColorTextures {};
     std::vector<RenderTarget> m_swapchainMockRenderTargets {};

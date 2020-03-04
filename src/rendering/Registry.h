@@ -37,6 +37,8 @@ public:
 
     [[nodiscard]] RayTracingState& createRayTracingState(const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*>, uint32_t maxRecursionDepth);
 
+    [[nodiscard]] ComputeState& createComputeState(const Shader&, std::vector<const BindingSet*>);
+
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture&);
 
@@ -53,6 +55,7 @@ public:
     [[nodiscard]] const std::vector<BottomLevelAS>& bottomLevelAS() const;
     [[nodiscard]] const std::vector<TopLevelAS>& topLevelAS() const;
     [[nodiscard]] const std::vector<RayTracingState>& rayTracingStates() const;
+    [[nodiscard]] const std::vector<ComputeState>& computeStates() const;
     [[nodiscard]] const std::vector<BufferUpdate>& bufferUpdates() const;
     [[nodiscard]] const std::vector<TextureUpdate>& textureUpdates() const;
 
@@ -89,6 +92,9 @@ private:
 
     static constexpr int maxNumRenderStates { 10 };
     CapList<RenderState> m_renderStates { maxNumRenderStates };
+
+    static constexpr int maxNumComputeStates { 10 };
+    CapList<ComputeState> m_computeStates { maxNumComputeStates };
 
     static constexpr int maxNumBottomLevelAS { 1000 };
     CapList<BottomLevelAS> m_bottomLevelAS { maxNumBottomLevelAS };

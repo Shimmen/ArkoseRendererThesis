@@ -178,19 +178,22 @@ shaderc_shader_kind ShaderManager::shaderKindForPath(const std::string& path) co
         return shaderc_fragment_shader;
     } else if (ext5 == ".rgen") {
         return shaderc_raygen_shader;
+    } else if (ext5 == ".comp") {
+        return shaderc_compute_shader;
     }
 
     if (path.length() < 6) {
         return shaderc_glsl_infer_from_source;
     }
     std::string ext6 = path.substr(path.length() - 6);
-    
+
     if (ext6 == ".rmiss") {
         return shaderc_miss_shader;
     } else if (ext6 == ".rchit") {
         return shaderc_closesthit_shader;
     }
 
+    LogWarning("ShaderManager::shaderKindForPath(): unrecognized shader file type '%s'\n", path.c_str());
     return shaderc_glsl_infer_from_source;
 }
 

@@ -2560,6 +2560,116 @@ void VulkanBackend::deleteRayTracingState(const RayTracingState& rtState)
     rtState.unregisterBackend(backendBadge());
 }
 
+void VulkanBackend::newComputeState(const ComputeState& computeState)
+{
+    VkPipelineShaderStageCreateInfo computeShaderStage { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    computeShaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    computeShaderStage.pName = "main";
+    {
+        const Shader& shader = computeState.shader();
+        ASSERT(shader.type() == ShaderType::Compute);
+        ASSERT(shader.files().size() == 1);
+
+        const ShaderFile& file = shader.files().front();
+        ASSERT(file.type() == ShaderFileType::Compute);
+
+        // TODO: Maybe don't create new modules every time? Currently they are deleted later in this function
+        VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+        const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(file.path());
+        moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
+        moduleCreateInfo.pCode = spirv.data();
+
+        VkShaderModule shaderModule {};
+        if (vkCreateShaderModule(device(), &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create shader module\n");
+        }
+
+        computeShaderStage.module = shaderModule;
+    }
+
+    //
+    // Create pipeline layout
+    //
+
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+
+    const auto& [descriptorSetLayouts, pushConstantRange] = createDescriptorSetLayoutForShader(computeState.shader());
+
+    pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
+    pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
+
+    if (pushConstantRange.has_value()) {
+        pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+        pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange.value();
+    } else {
+        pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+        pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+    }
+
+    VkPipelineLayout pipelineLayout {};
+    if (vkCreatePipelineLayout(device(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create pipeline layout\n");
+    }
+
+    // (it's *probably* safe to delete these after creating the pipeline layout! no layers are complaining)
+    for (const VkDescriptorSetLayout& layout : descriptorSetLayouts) {
+        vkDestroyDescriptorSetLayout(device(), layout, nullptr);
+    }
+
+    //
+    // Create pipeline
+    //
+
+    VkComputePipelineCreateInfo pipelineCreateInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+
+    pipelineCreateInfo.stage = computeShaderStage;
+    pipelineCreateInfo.layout = pipelineLayout;
+    pipelineCreateInfo.flags = 0u;
+
+    VkPipeline computePipeline {};
+    if (vkCreateComputePipelines(device(), VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &computePipeline) != VK_SUCCESS) {
+        LogErrorAndExit("Error trying to create compute pipeline\n");
+    }
+
+    // Remove shader modules, they are no longer needed after creating the pipeline
+    vkDestroyShaderModule(device(), computeShaderStage.module, nullptr);
+
+    ComputeStateInfo computeStateInfo {};
+    computeStateInfo.pipelineLayout = pipelineLayout;
+    computeStateInfo.pipeline = computePipeline;
+
+    for (auto& set : computeState.bindingSets()) {
+        for (auto& bindingInfo : set->shaderBindings()) {
+            for (auto texture : bindingInfo.textures) {
+                switch (bindingInfo.type) {
+                case ShaderBindingType::StorageImage:
+                    computeStateInfo.storageImages.push_back(texture);
+                    break;
+                default:
+                    ASSERT_NOT_REACHED();
+                }
+            }
+        }
+    }
+
+    size_t index = m_computeStateInfos.add(computeStateInfo);
+    computeState.registerBackend(backendBadge(), index);
+}
+
+void VulkanBackend::deleteComputeState(const ComputeState& compState)
+{
+    if (compState.id() == Resource::NullId) {
+        LogErrorAndExit("Trying to delete an already-deleted or not-yet-created computestate\n");
+    }
+
+    ComputeStateInfo& compStateInfo = computeStateInfo(compState);
+    vkDestroyPipeline(device(), compStateInfo.pipeline, nullptr);
+    vkDestroyPipelineLayout(device(), compStateInfo.pipelineLayout, nullptr);
+
+    m_computeStateInfos.remove(compState.id());
+    compState.unregisterBackend(backendBadge());
+}
+
 VulkanBackend::AccelerationStructureInfo& VulkanBackend::accelerationStructureInfo(const BottomLevelAS& blas)
 {
     AccelerationStructureInfo& accStructInfo = m_accStructInfos[blas.id()];
@@ -2576,6 +2686,12 @@ VulkanBackend::RayTracingStateInfo& VulkanBackend::rayTracingStateInfo(const Ray
 {
     RayTracingStateInfo& rtStateInfo = m_rtStateInfos[rtState.id()];
     return rtStateInfo;
+}
+
+VulkanBackend::ComputeStateInfo& VulkanBackend::computeStateInfo(const ComputeState& compState)
+{
+    ComputeStateInfo& compStateInfo = m_computeStateInfos[compState.id()];
+    return compStateInfo;
 }
 
 VulkanBackend::RenderStateInfo& VulkanBackend::renderStateInfo(const RenderState& renderState)
@@ -2655,6 +2771,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         for (auto& rtState : previous->rayTracingStates()) {
             deleteRayTracingState(rtState);
         }
+        for (auto& computeState : previous->computeStates()) {
+            deleteComputeState(computeState);
+        }
     }
 
     // Create new resources
@@ -2688,6 +2807,9 @@ void VulkanBackend::replaceResourcesForRegistry(Registry* previous, Registry* cu
         }
         for (auto& rtState : current->rayTracingStates()) {
             newRayTracingState(rtState);
+        }
+        for (auto& computeState : current->computeStates()) {
+            newComputeState(computeState);
         }
     }
 }

@@ -364,7 +364,7 @@ RasterState RenderStateBuilder::rasterState() const
 
 DepthState RenderStateBuilder::depthState() const
 {
-    DepthState state{
+    DepthState state {
         .writeDepth = writeDepth,
         .testDepth = testDepth,
     };
@@ -427,4 +427,10 @@ const std::vector<ShaderFile>& RayTracingState::shaderBindingTable() const
 const std::vector<const BindingSet*>& RayTracingState::bindingSets() const
 {
     return m_bindingSets;
+}
+
+ComputeState::ComputeState(Badge<Registry>, const Shader& shader, std::vector<const BindingSet*> bindingSets)
+    : m_shader(shader)
+    , m_bindingSets(bindingSets)
+{
 }

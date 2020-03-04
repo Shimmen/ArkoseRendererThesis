@@ -425,3 +425,16 @@ private:
     std::vector<const BindingSet*> m_bindingSets;
     uint32_t m_maxRecursionDepth;
 };
+
+class ComputeState : public Resource {
+public:
+    ComputeState() = default;
+    ComputeState(Badge<Registry>, const Shader&, std::vector<const BindingSet*>);
+
+    const Shader& shader() const { return m_shader; }
+    [[nodiscard]] const std::vector<const BindingSet*>& bindingSets() const { return m_bindingSets; }
+
+private:
+    Shader m_shader;
+    std::vector<const BindingSet*> m_bindingSets;
+};

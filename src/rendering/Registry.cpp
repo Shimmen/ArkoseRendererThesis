@@ -17,7 +17,9 @@ void Registry::setCurrentNode(std::string node)
 
 const RenderTarget& Registry::windowRenderTarget()
 {
-    ASSERT(m_windowRenderTarget);
+    if (!m_windowRenderTarget) {
+        LogErrorAndExit("Can't get the window render target from a non-frame registry!\n");
+    }
     return *m_windowRenderTarget;
 }
 
@@ -149,6 +151,13 @@ RayTracingState& Registry::createRayTracingState(const std::vector<ShaderFile>& 
     return m_rayTracingStates.back();
 }
 
+ComputeState& Registry::createComputeState(const Shader& shader, std::vector<const BindingSet*> bindingSets)
+{
+    ComputeState compState = { {}, shader, bindingSets };
+    m_computeStates.push_back(compState);
+    return m_computeStates.back();
+}
+
 void Registry::publish(const std::string& name, const Buffer& buffer)
 {
     ASSERT(m_currentNodeName.has_value());
@@ -244,6 +253,11 @@ const std::vector<TopLevelAS>& Registry::topLevelAS() const
 const std::vector<RayTracingState>& Registry::rayTracingStates() const
 {
     return m_rayTracingStates.vector();
+}
+
+const std::vector<ComputeState>& Registry::computeStates() const
+{
+    return m_computeStates.vector();
 }
 
 const std::vector<BufferUpdate>& Registry::bufferUpdates() const
