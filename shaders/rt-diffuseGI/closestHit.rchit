@@ -34,10 +34,8 @@ void unpack(out RTMesh mesh, out RTVertex v0, out RTVertex v1, out RTVertex v2)
 	v2 = vertices[objId].x[idx.z];
 }
 
-bool hitPointInShadow()
+bool hitPointInShadow(vec3 L)
 {
-	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
-
 	vec3 hitPoint = gl_WorldRayOriginNV + gl_HitTNV * gl_WorldRayDirectionNV;
 	uint flags = gl_RayFlagsTerminateOnFirstHitNV | gl_RayFlagsSkipClosestHitShaderNV | gl_RayFlagsOpaqueNV;
 	uint cullMask = 0xff;
@@ -57,18 +55,16 @@ bool hitPointInShadow()
 	return inShadow;
 }
 
-vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseColor, float roughness, float metallic)
+vec3 evaluateDirectionalLight(DirectionalLight light, vec3 baseColor, vec3 N)
 {
     vec3 lightColor = light.colorAndIntensity.a * light.colorAndIntensity.rgb;
     vec3 L = -normalize(light.worldSpaceDirection.xyz);
 
-    float shadowFactor = hitPointInShadow() ? 0.0 : 1.0;
+    float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
     vec3 directLight = lightColor * shadowFactor;
-
-    vec3 brdf = evaluateBRDF(L, V, N, baseColor, roughness, metallic);
     float LdotN = max(dot(L, N), 0.0);
 
-    return brdf * LdotN * directLight;
+    return baseColor * diffuseBRDF() * LdotN * directLight;
 }
 
 void main()
@@ -83,11 +79,7 @@ void main()
 	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
 
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
-
-	float metallic = 0.0;
-	float roughness = 0.0;
-	vec3 V = -normalize(gl_WorldRayDirectionNV);
-	vec3 color = evaluateDirectionalLight(dirLight, V, N, baseColor, roughness, metallic);
+	vec3 color = evaluateDirectionalLight(dirLight, baseColor, N);
 
 	//hitValue = N * 0.5 + 0.5;
 	//hitValue = vec3(uv, 0.0);
