@@ -7,7 +7,7 @@
 #include "shared/RTData.h"
 
 layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
-layout(binding = 1, set = 0, rgba16f) uniform writeonly image2D resultImage;
+layout(binding = 1, set = 0, rgba16f) uniform image2D resultImage;
 layout(binding = 2, set = 0) uniform sampler2D gBufferColor;
 layout(binding = 3, set = 0) uniform sampler2D gBufferNormal;
 layout(binding = 4, set = 0) uniform sampler2D gBufferDepth;
@@ -68,5 +68,7 @@ void main()
 	diffuse /= float(numSamples);
 	diffuse = firstHitColor * diffuse * diffuseBRDF();
 	
-	imageStore(resultImage, ivec2(gl_LaunchIDNV.xy), vec4(diffuse, 0.0));
+	// Accumulate frames
+	vec3 currentValue = imageLoad(resultImage, ivec2(gl_LaunchIDNV.xy)).rgb;
+	imageStore(resultImage, ivec2(gl_LaunchIDNV.xy), vec4(currentValue + diffuse, 0.0));
 }

@@ -79,6 +79,9 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
                                                          { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
+
+    // TODO: We need the size of the window here!
+    m_accumulationTexture = &nodeReg.createTexture2D({ 1200, 800 }, Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
 }
 
 RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) const
@@ -88,8 +91,8 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     const Texture* gBufferDepth = reg.getTexture(ForwardRenderNode::name(), "depth");
     ASSERT(gBufferColor && gBufferNormal && gBufferDepth);
 
-    Texture& diffuseGI = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
-    reg.publish("diffuseGI", diffuseGI);
+    //Texture& diffuseGI = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
+    reg.publish("diffuseGI", *m_accumulationTexture); // TODO: Publish the averaged texture, not the accumulation target!
 
     ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen", ShaderFileType::RTRaygen);
     ShaderFile miss = ShaderFile("rt-diffuseGI/miss.rmiss", ShaderFileType::RTMiss);
@@ -102,7 +105,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
-                                                         { 1, ShaderStageRTRayGen, &diffuseGI, ShaderBindingType::StorageImage },
+                                                         { 1, ShaderStageRTRayGen, m_accumulationTexture, ShaderBindingType::StorageImage },
                                                          { 2, ShaderStageRTRayGen, gBufferColor, ShaderBindingType::TextureSampler },
                                                          { 3, ShaderStageRTRayGen, gBufferNormal, ShaderBindingType::TextureSampler },
                                                          { 4, ShaderStageRTRayGen, gBufferDepth, ShaderBindingType::TextureSampler },
@@ -145,6 +148,13 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
         cmdList.bindSet(frameBindingSet, 0);
         cmdList.bindSet(*m_objectDataBindingSet, 1);
 
-        cmdList.traceRays(appState.windowExtent());
+        cmdList.waitEvent(0, appState.frameIndex() == 0 ? PipelineStage::Host : PipelineStage::RayTracing);
+        cmdList.resetEvent(0, PipelineStage::RayTracing);
+        {
+            cmdList.traceRays(appState.windowExtent());
+            //cmdList.debugBarrier(); // TODO: Add fine grained barrier here!
+            //cmdList.dispatch(the compute shader for averaging the results)
+        }
+        cmdList.signalEvent(0, PipelineStage::RayTracing);
     };
 }

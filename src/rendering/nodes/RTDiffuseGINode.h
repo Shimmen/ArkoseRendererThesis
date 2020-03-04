@@ -18,6 +18,8 @@ public:
 private:
     const Scene& m_scene;
 
+    Texture* m_accumulationTexture;
+
     mutable std::mt19937_64 m_randomGenerator;
     mutable std::uniform_real_distribution<float> m_bilateral { -1.0f, +1.0f };
 

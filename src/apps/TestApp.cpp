@@ -25,7 +25,7 @@ void TestApp::setup(RenderGraph& graph)
     m_testRoom = GltfModel::load("assets/PicaPicaPalletStack/scene.gltf");
     m_scene = { m_testRoom.get() }; // , m_boomBox.get()
 
-    m_scene.camera().lookAt({ 0, 4, 8 }, { 0, 3, 0 });
+    m_scene.camera().lookAt({ 0, 6, 20 }, { 0, 3, 0 });
 
     m_scene.setEnvironmentMap("assets/environments/tiergarten_2k.hdr");
     m_scene.environmentMultiplier() = 4.0f;
