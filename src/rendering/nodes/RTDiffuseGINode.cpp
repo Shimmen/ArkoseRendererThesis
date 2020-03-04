@@ -91,17 +91,14 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     const Texture* gBufferDepth = reg.getTexture(ForwardRenderNode::name(), "depth");
     ASSERT(gBufferColor && gBufferNormal && gBufferDepth);
 
-    //Texture& diffuseGI = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
-    reg.publish("diffuseGI", *m_accumulationTexture); // TODO: Publish the averaged texture, not the accumulation target!
-
     ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen", ShaderFileType::RTRaygen);
     ShaderFile miss = ShaderFile("rt-diffuseGI/miss.rmiss", ShaderFileType::RTMiss);
     ShaderFile shadowMiss = ShaderFile("rt-diffuseGI/shadow.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-diffuseGI/closestHit.rchit", ShaderFileType::RTClosestHit);
 
     constexpr size_t numSphereSamples = 10 * 256;
-    constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4);
-    Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
+    constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4); // TODO: There are still problems with using GpuOptimal.. Not sure why.
+    Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
 
     TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
@@ -117,6 +114,13 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
     uint32_t maxRecursionDepth = 2;
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, shadowMiss, closestHit }, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
+
+    Texture& diffuseGI = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
+    reg.publish("diffuseGI", diffuseGI);
+
+    BindingSet& avgAccumBindingSet = reg.createBindingSet({ { 0, ShaderStageCompute, m_accumulationTexture, ShaderBindingType::StorageImage },
+                                                            { 1, ShaderStageCompute, &diffuseGI, ShaderBindingType::StorageImage } });
+    ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("rt-diffuseGI/averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         std::vector<float> sphereSamples;
@@ -151,9 +155,23 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
         cmdList.waitEvent(0, appState.frameIndex() == 0 ? PipelineStage::Host : PipelineStage::RayTracing);
         cmdList.resetEvent(0, PipelineStage::RayTracing);
         {
+            if (m_scene.camera().didModifyOnLastUpdate() || Input::instance().isKeyDown(GLFW_KEY_R)) {
+                cmdList.clearTexture(*m_accumulationTexture, ClearColor(0, 0, 0));
+                m_numAccumulatedFrames = 0;
+            }
+
             cmdList.traceRays(appState.windowExtent());
-            //cmdList.debugBarrier(); // TODO: Add fine grained barrier here!
-            //cmdList.dispatch(the compute shader for averaging the results)
+            m_numAccumulatedFrames += 1;
+
+            cmdList.debugBarrier(); // TODO: Add fine grained barrier here to make sure ray tracing is done before averaging!
+
+            cmdList.setComputeState(compAvgAccumState);
+            cmdList.bindSet(avgAccumBindingSet, 0);
+            cmdList.pushConstants(ShaderStageCompute, &m_numAccumulatedFrames, sizeof(m_numAccumulatedFrames));
+
+            Extent2D totalSize = appState.windowExtent();
+            constexpr uint32_t localSize = 16;
+            cmdList.dispatch(totalSize.width() / localSize, totalSize.height() / localSize);
         }
         cmdList.signalEvent(0, PipelineStage::RayTracing);
     };
