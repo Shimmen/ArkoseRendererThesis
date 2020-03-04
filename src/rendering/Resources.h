@@ -237,6 +237,12 @@ struct Viewport {
     Extent2D extent;
 };
 
+enum class PipelineStage {
+    Host,
+    RayTracing,
+    // TODO: Add more obviously
+};
+
 enum ShaderStage : uint8_t {
     ShaderStageVertex = 0x01,
     ShaderStageFragment = 0x02,

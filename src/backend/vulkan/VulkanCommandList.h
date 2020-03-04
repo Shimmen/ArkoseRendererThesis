@@ -20,12 +20,19 @@ public:
     void rebuildTopLevelAcceratationStructure(TopLevelAS&) override;
     void traceRays(Extent2D) override;
     
+    void waitEvent(uint8_t eventId, PipelineStage) override;
+    void resetEvent(uint8_t eventId, PipelineStage) override;
+    void signalEvent(uint8_t eventId, PipelineStage) override;
+
     void debugBarrier() override;
 
     void endNode(Badge<VulkanBackend>);
 
 private:
     void endCurrentRenderPassIfAny();
+
+    VkEvent getEvent(uint8_t eventId);
+    VkPipelineStageFlags stageFlags(PipelineStage) const;
 
 private:
     VulkanBackend& m_backend;

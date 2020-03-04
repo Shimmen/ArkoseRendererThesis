@@ -18,6 +18,10 @@ public:
     virtual void rebuildTopLevelAcceratationStructure(TopLevelAS&) = 0;
     virtual void traceRays(Extent2D) = 0;
 
+    virtual void waitEvent(uint8_t eventId, PipelineStage) = 0;
+    virtual void resetEvent(uint8_t eventId, PipelineStage) = 0;
+    virtual void signalEvent(uint8_t eventId, PipelineStage) = 0;
+
     //! A barrier for all commands and memory, which probably only should be used for debug stuff.
     virtual void debugBarrier() = 0;
 };

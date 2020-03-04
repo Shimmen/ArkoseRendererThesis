@@ -184,6 +184,8 @@ private:
 
     VulkanQueue m_graphicsQueue {};
 
+    std::vector<VkEvent> m_events {};
+
     VkCommandPool m_renderGraphFrameCommandPool {};
     VkCommandPool m_transientCommandPool {};
 
