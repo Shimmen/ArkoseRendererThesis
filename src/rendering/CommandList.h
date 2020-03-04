@@ -6,8 +6,11 @@ class CommandList {
 public:
     virtual void updateBufferImmediately(Buffer&, void*, size_t) = 0;
 
+    virtual void clearTexture(Texture&, ClearColor) = 0;
+
     virtual void setRenderState(const RenderState&, ClearColor, float clearDepth, uint32_t clearStencil = 0) = 0;
     virtual void setRayTracingState(const RayTracingState&) = 0;
+    virtual void setComputeState(const ComputeState&) = 0;
 
     virtual void bindSet(BindingSet&, uint32_t index) = 0;
     virtual void pushConstants(ShaderStage, void*, size_t) = 0;
@@ -17,6 +20,8 @@ public:
 
     virtual void rebuildTopLevelAcceratationStructure(TopLevelAS&) = 0;
     virtual void traceRays(Extent2D) = 0;
+
+    virtual void dispatch(uint32_t x, uint32_t y, uint32_t z = 1) = 0;
 
     virtual void waitEvent(uint8_t eventId, PipelineStage) = 0;
     virtual void resetEvent(uint8_t eventId, PipelineStage) = 0;

@@ -8,8 +8,11 @@ public:
 
     void updateBufferImmediately(Buffer& buffer, void* pVoid, size_t size) override;
 
+    void clearTexture(Texture&, ClearColor) override;
+
     void setRenderState(const RenderState&, ClearColor, float clearDepth, uint32_t clearStencil) override;
     void setRayTracingState(const RayTracingState&) override;
+    void setComputeState(const ComputeState&) override;
 
     void bindSet(BindingSet&, uint32_t index) override;
     void pushConstants(ShaderStage, void*, size_t) override;
@@ -19,6 +22,8 @@ public:
     
     void rebuildTopLevelAcceratationStructure(TopLevelAS&) override;
     void traceRays(Extent2D) override;
+
+    void dispatch(uint32_t x, uint32_t y, uint32_t z = 1) override;
     
     void waitEvent(uint8_t eventId, PipelineStage) override;
     void resetEvent(uint8_t eventId, PipelineStage) override;
@@ -39,5 +44,6 @@ private:
     VkCommandBuffer m_commandBuffer;
 
     const RenderState* activeRenderState = nullptr;
+    const ComputeState* activeComputeState = nullptr;
     const RayTracingState* activeRayTracingState = nullptr;
 };

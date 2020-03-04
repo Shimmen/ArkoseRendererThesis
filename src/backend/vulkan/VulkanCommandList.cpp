@@ -32,6 +32,30 @@ void VulkanCommandList::updateBufferImmediately(Buffer& buffer, void* data, size
     }
 }
 
+void VulkanCommandList::clearTexture(Texture& colorTexture, ClearColor color)
+{
+    ASSERT(!colorTexture.hasDepthFormat());
+
+    const auto& texInfo = m_backend.textureInfo(colorTexture);
+
+    VkClearColorValue clearValue {};
+    clearValue.float32[0] = color.r;
+    clearValue.float32[1] = color.g;
+    clearValue.float32[2] = color.b;
+    clearValue.float32[3] = color.a;
+
+    VkImageSubresourceRange range {};
+    range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    range.baseMipLevel = 0;
+    range.levelCount = colorTexture.mipLevels();
+
+    range.baseArrayLayer = 0;
+    range.layerCount = 1;
+
+    vkCmdClearColorImage(m_commandBuffer, texInfo.image, texInfo.currentLayout, &clearValue, 1, &range);
+}
+
 void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColor clearColor, float clearDepth, uint32_t clearStencil)
 {
     if (activeRenderState) {
@@ -39,7 +63,9 @@ void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColo
         endCurrentRenderPassIfAny();
     }
     activeRenderState = &renderState;
+
     activeRayTracingState = nullptr;
+    activeComputeState = nullptr;
 
     const RenderTarget& renderTarget = renderState.renderTarget();
     const auto& targetInfo = m_backend.renderTargetInfo(renderTarget);
@@ -108,6 +134,7 @@ void VulkanCommandList::setRayTracingState(const RayTracingState& rtState)
     }
 
     activeRayTracingState = &rtState;
+    activeComputeState = nullptr;
 
     // Explicitly transition the layouts of the referenced textures to an optimal layout (if it isn't already)
     {
@@ -134,13 +161,37 @@ void VulkanCommandList::setRayTracingState(const RayTracingState& rtState)
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, rtStateInfo.pipeline);
 }
 
-void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
+void VulkanCommandList::setComputeState(const ComputeState& computeState)
 {
-    if (!activeRenderState && !activeRayTracingState) {
-        LogErrorAndExit("bindSet: no active render or ray tracing state to bind to!\n");
+    if (activeRenderState) {
+        LogWarning("setComputeState: active render state when starting compute state.\n");
+        endCurrentRenderPassIfAny();
     }
 
-    ASSERT(!(activeRenderState && activeRayTracingState));
+    activeComputeState = &computeState;
+    activeRayTracingState = nullptr;
+
+    auto& computeStateInfo = m_backend.computeStateInfo(computeState);
+
+    // Explicitly transition the layouts of the referenced textures to an optimal layout (if it isn't already)
+    for (const Texture* texture : computeStateInfo.storageImages) {
+        auto& texInfo = m_backend.textureInfo(*texture);
+        if (texInfo.currentLayout != VK_IMAGE_LAYOUT_GENERAL) {
+            m_backend.transitionImageLayout(texInfo.image, texture->hasDepthFormat(), texInfo.currentLayout, VK_IMAGE_LAYOUT_GENERAL, &m_commandBuffer);
+        }
+        texInfo.currentLayout = VK_IMAGE_LAYOUT_GENERAL;
+    }
+
+    vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computeStateInfo.pipeline);
+}
+
+void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
+{
+    if (!activeRenderState && !activeRayTracingState && !activeComputeState) {
+        LogErrorAndExit("bindSet: no active render or compute or ray tracing state to bind to!\n");
+    }
+
+    ASSERT(!(activeRenderState && activeRayTracingState && activeComputeState));
 
     VkPipelineLayout pipelineLayout;
     VkPipelineBindPoint bindPoint;
@@ -148,6 +199,10 @@ void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
     if (activeRenderState) {
         pipelineLayout = m_backend.renderStateInfo(*activeRenderState).pipelineLayout;
         bindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    }
+    if (activeComputeState) {
+        pipelineLayout = m_backend.computeStateInfo(*activeComputeState).pipelineLayout;
+        bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
     }
     if (activeRayTracingState) {
         pipelineLayout = m_backend.rayTracingStateInfo(*activeRayTracingState).pipelineLayout;
@@ -160,15 +215,18 @@ void VulkanCommandList::bindSet(BindingSet& bindingSet, uint32_t index)
 
 void VulkanCommandList::pushConstants(ShaderStage shaderStage, void* data, size_t size)
 {
-    if (!activeRenderState && !activeRayTracingState) {
-        LogErrorAndExit("pushConstants: no active render or ray tracing state to bind to!\n");
+    if (!activeRenderState && !activeRayTracingState && !activeComputeState) {
+        LogErrorAndExit("pushConstants: no active render or compute or ray tracing state to bind to!\n");
     }
 
-    ASSERT(!(activeRenderState && activeRayTracingState));
+    ASSERT(!(activeRenderState && activeRayTracingState && activeComputeState));
 
     VkPipelineLayout pipelineLayout;
     if (activeRenderState) {
         pipelineLayout = m_backend.renderStateInfo(*activeRenderState).pipelineLayout;
+    }
+    if (activeComputeState) {
+        pipelineLayout = m_backend.computeStateInfo(*activeComputeState).pipelineLayout;
     }
     if (activeRayTracingState) {
         pipelineLayout = m_backend.rayTracingStateInfo(*activeRayTracingState).pipelineLayout;
@@ -297,6 +355,14 @@ void VulkanCommandList::traceRays(Extent2D extent)
                                       rtStateInfo.sbtBuffer, rtStateInfo.sbtClosestHitIdx * bindingStride, bindingStride,
                                       VK_NULL_HANDLE, 0, 0,
                                       extent.width(), extent.height(), 1);
+}
+
+void VulkanCommandList::dispatch(uint32_t x, uint32_t y, uint32_t z)
+{
+    if (!activeComputeState) {
+        LogErrorAndExit("Trying to dispatch compute but there is no active compute state!\n");
+    }
+    vkCmdDispatch(m_commandBuffer, x, y, z);
 }
 
 void VulkanCommandList::waitEvent(uint8_t eventId, PipelineStage stage)
