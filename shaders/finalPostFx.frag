@@ -17,6 +17,10 @@ layout(binding = 3, set = 2) uniform EnvBlock { float envMultiplier; };
 
 layout(location = 0) out vec4 oColor;
 
+layout(push_constant) uniform PushConstants {
+	bool includeDiffuseGI;
+};
+
 void main()
 {
     vec3 hdrColor;
@@ -28,7 +32,9 @@ void main()
         hdrColor *= envMultiplier;
     } else {
         hdrColor = texture(uTexture, vTexCoord).rgb;
-        hdrColor += texture(uDiffuseGI, vTexCoord).rgb;
+        if (includeDiffuseGI) {
+            hdrColor += texture(uDiffuseGI, vTexCoord).rgb;
+        }
     }
 
     vec3 ldrColor = ACES_tonemap(hdrColor);
