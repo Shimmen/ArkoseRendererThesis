@@ -32,7 +32,8 @@ layout(location = 1) out vec4 oNormal;
 layout(location = 2) out vec4 oBaseColor;
 
 layout(push_constant) uniform PushConstants {
-	bool writeColor;
+    bool writeColor;
+    bool forceDiffuse;
 };
 
 // TODO: Move to some general location!
@@ -69,9 +70,14 @@ vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseC
 
     vec3 directLight = lightColor * shadowFactor;
 
-    vec3 brdf = evaluateBRDF(L, V, N, baseColor, roughness, metallic);
+    vec3 brdf;
+    if (forceDiffuse) {
+        brdf = baseColor * diffuseBRDF();
+    } else {
+        brdf = evaluateBRDF(L, V, N, baseColor, roughness, metallic);
+    }
+    
     float LdotN = max(dot(L, N), 0.0);
-
     return brdf * LdotN * directLight;
 }
 
