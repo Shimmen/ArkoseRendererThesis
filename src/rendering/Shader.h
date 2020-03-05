@@ -25,7 +25,8 @@ private:
 
 enum class ShaderType {
     Raster,
-    Compute
+    Compute,
+    RayTrace,
 };
 
 struct Shader {

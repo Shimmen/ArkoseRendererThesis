@@ -2388,9 +2388,26 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
         descriptorSetLayouts.push_back(bindingInfo.descriptorSetLayout);
     }
 
+    // TODO: Really, it makes sense to use the descriptor set layouts we get from the helper function as well.
+    //  However, the problem is that we have dynamic-length storage buffers in our ray tracing shaders, and if
+    //  I'm not mistaken we need to specify the length of them in the layout. The passed in stuff should include
+    //  the actual array so we know the length in that case. Without the input data though we don't know that.
+    //  We will have to think about what the best way to handle that would be..
+    Shader shader { rtState.shaderBindingTable(), ShaderType::RayTrace };
+    const auto& [_, pushConstantRange] = createDescriptorSetLayoutForShader(shader);
+
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+
     pipelineLayoutCreateInfo.setLayoutCount = descriptorSetLayouts.size();
     pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
+
+    if (pushConstantRange.has_value()) {
+        pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+        pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange.value();
+    } else {
+        pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+        pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+    }
 
     VkPipelineLayout pipelineLayout {};
     if (vkCreatePipelineLayout(device(), &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
