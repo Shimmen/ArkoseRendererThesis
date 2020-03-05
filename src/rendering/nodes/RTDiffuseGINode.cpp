@@ -3,6 +3,7 @@
 #include "ForwardRenderNode.h"
 #include "LightData.h"
 #include "SceneUniformNode.h"
+#include <imgui.h>
 
 RTDiffuseGINode::RTDiffuseGINode(const Scene& scene)
     : RenderGraphNode(RTDiffuseGINode::name())
@@ -123,6 +124,11 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("rt-diffuseGI/averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
+        static bool ignoreColor = false;
+        if (ImGui::CollapsingHeader("Diffuse GI")) {
+            ImGui::Checkbox("Ignore color", &ignoreColor);
+        }
+
         std::vector<float> sphereSamples;
         sphereSamples.resize(4u * numSphereSamples);
         for (size_t i = 0; i < numSphereSamples; ++i) {
@@ -151,6 +157,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
         cmdList.bindSet(frameBindingSet, 0);
         cmdList.bindSet(*m_objectDataBindingSet, 1);
+        cmdList.pushConstant(ShaderStageRTRayGen, ignoreColor);
 
         cmdList.waitEvent(0, appState.frameIndex() == 0 ? PipelineStage::Host : PipelineStage::RayTracing);
         cmdList.resetEvent(0, PipelineStage::RayTracing);
@@ -167,7 +174,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
             cmdList.setComputeState(compAvgAccumState);
             cmdList.bindSet(avgAccumBindingSet, 0);
-            cmdList.pushConstants(ShaderStageCompute, &m_numAccumulatedFrames, sizeof(m_numAccumulatedFrames));
+            cmdList.pushConstant(ShaderStageCompute, m_numAccumulatedFrames);
 
             Extent2D totalSize = appState.windowExtent();
             constexpr uint32_t localSize = 16;

@@ -14,6 +14,10 @@ layout(binding = 4, set = 0) uniform sampler2D gBufferDepth;
 layout(binding = 5, set = 0) uniform CameraStateBlock { CameraState camera; };
 layout(binding = 9, set = 0) buffer readonly SphereSamples { vec4 sphereSamples[]; };
 
+layout(push_constant) uniform PushConstants {
+    bool ignoreColor;
+};
+
 layout(location = 0) rayPayloadNV vec3 hitValue;
 
 uint randomIndex(uint i, uint n, uvec2 base)
@@ -34,7 +38,10 @@ void main()
 		return;
 	}
 
-	vec3 firstHitColor = texture(gBufferColor, inUV).rgb;
+	vec3 firstHitColor = vec3(1.0);
+	if (!ignoreColor) {
+		firstHitColor = texture(gBufferColor, inUV).rgb;
+	}
 
 	vec3 viewSpaceNormal = normalize(texture(gBufferNormal, inUV).rgb);
 	vec3 N = mat3(camera.worldFromView) * viewSpaceNormal;
