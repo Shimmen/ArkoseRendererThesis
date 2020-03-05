@@ -65,7 +65,7 @@ void ShaderManager::startFileWatching(unsigned msBetweenPolls, std::function<voi
                     m_loadedShaders.erase(path);
                 }
 
-                if (numChangedFiles > 0) {
+                if (numChangedFiles > 0 && fileChangeCallback) {
                     fileChangeCallback();
                 }
             }
