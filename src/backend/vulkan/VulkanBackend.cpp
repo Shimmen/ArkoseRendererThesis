@@ -20,6 +20,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
+static constexpr bool debugMode = true;
+
 static bool s_unhandledWindowResize = false;
 
 VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
@@ -34,7 +36,7 @@ VulkanBackend::VulkanBackend(GLFWwindow* window, App& app)
                                        s_unhandledWindowResize = true;
                                    }));
 
-    m_core = std::make_unique<VulkanCore>(window, true);
+    m_core = std::make_unique<VulkanCore>(window, debugMode);
 
     createSemaphoresAndFences(device());
 
@@ -182,6 +184,11 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT; // TODO: What do we want here? Maybe this suffices?
     // TODO: Assure VK_IMAGE_USAGE_STORAGE_BIT is supported using vkGetPhysicalDeviceSurfaceCapabilitiesKHR & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT
+
+    if (debugMode) {
+        // for nsight debugging & similar stuff)
+        createInfo.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
 
     uint32_t queueFamilyIndices[] = { m_graphicsQueue.familyIndex, m_presentQueue.familyIndex };
     if (!m_core->hasCombinedGraphicsComputeQueue()) {
@@ -644,6 +651,11 @@ void VulkanBackend::newBuffer(const Buffer& buffer)
         ASSERT_NOT_REACHED();
     }
 
+    if (debugMode) {
+        // for nsight debugging & similar stuff)
+        usageFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    }
+
     VmaAllocationCreateInfo allocCreateInfo = {};
     switch (buffer.memoryHint()) {
     case Buffer::MemoryHint::GpuOnly:
@@ -781,6 +793,11 @@ void VulkanBackend::newTexture(const Texture& texture)
     if (texture.hasMipmaps()) {
         usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         usageFlags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
+
+    if (debugMode) {
+        // for nsight debugging & similar stuff)
+        usageFlags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
     // TODO: For now always keep images in device local memory.
@@ -2257,12 +2274,14 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
     });
 
     vmaDestroyBuffer(m_memoryAllocator, scratchBuffer, scratchAllocation);
-    vmaDestroyBuffer(m_memoryAllocator, transformBuffer, transformBufferAllocation);
 
     AccelerationStructureInfo info {};
     info.accelerationStructure = accelerationStructure;
     info.memory = memory;
     info.handle = handle;
+
+    // (should persist for the lifetime of this BLAS)
+    info.associatedBuffers.push_back({ transformBuffer, transformBufferAllocation });
 
     size_t index = m_accStructInfos.add(info);
     blas.registerBackend(backendBadge(), index);
@@ -2277,6 +2296,10 @@ void VulkanBackend::deleteBottomLevelAccelerationStructure(const BottomLevelAS& 
     AccelerationStructureInfo& blasInfo = accelerationStructureInfo(blas);
     m_rtx->vkDestroyAccelerationStructureNV(device(), blasInfo.accelerationStructure, nullptr);
     vkFreeMemory(device(), blasInfo.memory, nullptr);
+
+    for (auto& [buffer, allocation] : blasInfo.associatedBuffers) {
+        vmaDestroyBuffer(m_memoryAllocator, buffer, allocation);
+    }
 
     m_accStructInfos.remove(blas.id());
     blas.unregisterBackend(backendBadge());
@@ -2355,12 +2378,14 @@ void VulkanBackend::newTopLevelAccelerationStructure(const TopLevelAS& tlas)
     });
 
     vmaDestroyBuffer(m_memoryAllocator, scratchBuffer, scratchAllocation);
-    vmaDestroyBuffer(m_memoryAllocator, instanceBuffer, instanceAllocation);
 
     AccelerationStructureInfo info {};
     info.accelerationStructure = accelerationStructure;
     info.memory = memory;
     info.handle = handle;
+
+    // (should persist for the lifetime of this TLAS)
+    info.associatedBuffers.push_back({ instanceBuffer, instanceAllocation });
 
     size_t index = m_accStructInfos.add(info);
     tlas.registerBackend(backendBadge(), index);
@@ -2375,6 +2400,10 @@ void VulkanBackend::deleteTopLevelAccelerationStructure(const TopLevelAS& tlas)
     AccelerationStructureInfo& tlasInfo = accelerationStructureInfo(tlas);
     m_rtx->vkDestroyAccelerationStructureNV(device(), tlasInfo.accelerationStructure, nullptr);
     vkFreeMemory(device(), tlasInfo.memory, nullptr);
+
+    for (auto& [buffer, allocation] : tlasInfo.associatedBuffers) {
+        vmaDestroyBuffer(m_memoryAllocator, buffer, allocation);
+    }
 
     m_accStructInfos.remove(tlas.id());
     tlas.unregisterBackend(backendBadge());
@@ -2512,6 +2541,11 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
         VkBufferCreateInfo scratchBufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
         scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
         scratchBufferCreateInfo.size = sbtSize;
+
+        if (debugMode) {
+            // for nsight debugging & similar stuff)
+            scratchBufferCreateInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        }
 
         VmaAllocationCreateInfo scratchAllocCreateInfo = {};
         scratchAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; // Gpu only is probably perfectly fine, except we need to copy the data using a staging buffer
@@ -3101,6 +3135,11 @@ VkBuffer VulkanBackend::createScratchBufferForAccelerationStructure(VkAccelerati
     scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
     scratchBufferCreateInfo.size = scratchMemRequirements2.memoryRequirements.size;
 
+    if (debugMode) {
+        // for nsight debugging & similar stuff)
+        scratchBufferCreateInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    }
+
     VmaAllocationCreateInfo scratchAllocCreateInfo = {};
     scratchAllocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
@@ -3143,6 +3182,11 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
     instanceBufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     instanceBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
     instanceBufferCreateInfo.size = totalSize;
+
+    if (debugMode) {
+        // for nsight debugging & similar stuff)
+        instanceBufferCreateInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    }
 
     VmaAllocationCreateInfo instanceAllocCreateInfo = {};
     instanceAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;

@@ -15,6 +15,7 @@ VulkanCore::VulkanCore(GLFWwindow* window, bool debugModeEnabled)
     if (debugModeEnabled) {
 
         m_activeValidationLayers.emplace_back("VK_LAYER_KHRONOS_validation");
+        m_activeValidationLayers.emplace_back("VK_LAYER_LUNARG_standard_validation");
 
         auto dbgMessengerCreateInfo = debugMessengerCreateInfo();
         m_instance = createInstance(&dbgMessengerCreateInfo);
@@ -251,6 +252,7 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     VkPhysicalDeviceFeatures requestedDeviceFeatures = {};
     requestedDeviceFeatures.samplerAnisotropy = VK_TRUE;
     requestedDeviceFeatures.fillModeNonSolid = VK_TRUE;
+    requestedDeviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
     requestedDeviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
     requestedDeviceFeatures.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
 

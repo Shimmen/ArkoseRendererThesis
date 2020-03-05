@@ -236,6 +236,8 @@ private:
         VkAccelerationStructureNV accelerationStructure {};
         VkDeviceMemory memory {};
         uint64_t handle {};
+
+        std::vector<std::pair<VkBuffer, VmaAllocation>> associatedBuffers {};
     };
 
     struct RayTracingStateInfo {

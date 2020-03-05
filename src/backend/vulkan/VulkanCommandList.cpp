@@ -333,7 +333,12 @@ void VulkanCommandList::rebuildTopLevelAcceratationStructure(TopLevelAS& tlas)
                          0, 1, &barrier, 0, nullptr, 0, nullptr);
 
     vmaDestroyBuffer(m_backend.m_memoryAllocator, scratchBuffer, scratchAllocation);
-    vmaDestroyBuffer(m_backend.m_memoryAllocator, instanceBuffer, instanceAllocation);
+
+    // Delete the old instance buffer & replace with the new one
+    ASSERT(tlasInfo.associatedBuffers.size() == 1);
+    auto& [prevInstanceBuf, prevInstanceAlloc] = tlasInfo.associatedBuffers[0];
+    vmaDestroyBuffer(m_backend.m_memoryAllocator, prevInstanceBuf, prevInstanceAlloc);
+    tlasInfo.associatedBuffers[0] = { instanceBuffer, instanceAllocation };
 }
 
 void VulkanCommandList::traceRays(Extent2D extent)
