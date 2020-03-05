@@ -209,9 +209,17 @@ VkInstance VulkanCore::createInstance(VkDebugUtilsMessengerCreateInfoEXT* debugM
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0); // NOLINT(hicpp-signed-bitwise)
     appInfo.apiVersion = VK_API_VERSION_1_1; // NOLINT(hicpp-signed-bitwise)
 
+    // See https://www.lunarg.com/wp-content/uploads/2019/02/GPU-Assisted-Validation_v3_02_22_19.pdf for information
+    VkValidationFeatureEnableEXT enables[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT };
+    VkValidationFeaturesEXT validationFeatures { VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT };
+    validationFeatures.enabledValidationFeatureCount = 1;
+    validationFeatures.pEnabledValidationFeatures = enables;
+
     VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-    instanceCreateInfo.pNext = debugMessengerCreateInfo;
     instanceCreateInfo.pApplicationInfo = &appInfo;
+
+    instanceCreateInfo.pNext = &validationFeatures;
+    validationFeatures.pNext = debugMessengerCreateInfo;
 
     const auto& extensions = instanceExtensions();
     instanceCreateInfo.enabledExtensionCount = extensions.size();
@@ -253,6 +261,7 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     requestedDeviceFeatures.samplerAnisotropy = VK_TRUE;
     requestedDeviceFeatures.fillModeNonSolid = VK_TRUE;
     requestedDeviceFeatures.fragmentStoresAndAtomics = VK_TRUE;
+    requestedDeviceFeatures.vertexPipelineStoresAndAtomics = VK_TRUE;
     requestedDeviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
     requestedDeviceFeatures.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
 
