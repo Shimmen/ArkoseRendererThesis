@@ -3,6 +3,7 @@
 #include "ForwardRenderNode.h"
 #include "LightData.h"
 #include "SceneUniformNode.h"
+#include "utility/GlobalState.h"
 #include <imgui.h>
 
 RTDiffuseGINode::RTDiffuseGINode(const Scene& scene)
@@ -81,8 +82,8 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
                                                          { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
 
-    // TODO: We need the size of the window here!
-    m_accumulationTexture = &nodeReg.createTexture2D({ 1200, 800 }, Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
+    Extent2D windowExtent = GlobalState::get().windowExtent();
+    m_accumulationTexture = &nodeReg.createTexture2D(windowExtent, Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
 }
 
 RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) const
