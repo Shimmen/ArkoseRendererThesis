@@ -165,6 +165,8 @@ void Input::mouseButtonEventCallback(GLFWwindow* window, int button, int action,
     default:
         break;
     }
+
+    glfwSetInputMode(window, GLFW_CURSOR, input->isButtonDown(GLFW_MOUSE_BUTTON_2) ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 
 void Input::mouseMovementEventCallback(GLFWwindow* window, double xPos, double yPos)
