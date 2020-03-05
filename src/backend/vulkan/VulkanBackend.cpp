@@ -20,7 +20,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#ifdef NDEBUG
+static constexpr bool debugMode = false;
+#else
 static constexpr bool debugMode = true;
+#endif
 
 static bool s_unhandledWindowResize = false;
 
