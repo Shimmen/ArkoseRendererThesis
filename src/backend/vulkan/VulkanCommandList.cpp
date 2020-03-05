@@ -87,10 +87,8 @@ void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColo
 
     // (there is automatic image layout transitions for attached textures, so when we bind the
     //  render target here, make sure to also swap to the new layout in the cache variable)
-    for (const auto& attachedTexture : targetInfo.attachedTextures) {
-        m_backend.textureInfo(*attachedTexture).currentLayout = attachedTexture->hasDepthFormat()
-            ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    for (const auto& [attachedTexture, implicitTransitionLayout] : targetInfo.attachedTextures) {
+        m_backend.textureInfo(*attachedTexture).currentLayout = implicitTransitionLayout;
     }
 
     // Explicitly transition the layouts of the sampled textures to an optimal layout (if it isn't already)
@@ -102,6 +100,8 @@ void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColo
                 m_backend.transitionImageLayout(texInfo.image, texture->hasDepthFormat(), texInfo.currentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &m_commandBuffer);
             }
             texInfo.currentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            // TODO: We probably want to support storage images here as well!
         }
     }
 

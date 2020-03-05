@@ -339,6 +339,10 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         RenderTargetInfo targetInfo {};
         targetInfo.compatibleRenderPass = m_swapchainRenderPass;
         targetInfo.framebuffer = m_swapchainFramebuffers[i];
+        targetInfo.attachedTextures = {
+            { &m_swapchainMockColorTextures[i], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR }, // this is important so that we know that we don't need to do an explicit transition before presenting
+            { &m_swapchainDepthTexture, VK_IMAGE_LAYOUT_UNDEFINED } // (this probably doesn't matter for the depth image)
+        };
 
         if (m_swapchainMockRenderTargets[i].hasBackend()) {
             m_renderTargetInfos.remove(m_swapchainMockRenderTargets[i].id());
@@ -525,6 +529,9 @@ void VulkanBackend::renderDearImguiFrame(VkCommandBuffer commandBuffer, uint32_t
     vkCmdBeginRenderPass(commandBuffer, &passBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
     vkCmdEndRenderPass(commandBuffer);
+
+    Texture& swapchainTexture = m_swapchainMockColorTextures[swapchainImageIndex];
+    textureInfo(swapchainTexture).currentLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 }
 
 bool VulkanBackend::executeFrame(double elapsedTime, double deltaTime, bool renderGui)
@@ -624,6 +631,16 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
         renderDearImguiFrame(commandBuffer, swapchainImageIndex);
     } else {
         ImGui::EndFrame();
+    }
+
+    // Explicitly tranfer the swapchain image to a present layout if not already
+    // In most cases it should always be, but with nsight it seems to do weird things.
+    Texture& swapchainTexture = m_swapchainMockColorTextures[swapchainImageIndex];
+    TextureInfo& texInfo = textureInfo(swapchainTexture);
+    if (texInfo.currentLayout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+        transitionImageLayout(texInfo.image, false, texInfo.currentLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, &commandBuffer);
+        LogInfo("VulkanBackend::executeRenderGraph(): performing explicit swapchain layout transition. "
+                "This should only happen if we don't render to the window and don't draw any GUI.\n");
     }
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -1356,7 +1373,10 @@ void VulkanBackend::newRenderTarget(const RenderTarget& renderTarget)
     renderTargetInfo.compatibleRenderPass = renderPass;
     renderTargetInfo.framebuffer = framebuffer;
     for (auto& attachment : renderTarget.sortedAttachments()) {
-        renderTargetInfo.attachedTextures.push_back(attachment.texture);
+        VkImageLayout finalLayout = (attachment.type == RenderTarget::AttachmentType::Depth)
+            ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        renderTargetInfo.attachedTextures.push_back({ attachment.texture, finalLayout });
     }
 
     size_t index = m_renderTargetInfos.add(renderTargetInfo);
@@ -2978,6 +2998,11 @@ bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void*
 
 bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* currentCommandBuffer) const
 {
+    if (oldLayout == newLayout) {
+        LogWarning("VulkanBackend::transitionImageLayout(): old & new layout identical, ignoring.\n");
+        return true;
+    }
+
     VkImageMemoryBarrier imageBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     imageBarrier.oldLayout = oldLayout;
     imageBarrier.newLayout = newLayout;
@@ -3059,7 +3084,7 @@ bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkI
         // ... before allowing any reading or writing
         destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-
+        
     } else {
         LogErrorAndExit("VulkanBackend::transitionImageLayout(): old & new layout combination unsupported by application, exiting.\n");
     }

@@ -216,7 +216,7 @@ private:
         VkFramebuffer framebuffer {};
         VkRenderPass compatibleRenderPass {};
 
-        std::vector<const Texture*> attachedTextures {};
+        std::vector<std::pair<const Texture*, VkImageLayout>> attachedTextures {};
     };
 
     struct BindingSetInfo {
