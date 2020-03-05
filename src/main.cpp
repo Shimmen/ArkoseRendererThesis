@@ -92,7 +92,7 @@ int main(int argc, char** argv)
     }
 
     BackendType backendType = BackendType::Vulkan;
-    GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1200, 800 });
+    GLFWwindow* window = createWindow(backendType, WindowType::Windowed, { 1920, 1080 });
     Input::registerWindow(window);
 
     {
