@@ -102,8 +102,13 @@ std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
         scene->m_allCameras[name] = camera;
     }
 
-    scene->m_currentMainCamera = scene->m_allCameras["main"];
     scene->loadAdditionalCameras();
+
+    std::string mainCamera = jsonScene.at("camera");
+    auto entry = scene->m_allCameras.find(mainCamera);
+    if (entry != scene->m_allCameras.end()) {
+        scene->m_currentMainCamera = scene->m_allCameras[mainCamera];
+    }
 
     return scene;
 }

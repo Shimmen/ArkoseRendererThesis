@@ -15,7 +15,8 @@
 
 void TestApp::setup(RenderGraph& graph)
 {
-    m_scene = Scene::loadFromFile("assets/Scenes/test.json");
+    //m_scene = Scene::loadFromFile("assets/Scenes/test.json");
+    m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
 
     graph.addNode<SceneUniformNode>(*m_scene);
     graph.addNode<ShadowMapNode>(*m_scene);
