@@ -366,6 +366,9 @@ void VulkanBackend::setupDearImgui()
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
     //
 
     ImGui_ImplGlfw_InitForVulkan(m_window, true);
@@ -3088,7 +3091,7 @@ bool VulkanBackend::transitionImageLayout(VkImage image, bool isDepthFormat, VkI
         // ... before allowing any reading or writing
         destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         imageBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-        
+
     } else {
         LogErrorAndExit("VulkanBackend::transitionImageLayout(): old & new layout combination unsupported by application, exiting.\n");
     }
