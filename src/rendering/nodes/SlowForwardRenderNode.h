@@ -4,6 +4,7 @@
 #include "ForwardData.h"
 #include "utility/FpsCamera.h"
 #include "utility/Model.h"
+#include "utility/Scene.h"
 
 class SlowForwardRenderNode final : public RenderGraphNode {
 public:

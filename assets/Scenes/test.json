@@ -1,0 +1,52 @@
+{
+  "environment": {
+    "texture": "assets/environments/tiergarten_2k.hdr",
+    "multiplier": 1.7
+  },
+  "models": [
+    {
+      "name": "cornell-box",
+      "gltf": "assets/CornellBox/CornellBoxFilled.gltf",
+      "transform": {
+        "translation": [ -6, 0, 0 ],
+        "rotation": {
+          "type": "axis-angle",
+          "axis": [ 0, 1, 0 ],
+          "angle": 0.3
+        },
+        "scale": [ 3, 3, 3 ]
+      }
+    },
+    {
+      "name": "pallet-stack",
+      "gltf": "assets/PicaPicaPalletStack/scene.gltf",
+      "transform": {
+        "translation": [ 7, 0, 0 ],
+        "rotation": {
+          "type": "axis-angle",
+          "axis": [ 0, 1, 0 ],
+          "angle": -0.5
+        },
+        "scale": [ 0.3, 0.3, 0.3 ]
+      }
+    }
+  ],
+  "lights": [
+    {
+      "name": "sun",
+      "type": "directional",
+      "color": [ 1, 1, 1 ],
+      "intensity": 30.0,
+      "direction": [ 1.0, -0.3, -1.0 ],
+      "worldExtent": 18.0,
+      "shadowMapSize": [ 2048, 2048 ]
+    }
+  ],
+  "cameras": [
+    {
+      "name": "main",
+      "origin": [ 0, 6, 20 ],
+      "target": [ 0, 3, 0 ]
+    }
+  ]
+}

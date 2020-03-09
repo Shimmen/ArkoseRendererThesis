@@ -3,6 +3,7 @@
 #include "rendering/App.h"
 #include "utility/FpsCamera.h"
 #include "utility/Model.h"
+#include "utility/Scene.h"
 
 class TestApp : public App {
 public:
@@ -10,8 +11,8 @@ public:
     void update(float elapsedTime, float deltaTime) override;
 
 private:
-    std::unique_ptr<Model> m_cornellBox {};
-    std::unique_ptr<Model> m_palletStack {};
-    std::unique_ptr<Model> m_boomBox {};
+    Model* m_cornellBox {};
+    Model* m_palletStack {};
+    Model* m_boomBox {};
     Scene m_scene {};
 };

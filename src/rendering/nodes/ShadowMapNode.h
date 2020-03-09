@@ -3,6 +3,7 @@
 #include "rendering/RenderGraphNode.h"
 #include "utility/FpsCamera.h"
 #include "utility/Model.h"
+#include "utility/Scene.h"
 
 class ShadowMapNode final : public RenderGraphNode {
 public:

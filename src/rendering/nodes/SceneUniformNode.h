@@ -2,6 +2,7 @@
 
 #include "../RenderGraphNode.h"
 #include "utility/Model.h"
+#include "utility/Scene.h"
 
 class SceneUniformNode final : public RenderGraphNode {
 public:

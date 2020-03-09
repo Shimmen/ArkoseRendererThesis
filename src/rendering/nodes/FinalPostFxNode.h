@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../RenderGraphNode.h"
+#include "utility/Scene.h"
 
 class FinalPostFxNode final : public RenderGraphNode {
 public:

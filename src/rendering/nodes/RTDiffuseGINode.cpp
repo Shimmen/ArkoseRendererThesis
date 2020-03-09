@@ -26,8 +26,8 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
     std::vector<RTMesh> rtMeshes {};
     std::vector<const Texture*> allTextures {};
 
-    for (auto& model : m_scene.models()) {
-        model->forEachMesh([&](const Mesh& mesh) {
+    m_scene.forEachModel([&](size_t, const Model& model) {
+        model.forEachMesh([&](const Mesh& mesh) {
             std::vector<RTVertex> vertices {};
             {
                 auto posData = mesh.positionData();
@@ -72,9 +72,9 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
             // TODO: Later we probably want to keep all meshes of a model in a single BLAS, but that requires some fancy SBT stuff which I don't wanna mess with now.
             BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure({ geometry });
             m_instances.push_back({ .blas = blas,
-                                    .transform = model->transform() });
+                                    .transform = model.transform() });
         });
-    }
+    });
 
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },

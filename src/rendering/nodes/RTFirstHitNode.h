@@ -3,6 +3,7 @@
 #include "../RenderGraphNode.h"
 #include "RTData.h"
 #include "utility/Model.h"
+#include "utility/Scene.h"
 
 class RTFirstHitNode final : public RenderGraphNode {
 public:
