@@ -17,13 +17,13 @@ void TestApp::setup(RenderGraph& graph)
 {
     m_scene = Scene::loadFromFile("assets/Scenes/test.json");
 
-    graph.addNode<SceneUniformNode>(m_scene);
-    graph.addNode<ShadowMapNode>(m_scene);
-    //graph.addNode<RTFirstHitNode>(m_scene);
-    graph.addNode<SlowForwardRenderNode>(m_scene);
-    //graph.addNode<RTReflectionsNode>(m_scene);
-    graph.addNode<RTDiffuseGINode>(m_scene);
-    graph.addNode<FinalPostFxNode>(m_scene);
+    graph.addNode<SceneUniformNode>(*m_scene);
+    graph.addNode<ShadowMapNode>(*m_scene);
+    //graph.addNode<RTFirstHitNode>(*m_scene);
+    graph.addNode<SlowForwardRenderNode>(*m_scene);
+    //graph.addNode<RTReflectionsNode>(*m_scene);
+    graph.addNode<RTDiffuseGINode>(*m_scene);
+    graph.addNode<FinalPostFxNode>(*m_scene);
 }
 
 void TestApp::update(float elapsedTime, float deltaTime)
@@ -45,16 +45,16 @@ void TestApp::update(float elapsedTime, float deltaTime)
     }
 
     ImGui::Begin("TestApp");
-    ImGui::ColorEdit3("Sun color", value_ptr(m_scene.sun().color));
-    ImGui::SliderFloat("Sun intensity", &m_scene.sun().intensity, 0.0f, 50.0f);
-    ImGui::SliderFloat("Environment", &m_scene.environmentMultiplier(), 0.0f, 5.0f);
+    ImGui::ColorEdit3("Sun color", value_ptr(m_scene->sun().color));
+    ImGui::SliderFloat("Sun intensity", &m_scene->sun().intensity, 0.0f, 50.0f);
+    ImGui::SliderFloat("Environment", &m_scene->environmentMultiplier(), 0.0f, 5.0f);
     if (ImGui::CollapsingHeader("Cameras")) {
-        m_scene.cameraGui();
+        m_scene->cameraGui();
     }
     ImGui::End();
 
     const Input& input = Input::instance();
-    m_scene.camera().update(input, GlobalState::get().windowExtent(), deltaTime);
+    m_scene->camera().update(input, GlobalState::get().windowExtent(), deltaTime);
 
     if (m_boomBox) {
         mat4 matrix = mathkit::translate(1.4f, 2.4f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(50);

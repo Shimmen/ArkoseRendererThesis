@@ -14,7 +14,7 @@ mat4 SunLight::lightProjection() const
     return lightProjection * lightOrientation;
 }
 
-Scene Scene::loadFromFile(const std::string& path)
+std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
 {
     using json = nlohmann::json;
 
@@ -26,16 +26,16 @@ Scene Scene::loadFromFile(const std::string& path)
     std::ifstream fileStream(path);
     fileStream >> jsonScene;
 
-    Scene scene;
+    auto scene = std::make_unique<Scene>(path);
 
     auto jsonEnv = jsonScene.at("environment");
-    jsonEnv.at("texture").get_to(scene.m_environmentMap);
-    jsonEnv.at("multiplier").get_to(scene.m_environmentMultiplier);
+    jsonEnv.at("texture").get_to(scene->m_environmentMap);
+    jsonEnv.at("multiplier").get_to(scene->m_environmentMultiplier);
 
     for (auto& jsonModel : jsonScene.at("models")) {
         std::string modelGltf;
         jsonModel.at("gltf").get_to(modelGltf);
-        Model* model = scene.addModel(GltfModel::load(modelGltf));
+        Model* model = scene->addModel(GltfModel::load(modelGltf));
 
         auto transform = jsonModel.at("transform");
 
@@ -83,7 +83,7 @@ Scene Scene::loadFromFile(const std::string& path)
         sun.shadowMapSize = { mapSize[0], mapSize[1] };
 
         // TODO!
-        scene.m_sunLight = sun;
+        scene->m_sunLight = sun;
     }
 
     for (auto& jsonCamera : jsonScene.at("cameras")) {
@@ -99,12 +99,58 @@ Scene Scene::loadFromFile(const std::string& path)
         jsonCamera.at("target").get_to(target);
 
         camera.lookAt({ origin[0], origin[1], origin[2] }, { target[0], target[1], target[2] }, mathkit::globalUp);
-        scene.m_altCameras[name] = camera;
+        scene->m_allCameras[name] = camera;
     }
 
-    scene.m_currentMainCamera = scene.m_altCameras["main"];
+    scene->m_currentMainCamera = scene->m_allCameras["main"];
+    scene->loadAdditionalCameras();
 
     return scene;
+}
+
+Scene::Scene(std::string path)
+    : m_loadedPath(std::move(path))
+{
+}
+
+Scene::~Scene()
+{
+    using json = nlohmann::json;
+    json savedCameras;
+
+    if (FileIO::isFileReadable(savedCamerasFile)) {
+        std::ifstream fileStream(savedCamerasFile);
+        fileStream >> savedCameras;
+    }
+
+    json jsonCameras = json::object();
+
+    for (const auto& [name, camera] : m_allCameras) {
+        if (name == "main") {
+            continue;
+        }
+
+        float posData[3];
+        posData[0] = camera.position().x;
+        posData[1] = camera.position().y;
+        posData[2] = camera.position().z;
+
+        float rotData[4];
+        rotData[0] = camera.orientation().w;
+        rotData[1] = camera.orientation().x;
+        rotData[2] = camera.orientation().y;
+        rotData[3] = camera.orientation().z;
+
+        jsonCameras[name] = {
+            { "position", posData },
+            { "orientation", rotData }
+        };
+    }
+
+    savedCameras[m_loadedPath] = jsonCameras;
+
+    std::ofstream fileStream(savedCamerasFile);
+    savedCameras >> fileStream;
 }
 
 Model* Scene::addModel(std::unique_ptr<Model> model)
@@ -147,7 +193,7 @@ int Scene::forEachDrawable(std::function<void(int, const Mesh&)> callback) const
 
 void Scene::cameraGui()
 {
-    for (const auto& [name, camera] : m_altCameras) {
+    for (const auto& [name, camera] : m_allCameras) {
         if (ImGui::Button(name.c_str())) {
             m_currentMainCamera = camera;
         }
@@ -156,7 +202,36 @@ void Scene::cameraGui()
     ImGui::Separator();
     static char nameBuffer[63];
     ImGui::InputText("Name", nameBuffer, sizeof(nameBuffer), ImGuiInputTextFlags_AutoSelectAll);
-    if (ImGui::Button("Save current")) {
-        m_altCameras[nameBuffer] = m_currentMainCamera;
+
+    bool hasName = std::strlen(nameBuffer) > 0;
+    if (hasName && ImGui::Button("Save current")) {
+        m_allCameras[nameBuffer] = m_currentMainCamera;
+    }
+}
+
+void Scene::loadAdditionalCameras()
+{
+    using json = nlohmann::json;
+
+    json savedCameras;
+    if (FileIO::isFileReadable(savedCamerasFile)) {
+        std::ifstream fileStream(savedCamerasFile);
+        fileStream >> savedCameras;
+    }
+
+    auto savedCamerasForFile = savedCameras[m_loadedPath];
+
+    for (auto& [name, jsonCamera] : savedCamerasForFile.items()) {
+        FpsCamera camera {};
+
+        float posData[3];
+        jsonCamera.at("position").get_to(posData);
+        camera.setPosition({ posData[0], posData[1], posData[2] });
+
+        float rotData[4];
+        jsonCamera.at("orientation").get_to(rotData);
+        camera.setOrientation({ rotData[0], rotData[1], rotData[2], rotData[3] });
+
+        m_allCameras[name] = camera;
     }
 }

@@ -10,9 +10,17 @@ public:
     ~FpsCamera() = default;
 
     void update(const Input&, const Extent2D& screenExtent, float deltaTime);
-    bool didModifyOnLastUpdate() const;
+
+    void setDidModify(bool);
+    bool didModify() const;
 
     void lookAt(const vec3& position, const vec3& target, const vec3& up = mathkit::globalY);
+
+    vec3 position() const { return m_position; }
+    void setPosition(vec3 p) { m_position = p; }
+
+    quat orientation() const { return m_orientation; }
+    void setOrientation(quat q) { m_orientation = q; }
 
     [[nodiscard]] mat4 viewMatrix() const { return m_viewFromWorld; }
     [[nodiscard]] mat4 projectionMatrix() const { return m_projectionFromView; }

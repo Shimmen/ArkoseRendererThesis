@@ -19,9 +19,11 @@ public:
 
 class Scene {
 public:
-    static Scene loadFromFile(const std::string&);
+    static constexpr const char* savedCamerasFile = "assets/cameras.json";
+    static std::unique_ptr<Scene> loadFromFile(const std::string&);
 
-    Scene() = default;
+    Scene(std::string);
+    ~Scene();
 
     Model* addModel(std::unique_ptr<Model>);
 
@@ -45,11 +47,16 @@ public:
     float& environmentMultiplier() { return m_environmentMultiplier; }
 
 private:
+    void loadAdditionalCameras();
+
+private:
+    std::string m_loadedPath {};
+
     std::vector<std::unique_ptr<Model>> m_models;
     SunLight m_sunLight;
 
     FpsCamera m_currentMainCamera;
-    std::unordered_map<std::string, FpsCamera> m_altCameras {};
+    std::unordered_map<std::string, FpsCamera> m_allCameras {};
 
     std::string m_environmentMap {};
     float m_environmentMultiplier { 1.0f };

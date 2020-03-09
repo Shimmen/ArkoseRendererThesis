@@ -14,5 +14,5 @@ private:
     Model* m_cornellBox {};
     Model* m_palletStack {};
     Model* m_boomBox {};
-    Scene m_scene {};
+    std::unique_ptr<Scene> m_scene {};
 };

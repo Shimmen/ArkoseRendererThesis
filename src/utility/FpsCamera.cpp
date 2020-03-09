@@ -138,7 +138,12 @@ void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float d
     m_projectionFromView = mathkit::perspective(m_fieldOfView, aspectRatio, zNear, 10000.0f);
 }
 
-bool FpsCamera::didModifyOnLastUpdate() const
+void FpsCamera::setDidModify(bool value)
+{
+    m_didModify = value;
+}
+
+bool FpsCamera::didModify() const
 {
     return m_didModify;
 }
@@ -149,4 +154,5 @@ void FpsCamera::lookAt(const vec3& position, const vec3& target, const vec3& up)
     auto direction = normalize(target - position);
     m_orientation = mathkit::quatLookAt(direction, up);
     m_viewFromWorld = mathkit::lookAt(m_position, target, up);
+    setDidModify(true);
 }
