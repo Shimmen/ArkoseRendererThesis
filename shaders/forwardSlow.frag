@@ -83,7 +83,12 @@ vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseC
 
 void main()
 {
-    vec3 baseColor = texture(uBaseColor, vTexCoord).rgb;
+    vec4 inputBaseColor = texture(uBaseColor, vTexCoord).rgba;
+    if (inputBaseColor.a < 1e-2) {
+        discard;
+    }
+
+    vec3 baseColor = inputBaseColor.rgb;
     vec3 emissive = texture(uEmissive, vTexCoord).rgb;
 
     vec4 metallicRoughness = texture(uMetallicRoughnessMap, vTexCoord);
