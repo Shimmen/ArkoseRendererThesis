@@ -209,7 +209,7 @@ VkInstance VulkanCore::createInstance(VkDebugUtilsMessengerCreateInfoEXT* debugM
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0); // NOLINT(hicpp-signed-bitwise)
     appInfo.pEngineName = "ArkoseRendererEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0); // NOLINT(hicpp-signed-bitwise)
-    appInfo.apiVersion = VK_API_VERSION_1_2; // NOLINT(hicpp-signed-bitwise)
+    appInfo.apiVersion = VK_API_VERSION_1_1; // NOLINT(hicpp-signed-bitwise)
 
     // See https://www.lunarg.com/wp-content/uploads/2019/02/GPU-Assisted-Validation_v3_02_22_19.pdf for information
     VkValidationFeatureEnableEXT enables[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT };
