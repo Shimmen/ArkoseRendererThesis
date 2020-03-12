@@ -98,7 +98,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ShaderFile shadowMiss = ShaderFile("rt-diffuseGI/shadow.rmiss", ShaderFileType::RTMiss);
     ShaderFile closestHit = ShaderFile("rt-diffuseGI/closestHit.rchit", ShaderFileType::RTClosestHit);
 
-    constexpr size_t numSphereSamples = 10 * 256;
+    constexpr size_t numSphereSamples = 23 * 256;
     constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4); // TODO: There are still problems with using GpuOptimal.. Not sure why.
     Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
 
@@ -131,7 +131,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
         }
 
         std::vector<float> sphereSamples;
-        sphereSamples.resize(4u * numSphereSamples);
+        sphereSamples.resize(4 * numSphereSamples);
         for (size_t i = 0; i < numSphereSamples; ++i) {
 
             float x, y, z;

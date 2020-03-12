@@ -57,7 +57,7 @@ void main()
 
 	
 	vec3 diffuse = vec3(0.0);
-	const uint numSamples = 16;
+	const uint numSamples = 4;
 
 	for (uint i = 0; i < numSamples; ++i) {
 		uint idx = randomIndex(i, numSamples, gl_LaunchIDNV.xy);
