@@ -639,6 +639,7 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
     } else {
         ImGui::EndFrame();
     }
+    ImGui::UpdatePlatformWindows();
 
     // Explicitly tranfer the swapchain image to a present layout if not already
     // In most cases it should always be, but with nsight it seems to do weird things.
