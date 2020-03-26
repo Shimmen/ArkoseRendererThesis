@@ -86,8 +86,13 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
                                                              { 2, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                              { 3, ShaderStageRTMiss, &timeBuffer } });
 
+        ShaderFile raygen = ShaderFile("rt-firsthit/raygen.rgen", ShaderFileType::RTRaygen);
+        HitGroup mainHitGroup { ShaderFile("rt-firsthit/closestHit.rchit", ShaderFileType::RTClosestHit) };
+        ShaderFile missShader { ShaderFile("rt-firsthit/miss.rmiss", ShaderFileType::RTMiss) };
+        ShaderBindingTable sbt { raygen, { mainHitGroup }, { missShader } };
+
         uint32_t maxRecursionDepth = 1;
-        RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);
+        RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);
 
         return { frameBindingSet, rtState };
     };

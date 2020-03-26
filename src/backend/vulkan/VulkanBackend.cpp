@@ -2450,7 +2450,7 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
     //  I'm not mistaken we need to specify the length of them in the layout. The passed in stuff should include
     //  the actual array so we know the length in that case. Without the input data though we don't know that.
     //  We will have to think about what the best way to handle that would be..
-    Shader shader { rtState.shaderBindingTable(), ShaderType::RayTrace };
+    Shader shader { rtState.shaderBindingTable().allReferencedShaderFiles(), ShaderType::RayTrace };
     const auto& [_, pushConstantRange] = createDescriptorSetLayoutForShader(shader);
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -2471,81 +2471,116 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
         LogErrorAndExit("Error trying to create pipeline layout for ray tracing\n");
     }
 
-    const std::vector<ShaderFile>& sbt = rtState.shaderBindingTable();
-
-    int shaderIndexRaygen = -1;
-    int shaderIndexMiss = -1;
-    int shaderIndexClosestHit = -1;
-
+    const ShaderBindingTable& sbt = rtState.shaderBindingTable();
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages {};
     std::vector<VkRayTracingShaderGroupCreateInfoNV> shaderGroups {};
 
-    for (size_t idx = 0; idx < sbt.size(); ++idx) {
-        const ShaderFile& file = sbt[idx];
-
+    // RayGen
+    {
         VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
-        const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(file.path());
+        const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(sbt.rayGen().path());
         moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
         moduleCreateInfo.pCode = spirv.data();
 
+        // FIXME: this module is currently leaked!
         VkShaderModule shaderModule {};
         if (vkCreateShaderModule(device(), &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-            LogErrorAndExit("Error trying to create shader module for ray tracing state\n");
+            LogErrorAndExit("Error trying to create shader module for raygen shader for ray tracing state\n");
         }
 
         VkPipelineShaderStageCreateInfo stageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        stageCreateInfo.stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
         stageCreateInfo.module = shaderModule;
         stageCreateInfo.pName = "main";
 
+        uint32_t shaderIndex = shaderStages.size();
+        shaderStages.push_back(stageCreateInfo);
+
         VkRayTracingShaderGroupCreateInfoNV shaderGroup = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
+        shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+        shaderGroup.generalShader = shaderIndex;
+
+        shaderGroup.closestHitShader = VK_SHADER_UNUSED_NV;
+        shaderGroup.anyHitShader = VK_SHADER_UNUSED_NV;
+        shaderGroup.intersectionShader = VK_SHADER_UNUSED_NV;
+
+        shaderGroups.push_back(shaderGroup);
+    }
+
+    // HitGroups
+    for (const HitGroup& hitGroup : sbt.hitGroups()) {
+
+        VkRayTracingShaderGroupCreateInfoNV shaderGroup = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
+
+        // TODO: Add support for non-triangle hit groups!
+        shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV;
+        //shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_NV;
+
         shaderGroup.generalShader = VK_SHADER_UNUSED_NV;
         shaderGroup.closestHitShader = VK_SHADER_UNUSED_NV;
         shaderGroup.anyHitShader = VK_SHADER_UNUSED_NV;
         shaderGroup.intersectionShader = VK_SHADER_UNUSED_NV;
 
-        switch (file.type()) {
-        case ShaderFileType::RTRaygen:
-            stageCreateInfo.stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-            shaderIndexRaygen = idx;
+        // ClosestHit
+        {
+            VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+            const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(hitGroup.closestHit().path());
+            moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
+            moduleCreateInfo.pCode = spirv.data();
 
-            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
-            shaderGroup.generalShader = idx;
-
-            break;
-        case ShaderFileType::RTMiss:
-            stageCreateInfo.stage = VK_SHADER_STAGE_MISS_BIT_NV;
-
-            // TODO: Create proper SBT stuff! Since we (in rt-reflections) have two miss shaders, one for shadows, and we want the first miss shader
-            //  to be the base one. So by doing this we ensure that for now. But soon enough we need a proper SBT abstraction.
-            if (shaderIndexMiss == -1) {
-                shaderIndexMiss = idx;
+            // FIXME: this module is currently leaked!
+            VkShaderModule shaderModule {};
+            if (vkCreateShaderModule(device(), &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+                LogErrorAndExit("Error trying to create shader module for closest hit shader for ray tracing state\n");
             }
 
-            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
-            shaderGroup.generalShader = idx;
-
-            break;
-        case ShaderFileType::RTClosestHit:
+            VkPipelineShaderStageCreateInfo stageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
             stageCreateInfo.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
-            shaderIndexClosestHit = idx;
+            stageCreateInfo.module = shaderModule;
+            stageCreateInfo.pName = "main";
 
-            shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV;
-            shaderGroup.generalShader = VK_SHADER_UNUSED_NV;
-            shaderGroup.closestHitShader = idx;
-
-            break;
-        default:
-            LogErrorAndExit("Trying to use non ray trace shader for ray tracing\n");
+            shaderGroup.closestHitShader = shaderStages.size();
+            shaderStages.push_back(stageCreateInfo);
         }
 
-        shaderStages.push_back(stageCreateInfo);
+        ASSERT(!hitGroup.hasAnyHitShader()); // for now!
+        ASSERT(!hitGroup.hasIntersectionShader()); // for now!
+
         shaderGroups.push_back(shaderGroup);
     }
 
-    // TODO: Figure out something more creative or elegant for this..
-    ASSERT(shaderIndexRaygen != -1);
-    ASSERT(shaderIndexMiss != -1);
-    ASSERT(shaderIndexClosestHit != -1);
+    // Miss shaders
+    for (const ShaderFile& missShader : sbt.missShaders()) {
+
+        VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+        const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(missShader.path());
+        moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
+        moduleCreateInfo.pCode = spirv.data();
+
+        // FIXME: this module is currently leaked!
+        VkShaderModule shaderModule {};
+        if (vkCreateShaderModule(device(), &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create shader module for miss shader for ray tracing state\n");
+        }
+
+        VkPipelineShaderStageCreateInfo stageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+        stageCreateInfo.stage = VK_SHADER_STAGE_MISS_BIT_NV;
+        stageCreateInfo.module = shaderModule;
+        stageCreateInfo.pName = "main";
+
+        uint32_t shaderIndex = shaderStages.size();
+        shaderStages.push_back(stageCreateInfo);
+
+        VkRayTracingShaderGroupCreateInfoNV shaderGroup = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
+        shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV;
+        shaderGroup.generalShader = shaderIndex;
+
+        shaderGroup.closestHitShader = VK_SHADER_UNUSED_NV;
+        shaderGroup.anyHitShader = VK_SHADER_UNUSED_NV;
+        shaderGroup.intersectionShader = VK_SHADER_UNUSED_NV;
+
+        shaderGroups.push_back(shaderGroup);
+    }
 
     VkRayTracingPipelineCreateInfoNV rtPipelineCreateInfo { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV };
     rtPipelineCreateInfo.maxRecursionDepth = rtState.maxRecursionDepth();
@@ -2597,10 +2632,6 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
     rtStateInfo.pipeline = pipeline;
     rtStateInfo.sbtBuffer = sbtBuffer;
     rtStateInfo.sbtBufferAllocation = sbtBufferAllocation;
-
-    rtStateInfo.sbtRaygenIdx = shaderIndexRaygen;
-    rtStateInfo.sbtMissIdx = shaderIndexMiss;
-    rtStateInfo.sbtClosestHitIdx = shaderIndexClosestHit;
 
     for (auto& set : rtState.bindingSets()) {
         for (auto& bindingInfo : set->shaderBindings()) {

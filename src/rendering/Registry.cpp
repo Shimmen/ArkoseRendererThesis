@@ -144,9 +144,9 @@ TopLevelAS& Registry::createTopLevelAccelerationStructure(std::vector<RTGeometry
     return m_topLevelAS.back();
 }
 
-RayTracingState& Registry::createRayTracingState(const std::vector<ShaderFile>& shaderBindingTable, std::vector<const BindingSet*> bindingSets, uint32_t maxRecursionDepth)
+RayTracingState& Registry::createRayTracingState(const ShaderBindingTable& sbt, std::vector<const BindingSet*> bindingSets, uint32_t maxRecursionDepth)
 {
-    RayTracingState rtState = { {}, shaderBindingTable, bindingSets, maxRecursionDepth };
+    RayTracingState rtState = { {}, sbt, bindingSets, maxRecursionDepth };
     m_rayTracingStates.push_back(rtState);
     return m_rayTracingStates.back();
 }

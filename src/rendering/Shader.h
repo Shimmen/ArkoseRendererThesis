@@ -9,6 +9,8 @@ enum class ShaderFileType {
     Compute,
     RTRaygen,
     RTClosestHit,
+    RTAnyHit,
+    RTIntersection,
     RTMiss,
 };
 

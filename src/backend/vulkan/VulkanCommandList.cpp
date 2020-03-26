@@ -352,12 +352,25 @@ void VulkanCommandList::traceRays(Extent2D extent)
     }
 
     auto& rtStateInfo = m_backend.rayTracingStateInfo(*activeRayTracingState);
-    VkDeviceSize bindingStride = m_backend.m_rtx->properties().shaderGroupHandleSize;
+    VkBuffer sbtBuffer = rtStateInfo.sbtBuffer;
+
+    VkDeviceSize shaderGroupHandleSize = m_backend.m_rtx->properties().shaderGroupHandleSize;
+
+    VkDeviceSize raygenOffset = 0; // we always start with raygen
+    VkDeviceSize raygenStride = shaderGroupHandleSize; // since we have no data => TODO!
+    size_t numRaygenShaders = 1; // for now, always just one
+
+    VkDeviceSize hitGroupOffset = raygenOffset + (numRaygenShaders * raygenStride);
+    VkDeviceSize hitGroupStride = shaderGroupHandleSize; // since we have no data and a single shader for now => TODO! ALSO CONSIDER IF THIS SHOULD SIMPLY BE PASSED IN TO HERE?!
+    size_t numHitGroups = 1; // for now, but not for very long => TODO!
+
+    VkDeviceSize missOffset = hitGroupOffset + (numHitGroups * hitGroupStride);
+    VkDeviceSize missStride = shaderGroupHandleSize; // since we have no data => TODO!
 
     m_backend.m_rtx->vkCmdTraceRaysNV(m_commandBuffer,
-                                      rtStateInfo.sbtBuffer, rtStateInfo.sbtRaygenIdx * bindingStride,
-                                      rtStateInfo.sbtBuffer, rtStateInfo.sbtMissIdx * bindingStride, bindingStride,
-                                      rtStateInfo.sbtBuffer, rtStateInfo.sbtClosestHitIdx * bindingStride, bindingStride,
+                                      sbtBuffer, raygenOffset,
+                                      sbtBuffer, missOffset, missStride,
+                                      sbtBuffer, hitGroupOffset, hitGroupStride,
                                       VK_NULL_HANDLE, 0, 0,
                                       extent.width(), extent.height(), 1);
 }

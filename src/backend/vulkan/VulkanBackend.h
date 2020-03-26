@@ -247,10 +247,6 @@ private:
         VkBuffer sbtBuffer {};
         VmaAllocation sbtBufferAllocation {};
 
-        size_t sbtRaygenIdx;
-        size_t sbtMissIdx;
-        size_t sbtClosestHitIdx;
-
         std::vector<const Texture*> sampledTextures {};
         std::vector<const Texture*> storageImages {};
     };

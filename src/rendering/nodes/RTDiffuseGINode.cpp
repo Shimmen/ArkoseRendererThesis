@@ -80,11 +80,6 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     const Texture* gBufferDepth = reg.getTexture(ForwardRenderNode::name(), "depth");
     ASSERT(gBufferColor && gBufferNormal && gBufferDepth);
 
-    ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen", ShaderFileType::RTRaygen);
-    ShaderFile miss = ShaderFile("rt-diffuseGI/miss.rmiss", ShaderFileType::RTMiss);
-    ShaderFile shadowMiss = ShaderFile("rt-diffuseGI/shadow.rmiss", ShaderFileType::RTMiss);
-    ShaderFile closestHit = ShaderFile("rt-diffuseGI/closestHit.rchit", ShaderFileType::RTClosestHit);
-
     constexpr size_t numSphereSamples = 23 * 256;
     constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4); // TODO: There are still problems with using GpuOptimal.. Not sure why.
     Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
@@ -101,8 +96,14 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
                                                          { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") },
                                                          { 9, ShaderStageRTRayGen, &sphereSampleBuffer, ShaderBindingType::StorageBuffer } });
 
+    ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen", ShaderFileType::RTRaygen);
+    HitGroup mainHitGroup { ShaderFile("rt-diffuseGI/closestHit.rchit", ShaderFileType::RTClosestHit) };
+    std::vector<ShaderFile> missShaders { ShaderFile("rt-diffuseGI/miss.rmiss", ShaderFileType::RTMiss),
+                                          ShaderFile("rt-diffuseGI/shadow.rmiss", ShaderFileType::RTMiss) };
+    ShaderBindingTable sbt { raygen, { mainHitGroup }, missShaders };
+
     uint32_t maxRecursionDepth = 2;
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, shadowMiss, closestHit }, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
+    RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
 
     Texture& diffuseGI = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
     reg.publish("diffuseGI", diffuseGI);
