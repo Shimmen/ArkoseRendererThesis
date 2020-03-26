@@ -1,8 +1,8 @@
 #include "Scene.h"
 
-#include "FileIO.h"
-#include "GltfModel.h"
-#include "Logging.h"
+#include "utility/FileIO.h"
+#include "utility/Logging.h"
+#include "utility/models/GltfModel.h"
 #include <fstream>
 #include <imgui.h>
 #include <json.hpp>
@@ -29,36 +29,46 @@ std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
     auto scene = std::make_unique<Scene>(path);
 
     auto jsonEnv = jsonScene.at("environment");
-    jsonEnv.at("texture").get_to(scene->m_environmentMap);
-    jsonEnv.at("multiplier").get_to(scene->m_environmentMultiplier);
+    scene->m_environmentMap = jsonEnv.at("texture");
+    scene->m_environmentMultiplier = jsonEnv.at("multiplier");
 
     for (auto& jsonModel : jsonScene.at("models")) {
-        std::string modelGltf;
-        jsonModel.at("gltf").get_to(modelGltf);
-        Model* model = scene->addModel(GltfModel::load(modelGltf));
+        std::string modelGltf = jsonModel.at("gltf");
+
+        auto model = GltfModel::load(modelGltf);
+        if (!model) {
+            continue;
+        }
+
+        if (jsonModel.find("proxy") != jsonModel.end()) {
+            std::string proxyGltf = jsonModel.at("proxy");
+            auto proxy = GltfModel::load(proxyGltf);
+            if (proxy) {
+                model->setProxy(std::move(proxy));
+            }
+        }
 
         auto transform = jsonModel.at("transform");
 
-        std::vector<float> translation;
-        transform.at("translation").get_to(translation);
-
-        std::vector<float> scale;
-        transform.at("scale").get_to(scale);
+        std::vector<float> translation = transform.at("translation");
+        std::vector<float> scale = transform.at("scale");
 
         mat4 rotationMatrix;
         auto jsonRotation = transform.at("rotation");
         std::string rotType = jsonRotation.at("type");
         if (rotType == "axis-angle") {
-            std::vector<float> axis;
-            jsonRotation.at("axis").get_to(axis);
-            float angle;
-            jsonRotation.at("angle").get_to(angle);
+            float angle = jsonRotation.at("angle");
+            std::vector<float> axis = jsonRotation.at("axis");
             rotationMatrix = mathkit::axisAngleMatrix({ axis[0], axis[1], axis[2] }, angle);
+        } else {
+            ASSERT_NOT_REACHED();
         }
 
         mat4 localMatrix = mathkit::translate(translation[0], translation[1], translation[2])
             * rotationMatrix * mathkit::scale(scale[0], scale[1], scale[2]);
         model->transform().setLocalMatrix(localMatrix);
+
+        scene->addModel(std::move(model));
     }
 
     for (auto& jsonLight : jsonScene.at("lights")) {
@@ -70,13 +80,13 @@ std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
         jsonLight.at("color").get_to(color);
         sun.color = { color[0], color[1], color[2] };
 
-        jsonLight.at("intensity").get_to(sun.intensity);
+        sun.intensity = jsonLight.at("intensity");
 
         float dir[3];
         jsonLight.at("direction").get_to(dir);
         sun.direction = normalize(vec3(dir[0], dir[1], dir[2]));
 
-        jsonLight.at("worldExtent").get_to(sun.worldExtent);
+        sun.worldExtent = jsonLight.at("worldExtent");
 
         int mapSize[2];
         jsonLight.at("shadowMapSize").get_to(mapSize);
@@ -160,8 +170,11 @@ Scene::~Scene()
 
 Model* Scene::addModel(std::unique_ptr<Model> model)
 {
-    m_models.push_back(std::move(model));
-    return m_models.back().get();
+    if (model) {
+        m_models.push_back(std::move(model));
+        return m_models.back().get();
+    }
+    return nullptr;
 }
 
 size_t Scene::modelCount() const

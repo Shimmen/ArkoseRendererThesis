@@ -1,7 +1,7 @@
 #pragma once
 
-#include "FpsCamera.h"
-#include "mathkit.h"
+#include "utility/FpsCamera.h"
+#include "utility/mathkit.h"
 #include <functional>
 
 class Material {
@@ -103,9 +103,13 @@ public:
     Transform& transform() { return m_transform; }
     const Transform& transform() const { return m_transform; }
 
-    virtual const Mesh* operator[](size_t index) const = 0;
     virtual void forEachMesh(std::function<void(const Mesh&)>) const = 0;
+
+    bool hasProxy() { return m_proxy != nullptr; }
+    void setProxy(std::unique_ptr<Model> proxy) { m_proxy = std::move(proxy); }
+    const Model& proxy() { return *m_proxy; }
 
 private:
     Transform m_transform {};
+    std::unique_ptr<Model> m_proxy {};
 };

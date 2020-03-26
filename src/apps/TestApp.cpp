@@ -10,13 +10,14 @@
 #include "rendering/nodes/ShadowMapNode.h"
 #include "rendering/nodes/SlowForwardRenderNode.h"
 #include "utility/GlobalState.h"
-#include "utility/GltfModel.h"
 #include "utility/Input.h"
+#include "utility/models/GltfModel.h"
 #include <imgui.h>
 
 void TestApp::setup(RenderGraph& graph)
 {
-    m_scene = Scene::loadFromFile("assets/Scenes/test.json");
+    //m_scene = Scene::loadFromFile("assets/Scenes/test.json");
+    m_scene = Scene::loadFromFile("assets/Scenes/proxy-test.json");
     //m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
 
     graph.addNode<SceneUniformNode>(*m_scene);

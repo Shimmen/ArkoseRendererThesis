@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Model.h"
-#include "mathkit.h"
+#include "utility/mathkit.h"
 #include <memory>
 #include <string>
 
