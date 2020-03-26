@@ -2,6 +2,7 @@
 
 #include "RTAccelerationStructures.h"
 #include "SceneUniformNode.h"
+#include <imgui.h>
 
 RTFirstHitNode::RTFirstHitNode(const Scene& scene)
     : RenderGraphNode(RTFirstHitNode::name())
@@ -79,21 +80,40 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
 
     BindingSet& environmentBindingSet = reg.createBindingSet({ { 0, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") } });
 
-    const TopLevelAS& tlas = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "scene");
-    BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
-                                                         { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
-                                                         { 2, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
-                                                         { 3, ShaderStageRTMiss, &timeBuffer } });
+    auto createStateForTLAS = [&](const TopLevelAS& tlas) -> std::pair<BindingSet&, RayTracingState&> {
+        BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
+                                                             { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
+                                                             { 2, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
+                                                             { 3, ShaderStageRTMiss, &timeBuffer } });
 
-    uint32_t maxRecursionDepth = 1;
-    RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);
+        uint32_t maxRecursionDepth = 1;
+        RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);
+
+        return { frameBindingSet, rtState };
+    };
+
+    const TopLevelAS& mainTLAS = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "scene");
+    auto& [frameBindingSet, rtState] = createStateForTLAS(mainTLAS);
+
+    const TopLevelAS& proxyTLAS = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "proxy");
+    auto& [frameBindingSetProxy, rtStateProxy] = createStateForTLAS(proxyTLAS);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        cmdList.setRayTracingState(rtState);
+        static bool useProxies = false;
+        if (ImGui::CollapsingHeader("RT first-hit")) {
+            ImGui::Checkbox("Use proxies", &useProxies);
+        }
+
+        if (useProxies) {
+            cmdList.setRayTracingState(rtStateProxy);
+            cmdList.bindSet(frameBindingSetProxy, 0);
+        } else {
+            cmdList.setRayTracingState(rtState);
+            cmdList.bindSet(frameBindingSet, 0);
+        }
 
         float time = appState.elapsedTime();
         cmdList.updateBufferImmediately(timeBuffer, &time, sizeof(time));
-        cmdList.bindSet(frameBindingSet, 0);
 
         cmdList.bindSet(*m_objectDataBindingSet, 1);
         cmdList.bindSet(environmentBindingSet, 2);

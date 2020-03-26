@@ -23,7 +23,7 @@ void TestApp::setup(RenderGraph& graph)
     graph.addNode<SceneUniformNode>(*m_scene);
     graph.addNode<ShadowMapNode>(*m_scene);
     graph.addNode<RTAccelerationStructures>(*m_scene);
-    //graph.addNode<RTFirstHitNode>(*m_scene);
+    graph.addNode<RTFirstHitNode>(*m_scene);
     graph.addNode<SlowForwardRenderNode>(*m_scene);
     //graph.addNode<RTReflectionsNode>(*m_scene);
     graph.addNode<RTDiffuseGINode>(*m_scene);
