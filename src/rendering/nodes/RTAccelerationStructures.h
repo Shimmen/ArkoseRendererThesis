@@ -14,6 +14,12 @@ public:
     ExecuteCallback constructFrame(Registry&) const override;
 
 private:
+    RTGeometry createGeometryForTriangleMesh(const Mesh&, Registry&) const;
+    RTGeometryInstance createGeometryInstance(const RTGeometry&, const Transform&, Registry&) const;
+
+private:
     const Scene& m_scene;
-    std::vector<RTGeometryInstance> m_instances {};
+
+    std::vector<RTGeometryInstance> m_mainInstances {};
+    std::vector<RTGeometryInstance> m_proxyInstances {};
 };

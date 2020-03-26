@@ -102,6 +102,11 @@ GltfModel::GltfModel(std::string path, const tinygltf::Model& model)
     }
 }
 
+bool GltfModel::hasMeshes() const
+{
+    return !m_meshes.empty();
+}
+
 void GltfModel::forEachMesh(std::function<void(const Mesh&)> callback) const
 {
     for (const Mesh& mesh : m_meshes) {

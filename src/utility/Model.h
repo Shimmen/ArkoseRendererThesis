@@ -103,11 +103,12 @@ public:
     Transform& transform() { return m_transform; }
     const Transform& transform() const { return m_transform; }
 
+    virtual bool hasMeshes() const = 0;
     virtual void forEachMesh(std::function<void(const Mesh&)>) const = 0;
 
-    bool hasProxy() { return m_proxy != nullptr; }
-    void setProxy(std::unique_ptr<Model> proxy) { m_proxy = std::move(proxy); }
-    const Model& proxy() { return *m_proxy; }
+    bool hasProxy() const;
+    const Model& proxy() const;
+    void setProxy(std::unique_ptr<Model>);
 
 private:
     Transform m_transform {};

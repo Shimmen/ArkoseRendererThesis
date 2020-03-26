@@ -29,6 +29,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/RTDiffuseGINode.cpp
         src/utility/GlobalState.cpp
         src/utility/models/GltfModel.cpp
+        src/utility/Model.cpp
         src/utility/Scene.cpp
         src/utility/FpsCamera.cpp
         src/utility/Input.cpp

@@ -19,8 +19,8 @@
     },
     {
       "name": "bunny",
-      "gltf": "assets/Bunny/Bunny.gltf",
-      "proxy":  "assets/Bunny/BunnyLowres.gltf",
+      "gltf": "assets/Bunny/bunny.gltf",
+      "proxy":  "assets/Bunny/bunny_lowres.gltf",
       "transform": {
         "translation": [ 1, 0, 0 ],
         "rotation": {
