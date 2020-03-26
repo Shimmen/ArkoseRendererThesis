@@ -2,6 +2,7 @@
 
 #include "rendering/nodes/FinalPostFxNode.h"
 #include "rendering/nodes/ForwardRenderNode.h"
+#include "rendering/nodes/RTAccelerationStructures.h"
 #include "rendering/nodes/RTDiffuseGINode.h"
 #include "rendering/nodes/RTFirstHitNode.h"
 #include "rendering/nodes/RTReflectionsNode.h"
@@ -15,11 +16,12 @@
 
 void TestApp::setup(RenderGraph& graph)
 {
-    //m_scene = Scene::loadFromFile("assets/Scenes/test.json");
-    m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
+    m_scene = Scene::loadFromFile("assets/Scenes/test.json");
+    //m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
 
     graph.addNode<SceneUniformNode>(*m_scene);
     graph.addNode<ShadowMapNode>(*m_scene);
+    graph.addNode<RTAccelerationStructures>(*m_scene);
     //graph.addNode<RTFirstHitNode>(*m_scene);
     graph.addNode<SlowForwardRenderNode>(*m_scene);
     //graph.addNode<RTReflectionsNode>(*m_scene);

@@ -1,5 +1,6 @@
 #include "RTFirstHitNode.h"
 
+#include "RTAccelerationStructures.h"
 #include "SceneUniformNode.h"
 
 RTFirstHitNode::RTFirstHitNode(const Scene& scene)
@@ -15,8 +16,6 @@ std::string RTFirstHitNode::name()
 
 void RTFirstHitNode::constructNode(Registry& nodeReg)
 {
-    m_instances.clear();
-
     std::vector<const Buffer*> vertexBuffers {};
     std::vector<const Buffer*> indexBuffers {};
     std::vector<RTMesh> rtMeshes {};
@@ -51,24 +50,12 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
             size_t texIndex = allTextures.size();
             allTextures.push_back(baseColorTexture);
 
-            rtMeshes.push_back({ .objectId = (int)m_instances.size(),
+            rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
                                  .baseColor = (int)texIndex });
 
             // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
             vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
             indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-
-            RTGeometry geometry { .vertexBuffer = nodeReg.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                                  .vertexFormat = VertexFormat::XYZ32F,
-                                  .vertexStride = sizeof(RTVertex),
-                                  .indexBuffer = nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
-                                  .indexType = mesh.indexType(),
-                                  .transform = mesh.transform().localMatrix() };
-
-            // TODO: Later we probably want to keep all meshes of a model in a single BLAS, but that requires some fancy SBT stuff which I don't wanna mess with now.
-            BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure({ geometry });
-            m_instances.push_back({ .blas = blas,
-                                    .transform = model.transform() });
         });
     });
 
@@ -92,7 +79,7 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
 
     BindingSet& environmentBindingSet = reg.createBindingSet({ { 0, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") } });
 
-    TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
+    const TopLevelAS& tlas = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "scene");
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStageRTRayGen, &tlas },
                                                          { 1, ShaderStageRTRayGen, &storageImage, ShaderBindingType::StorageImage },
                                                          { 2, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
@@ -102,7 +89,6 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
     RayTracingState& rtState = reg.createRayTracingState({ raygen, miss, closestHit }, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
 
         float time = appState.elapsedTime();

@@ -41,9 +41,11 @@ public:
 
     void publish(const std::string& name, const Buffer&);
     void publish(const std::string& name, const Texture&);
+    void publish(const std::string& name, const TopLevelAS&);
 
     [[nodiscard]] const Texture* getTexture(const std::string& renderPass, const std::string& name);
     [[nodiscard]] const Buffer* getBuffer(const std::string& renderPass, const std::string& name);
+    [[nodiscard]] const TopLevelAS* getTopLevelAccelerationStructure(const std::string& renderPass, const std::string& name);
 
     [[nodiscard]] const std::unordered_set<NodeDependency>& nodeDependencies() const;
 
@@ -72,6 +74,7 @@ private:
 
     std::unordered_map<std::string, const Buffer*> m_nameBufferMap;
     std::unordered_map<std::string, const Texture*> m_nameTextureMap;
+    std::unordered_map<std::string, const TopLevelAS*> m_nameTopLevelASMap;
 
     std::vector<BufferUpdate> m_immediateBufferUpdates;
     std::vector<TextureUpdate> m_immediateTextureUpdates;

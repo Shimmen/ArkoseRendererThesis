@@ -25,6 +25,5 @@ private:
     mutable std::mt19937_64 m_randomGenerator;
     mutable std::uniform_real_distribution<float> m_bilateral { -1.0f, +1.0f };
 
-    std::vector<RTGeometryInstance> m_instances {};
     BindingSet* m_objectDataBindingSet {};
 };

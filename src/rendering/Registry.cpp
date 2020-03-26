@@ -176,6 +176,15 @@ void Registry::publish(const std::string& name, const Texture& texture)
     m_nameTextureMap[fullName] = &texture;
 }
 
+void Registry::publish(const std::string& name, const TopLevelAS& tlas)
+{
+    ASSERT(m_currentNodeName.has_value());
+    std::string fullName = makeQualifiedName(m_currentNodeName.value(), name);
+    auto entry = m_nameTopLevelASMap.find(fullName);
+    ASSERT(entry == m_nameTopLevelASMap.end());
+    m_nameTopLevelASMap[fullName] = &tlas;
+}
+
 const Texture* Registry::getTexture(const std::string& renderPass, const std::string& name)
 {
     std::string fullName = makeQualifiedName(renderPass, name);
@@ -208,6 +217,23 @@ const Buffer* Registry::getBuffer(const std::string& renderPass, const std::stri
 
     const Buffer* buffer = entry->second;
     return buffer;
+}
+
+const TopLevelAS* Registry::getTopLevelAccelerationStructure(const std::string& renderPass, const std::string& name)
+{
+    std::string fullName = makeQualifiedName(renderPass, name);
+    auto entry = m_nameTopLevelASMap.find(fullName);
+
+    if (entry == m_nameTopLevelASMap.end()) {
+        return nullptr;
+    }
+
+    ASSERT(m_currentNodeName.has_value());
+    NodeDependency dependency { m_currentNodeName.value(), renderPass };
+    m_nodeDependencies.insert(dependency);
+
+    const TopLevelAS* tlas = entry->second;
+    return tlas;
 }
 
 const std::unordered_set<NodeDependency>& Registry::nodeDependencies() const

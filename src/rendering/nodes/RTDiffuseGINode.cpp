@@ -2,6 +2,7 @@
 
 #include "ForwardRenderNode.h"
 #include "LightData.h"
+#include "RTAccelerationStructures.h"
 #include "SceneUniformNode.h"
 #include "utility/GlobalState.h"
 #include <imgui.h>
@@ -19,8 +20,6 @@ std::string RTDiffuseGINode::name()
 
 void RTDiffuseGINode::constructNode(Registry& nodeReg)
 {
-    m_instances.clear();
-
     std::vector<const Buffer*> vertexBuffers {};
     std::vector<const Buffer*> indexBuffers {};
     std::vector<RTMesh> rtMeshes {};
@@ -55,24 +54,12 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
             size_t texIndex = allTextures.size();
             allTextures.push_back(baseColorTexture);
 
-            rtMeshes.push_back({ .objectId = (int)m_instances.size(),
+            rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
                                  .baseColor = (int)texIndex });
 
             // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
             vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
             indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-
-            RTGeometry geometry { .vertexBuffer = nodeReg.createBuffer(std::move(vertices), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                                  .vertexFormat = VertexFormat::XYZ32F,
-                                  .vertexStride = sizeof(RTVertex),
-                                  .indexBuffer = nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
-                                  .indexType = mesh.indexType(),
-                                  .transform = mesh.transform().localMatrix() };
-
-            // TODO: Later we probably want to keep all meshes of a model in a single BLAS, but that requires some fancy SBT stuff which I don't wanna mess with now.
-            BottomLevelAS& blas = nodeReg.createBottomLevelAccelerationStructure({ geometry });
-            m_instances.push_back({ .blas = blas,
-                                    .transform = model.transform() });
         });
     });
 
@@ -102,7 +89,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4); // TODO: There are still problems with using GpuOptimal.. Not sure why.
     Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
 
-    TopLevelAS& tlas = reg.createTopLevelAccelerationStructure(m_instances);
+    const TopLevelAS& tlas = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "scene");
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
                                                          { 1, ShaderStageRTRayGen, m_accumulationTexture, ShaderBindingType::StorageImage },
                                                          { 2, ShaderStageRTRayGen, gBufferColor, ShaderBindingType::TextureSampler },
@@ -153,7 +140,6 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
         //  and then just index into it & update every once in a while. Or something like that..
         cmdList.updateBufferImmediately(sphereSampleBuffer, sphereSamples.data(), totalSphereSamplesSize);
 
-        cmdList.rebuildTopLevelAcceratationStructure(tlas);
         cmdList.setRayTracingState(rtState);
 
         cmdList.bindSet(frameBindingSet, 0);

@@ -17,7 +17,5 @@ public:
 
 private:
     const Scene& m_scene;
-    std::vector<RTGeometryInstance> m_instances {};
-
     BindingSet* m_objectDataBindingSet {};
 };

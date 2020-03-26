@@ -1,14 +1,12 @@
 #pragma once
 
 #include "../RenderGraphNode.h"
-#include "RTData.h"
-#include "utility/Model.h"
 #include "utility/Scene.h"
 
-class RTFirstHitNode final : public RenderGraphNode {
+class RTAccelerationStructures final : public RenderGraphNode {
 public:
-    explicit RTFirstHitNode(const Scene&);
-    ~RTFirstHitNode() override = default;
+    explicit RTAccelerationStructures(const Scene&);
+    ~RTAccelerationStructures() override = default;
 
     static std::string name();
 
@@ -17,5 +15,5 @@ public:
 
 private:
     const Scene& m_scene;
-    BindingSet* m_objectDataBindingSet {};
+    std::vector<RTGeometryInstance> m_instances {};
 };
