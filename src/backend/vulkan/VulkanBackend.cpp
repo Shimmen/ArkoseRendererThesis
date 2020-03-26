@@ -367,7 +367,7 @@ void VulkanBackend::setupDearImgui()
     ImGui::StyleColorsDark();
 
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    //ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     //
 
