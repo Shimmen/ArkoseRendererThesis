@@ -21,21 +21,21 @@ void RTAccelerationStructures::constructNode(Registry& nodeReg)
     m_scene.forEachModel([&](size_t, const Model& model) {
         model.forEachMesh([&](const Mesh& mesh) {
             RTGeometry geometry = createGeometryForTriangleMesh(mesh, nodeReg);
-            RTGeometryInstance instance = createGeometryInstance(geometry, model.transform(), nodeReg);
+            RTGeometryInstance instance = createGeometryInstance(geometry, model.transform(), HitGroupIndex::Triangle, nodeReg);
             m_mainInstances.push_back(instance);
         });
 
         if (model.proxy().hasMeshes()) {
             model.proxy().forEachMesh([&](const Mesh& proxyMesh) {
                 RTGeometry proxyGeometry = createGeometryForTriangleMesh(proxyMesh, nodeReg);
-                RTGeometryInstance instance = createGeometryInstance(proxyGeometry, model.transform(), nodeReg);
+                RTGeometryInstance instance = createGeometryInstance(proxyGeometry, model.transform(), HitGroupIndex::Triangle, nodeReg);
                 m_proxyInstances.push_back(instance);
             });
         } else {
             const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model);
             if (sphereSetModel) {
                 RTGeometry sphereSetGeometry = createGeometryForSphereSet(*sphereSetModel, nodeReg);
-                RTGeometryInstance instance = createGeometryInstance(sphereSetGeometry, model.transform(), nodeReg);
+                RTGeometryInstance instance = createGeometryInstance(sphereSetGeometry, model.transform(), HitGroupIndex::Sphere, nodeReg);
                 m_proxyInstances.push_back(instance);
             } else {
                 ASSERT_NOT_REACHED();
@@ -87,11 +87,12 @@ RTGeometry RTAccelerationStructures::createGeometryForSphereSet(const SphereSetM
     return geometry;
 }
 
-RTGeometryInstance RTAccelerationStructures::createGeometryInstance(const RTGeometry& geometry, const Transform& transform, Registry& reg) const
+RTGeometryInstance RTAccelerationStructures::createGeometryInstance(const RTGeometry& geometry, const Transform& transform, uint32_t sbtOffset, Registry& reg) const
 {
     // TODO: Later we probably want to keep all meshes of a model in a single BLAS, but that requires some fancy SBT stuff which I don't wanna mess with now.
     BottomLevelAS& blas = reg.createBottomLevelAccelerationStructure({ geometry });
     RTGeometryInstance instance = { .blas = blas,
-                                    .transform = transform };
+                                    .transform = transform,
+                                    .shaderBindingTableOffset = sbtOffset };
     return instance;
 }

@@ -3269,7 +3269,7 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
 
         data.instanceId = instanceIdx;
         data.mask = 0xff;
-        data.instanceOffset = 0;
+        data.instanceOffset = instance.shaderBindingTableOffset;
         data.flags = 0; //VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
 
         instanceData.push_back(data);

@@ -417,6 +417,7 @@ private:
 struct RTGeometryInstance {
     const BottomLevelAS& blas;
     const Transform& transform;
+    uint32_t shaderBindingTableOffset;
 };
 
 class TopLevelAS : public Resource {
