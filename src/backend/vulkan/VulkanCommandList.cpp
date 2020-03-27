@@ -354,18 +354,18 @@ void VulkanCommandList::traceRays(Extent2D extent)
     auto& rtStateInfo = m_backend.rayTracingStateInfo(*activeRayTracingState);
     VkBuffer sbtBuffer = rtStateInfo.sbtBuffer;
 
-    VkDeviceSize shaderGroupHandleSize = m_backend.m_rtx->properties().shaderGroupHandleSize;
+    uint32_t baseAlignment = m_backend.m_rtx->properties().shaderGroupBaseAlignment;
 
-    VkDeviceSize raygenOffset = 0; // we always start with raygen
-    VkDeviceSize raygenStride = shaderGroupHandleSize; // since we have no data => TODO!
+    uint32_t raygenOffset = 0; // we always start with raygen
+    uint32_t raygenStride = baseAlignment; // since we have no data => TODO!
     size_t numRaygenShaders = 1; // for now, always just one
 
-    VkDeviceSize hitGroupOffset = raygenOffset + (numRaygenShaders * raygenStride);
-    VkDeviceSize hitGroupStride = shaderGroupHandleSize; // since we have no data and a single shader for now => TODO! ALSO CONSIDER IF THIS SHOULD SIMPLY BE PASSED IN TO HERE?!
+    uint32_t hitGroupOffset = raygenOffset + (numRaygenShaders * raygenStride);
+    uint32_t hitGroupStride = baseAlignment; // since we have no data and a single shader for now => TODO! ALSO CONSIDER IF THIS SHOULD SIMPLY BE PASSED IN TO HERE?!
     size_t numHitGroups = 1; // for now, but not for very long => TODO!
 
-    VkDeviceSize missOffset = hitGroupOffset + (numHitGroups * hitGroupStride);
-    VkDeviceSize missStride = shaderGroupHandleSize; // since we have no data => TODO!
+    uint32_t missOffset = hitGroupOffset + (numHitGroups * hitGroupStride);
+    uint32_t missStride = baseAlignment; // since we have no data => TODO!
 
     m_backend.m_rtx->vkCmdTraceRaysNV(m_commandBuffer,
                                       sbtBuffer, raygenOffset,

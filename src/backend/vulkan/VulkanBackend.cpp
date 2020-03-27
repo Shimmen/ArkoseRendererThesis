@@ -2634,30 +2634,45 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
     VkBuffer sbtBuffer;
     VmaAllocation sbtBufferAllocation;
     {
-        size_t sbtSize = m_rtx->properties().shaderGroupHandleSize * shaderGroups.size();
-
-        VkBufferCreateInfo scratchBufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-        scratchBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
-        scratchBufferCreateInfo.size = sbtSize;
-
-        if (debugMode) {
-            // for nsight debugging & similar stuff)
-            scratchBufferCreateInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        }
-
-        VmaAllocationCreateInfo scratchAllocCreateInfo = {};
-        scratchAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; // Gpu only is probably perfectly fine, except we need to copy the data using a staging buffer
-
-        if (vmaCreateBuffer(m_memoryAllocator, &scratchBufferCreateInfo, &scratchAllocCreateInfo, &sbtBuffer, &sbtBufferAllocation, nullptr) != VK_SUCCESS) {
-            LogErrorAndExit("Error trying to create buffer for the shader binding table.\n");
-        }
-
-        std::vector<std::byte> shaderGroupHandles { sbtSize };
-        if (m_rtx->vkGetRayTracingShaderGroupHandlesNV(device(), pipeline, 0, shaderGroups.size(), sbtSize, shaderGroupHandles.data()) != VK_SUCCESS) {
+        uint32_t sizeOfSingleHandle = m_rtx->properties().shaderGroupHandleSize;
+        uint32_t sizeOfAllHandles = sizeOfSingleHandle * shaderGroups.size();
+        std::vector<std::byte> shaderGroupHandles { sizeOfAllHandles };
+        if (m_rtx->vkGetRayTracingShaderGroupHandlesNV(device(), pipeline, 0, shaderGroups.size(), sizeOfAllHandles, shaderGroupHandles.data()) != VK_SUCCESS) {
             LogErrorAndExit("Error trying to get shader group handles for the shader binding table.\n");
         }
 
-        if (!setBufferMemoryUsingMapping(sbtBufferAllocation, shaderGroupHandles.data(), sbtSize)) {
+        // TODO: For now we don't have any data, only shader handles, but we still have to consider the alignments & strides
+        uint32_t baseAlignment = m_rtx->properties().shaderGroupBaseAlignment;
+        uint32_t sbtSize = baseAlignment * shaderGroups.size();
+        std::vector<std::byte> sbtData { sbtSize };
+
+        for (size_t i = 0; i < shaderGroups.size(); ++i) {
+
+            uint32_t srcOffset = i * sizeOfSingleHandle;
+            uint32_t dstOffset = i * baseAlignment;
+
+            std::copy(shaderGroupHandles.begin() + srcOffset,
+                      shaderGroupHandles.begin() + srcOffset + sizeOfSingleHandle,
+                      sbtData.begin() + dstOffset);
+        }
+
+        VkBufferCreateInfo sbtBufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+        sbtBufferCreateInfo.usage = VK_BUFFER_USAGE_RAY_TRACING_BIT_NV;
+        sbtBufferCreateInfo.size = sbtSize;
+
+        if (debugMode) {
+            // for nsight debugging & similar stuff)
+            sbtBufferCreateInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        }
+
+        VmaAllocationCreateInfo sbtAllocCreateInfo = {};
+        sbtAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU; // Gpu only is probably perfectly fine, except we need to copy the data using a staging buffer
+
+        if (vmaCreateBuffer(m_memoryAllocator, &sbtBufferCreateInfo, &sbtAllocCreateInfo, &sbtBuffer, &sbtBufferAllocation, nullptr) != VK_SUCCESS) {
+            LogErrorAndExit("Error trying to create buffer for the shader binding table.\n");
+        }
+
+        if (!setBufferMemoryUsingMapping(sbtBufferAllocation, sbtData.data(), sbtSize)) {
             LogErrorAndExit("Error trying to copy data to the shader binding table.\n");
         }
     }
