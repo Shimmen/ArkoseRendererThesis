@@ -23,6 +23,17 @@ using mat3 = glm::mat3;
 using mat4 = glm::mat4;
 using quat = glm::quat;
 
+struct aabb3 {
+    aabb3(vec3 min, vec3 max)
+        : min(min)
+        , max(max)
+    {
+    }
+
+    vec3 min;
+    vec3 max;
+};
+
 namespace mathkit {
 
 #include <glm/gtc/matrix_transform.hpp>

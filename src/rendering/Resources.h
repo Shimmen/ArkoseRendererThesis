@@ -10,6 +10,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 class Backend;
@@ -370,7 +371,7 @@ private:
     std::vector<const BindingSet*> m_bindingSets {};
 };
 
-struct RTGeometry {
+struct RTTriangleGeometry {
     const Buffer& vertexBuffer;
     VertexFormat vertexFormat;
     size_t vertexStride;
@@ -379,6 +380,26 @@ struct RTGeometry {
     IndexType indexType;
 
     mat4 transform;
+};
+
+struct RTAABBGeometry {
+    const Buffer& aabbBuffer;
+    size_t aabbStride;
+};
+
+class RTGeometry {
+public:
+    RTGeometry(RTTriangleGeometry);
+    RTGeometry(RTAABBGeometry);
+
+    bool hasTriangles() const;
+    bool hasAABBs() const;
+
+    const RTTriangleGeometry& triangles() const;
+    const RTAABBGeometry& aabbs() const;
+
+private:
+    std::variant<RTTriangleGeometry, RTAABBGeometry> m_internal;
 };
 
 class BottomLevelAS : public Resource {

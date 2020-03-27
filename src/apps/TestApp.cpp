@@ -12,6 +12,7 @@
 #include "utility/GlobalState.h"
 #include "utility/Input.h"
 #include "utility/models/GltfModel.h"
+#include "utility/models/SphereSetModel.h"
 #include <imgui.h>
 
 void TestApp::setup(RenderGraph& graph)
@@ -19,6 +20,9 @@ void TestApp::setup(RenderGraph& graph)
     //m_scene = Scene::loadFromFile("assets/Scenes/test.json");
     m_scene = Scene::loadFromFile("assets/Scenes/proxy-test.json");
     //m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
+
+    std::vector<SphereSetModel::Sphere> testSpheres { { 0, 0, 0, 1 } };
+    m_scene->addModel(std::make_unique<SphereSetModel>(testSpheres));
 
     graph.addNode<SceneUniformNode>(*m_scene);
     graph.addNode<ShadowMapNode>(*m_scene);

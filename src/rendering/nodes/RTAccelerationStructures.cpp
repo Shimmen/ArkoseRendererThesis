@@ -1,5 +1,7 @@
 #include "RTAccelerationStructures.h"
 
+#include "utility/models/SphereSetModel.h"
+
 RTAccelerationStructures::RTAccelerationStructures(const Scene& scene)
     : RenderGraphNode(RTAccelerationStructures::name())
     , m_scene(scene)
@@ -30,8 +32,14 @@ void RTAccelerationStructures::constructNode(Registry& nodeReg)
                 m_proxyInstances.push_back(instance);
             });
         } else {
-            // TODO: Handle other types of proxies here!
-            ASSERT_NOT_REACHED();
+            const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model);
+            if (sphereSetModel) {
+                RTGeometry sphereSetGeometry = createGeometryForSphereSet(*sphereSetModel, nodeReg);
+                RTGeometryInstance instance = createGeometryInstance(sphereSetGeometry, model.transform(), nodeReg);
+                m_proxyInstances.push_back(instance);
+            } else {
+                ASSERT_NOT_REACHED();
+            }
         }
     });
 }
@@ -52,12 +60,30 @@ RenderGraphNode::ExecuteCallback RTAccelerationStructures::constructFrame(Regist
 
 RTGeometry RTAccelerationStructures::createGeometryForTriangleMesh(const Mesh& mesh, Registry& reg) const
 {
-    RTGeometry geometry { .vertexBuffer = reg.createBuffer(mesh.positionData(), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                          .vertexFormat = VertexFormat::XYZ32F,
-                          .vertexStride = sizeof(vec3),
-                          .indexBuffer = reg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
-                          .indexType = mesh.indexType(),
-                          .transform = mesh.transform().localMatrix() };
+    RTTriangleGeometry geometry { .vertexBuffer = reg.createBuffer(mesh.positionData(), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
+                                  .vertexFormat = VertexFormat::XYZ32F,
+                                  .vertexStride = sizeof(vec3),
+                                  .indexBuffer = reg.createBuffer(mesh.indexData(), Buffer::Usage::Index, Buffer::MemoryHint::GpuOptimal),
+                                  .indexType = mesh.indexType(),
+                                  .transform = mesh.transform().localMatrix() };
+    return geometry;
+}
+
+RTGeometry RTAccelerationStructures::createGeometryForSphereSet(const SphereSetModel& set, Registry& reg) const
+{
+    std::vector<aabb3> aabbData;
+    for (const auto& sphere : set.spheres()) {
+        vec3 center = vec3(sphere);
+        float radius = sphere.w;
+
+        vec3 min = center - vec3(radius);
+        vec3 max = center + vec3(radius);
+
+        aabbData.emplace_back(min, max);
+    }
+
+    RTAABBGeometry geometry { .aabbBuffer = reg.createBuffer(std::move(aabbData), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
+                              .aabbStride = sizeof(aabb3) };
     return geometry;
 }
 

@@ -382,6 +382,36 @@ const std::vector<const BindingSet*>& RenderStateBuilder::bindingSets() const
     return m_bindingSets;
 }
 
+RTGeometry::RTGeometry(RTTriangleGeometry triangles)
+    : m_internal(triangles)
+{
+}
+
+RTGeometry::RTGeometry(RTAABBGeometry aabbs)
+    : m_internal(aabbs)
+{
+}
+
+bool RTGeometry::hasTriangles() const
+{
+    return std::holds_alternative<RTTriangleGeometry>(m_internal);
+}
+
+bool RTGeometry::hasAABBs() const
+{
+    return std::holds_alternative<RTAABBGeometry>(m_internal);
+}
+
+const RTTriangleGeometry& RTGeometry::triangles() const
+{
+    return std::get<RTTriangleGeometry>(m_internal);
+}
+
+const RTAABBGeometry& RTGeometry::aabbs() const
+{
+    return std::get<RTAABBGeometry>(m_internal);
+}
+
 BottomLevelAS::BottomLevelAS(Badge<Registry>, std::vector<RTGeometry> geometries)
     : m_geometries(geometries)
 {

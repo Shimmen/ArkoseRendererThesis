@@ -2170,13 +2170,19 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
         LogErrorAndExit("Trying to create a bottom level acceleration structure, but there is no ray tracing support!\n");
     }
 
+    // All geometries in a BLAS must have the same type (i.e. AABB/triangles)
+    bool isTriangleBLAS = blas.geometries().front().hasTriangles();
+    for (size_t i = 1; i < blas.geometries().size(); ++i) {
+        ASSERT(blas.geometries()[i].hasTriangles() == isTriangleBLAS);
+    }
+
     VkBuffer transformBuffer;
     VmaAllocation transformBufferAllocation;
     size_t singleTransformSize = 3 * 4 * sizeof(float);
-    {
+    if (isTriangleBLAS) {
         std::vector<glm::mat3x4> transforms {};
         for (auto& geo : blas.geometries()) {
-            glm::mat3x4 mat34 = transpose(geo.transform);
+            glm::mat3x4 mat34 = transpose(geo.triangles().transform);
             transforms.push_back(mat34);
         }
 
@@ -2203,44 +2209,71 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
     for (size_t geoIdx = 0; geoIdx < blas.geometries().size(); ++geoIdx) {
         const RTGeometry& geo = blas.geometries()[geoIdx];
 
-        VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
-        aabbs.numAABBs = 0;
+        if (geo.hasTriangles()) {
+            const RTTriangleGeometry& triGeo = geo.triangles();
 
-        VkGeometryTrianglesNV triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
+            VkGeometryTrianglesNV triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
 
-        triangles.vertexData = bufferInfo(geo.vertexBuffer).buffer;
-        triangles.vertexOffset = 0;
-        triangles.vertexStride = geo.vertexStride;
-        triangles.vertexCount = geo.vertexBuffer.size() / triangles.vertexStride;
-        switch (geo.vertexFormat) {
-        case VertexFormat::XYZ32F:
-            triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-            break;
+            triangles.vertexData = bufferInfo(triGeo.vertexBuffer).buffer;
+            triangles.vertexOffset = 0;
+            triangles.vertexStride = triGeo.vertexStride;
+            triangles.vertexCount = triGeo.vertexBuffer.size() / triangles.vertexStride;
+            switch (triGeo.vertexFormat) {
+            case VertexFormat::XYZ32F:
+                triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+                break;
+            }
+
+            triangles.indexData = bufferInfo(triGeo.indexBuffer).buffer;
+            triangles.indexOffset = 0;
+            switch (triGeo.indexType) {
+            case IndexType::UInt16:
+                triangles.indexType = VK_INDEX_TYPE_UINT16;
+                triangles.indexCount = triGeo.indexBuffer.size() / sizeof(uint16_t);
+                break;
+            case IndexType::UInt32:
+                triangles.indexType = VK_INDEX_TYPE_UINT32;
+                triangles.indexCount = triGeo.indexBuffer.size() / sizeof(uint32_t);
+                break;
+            }
+
+            triangles.transformData = transformBuffer;
+            triangles.transformOffset = geoIdx * singleTransformSize;
+
+            VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
+            geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV; // "indicates that this geometry does not invoke the any-hit shaders even if present in a hit group."
+
+            geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
+            geometry.geometry.triangles = triangles;
+
+            VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
+            aabbs.numAABBs = 0;
+            geometry.geometry.aabbs = aabbs;
+
+            geometries.push_back(geometry);
         }
 
-        triangles.indexData = bufferInfo(geo.indexBuffer).buffer;
-        triangles.indexOffset = 0;
-        switch (geo.indexType) {
-        case IndexType::UInt16:
-            triangles.indexType = VK_INDEX_TYPE_UINT16;
-            triangles.indexCount = geo.indexBuffer.size() / sizeof(uint16_t);
-            break;
-        case IndexType::UInt32:
-            triangles.indexType = VK_INDEX_TYPE_UINT32;
-            triangles.indexCount = geo.indexBuffer.size() / sizeof(uint32_t);
-            break;
+        else if (geo.hasAABBs()) {
+            const RTAABBGeometry& aabbGeo = geo.aabbs();
+
+            VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
+            aabbs.offset = 0;
+            aabbs.aabbData = bufferInfo(aabbGeo.aabbBuffer).buffer;
+            aabbs.numAABBs = aabbGeo.aabbBuffer.size() / aabbGeo.aabbStride;
+
+            VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
+            geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV; // "indicates that this geometry does not invoke the any-hit shaders even if present in a hit group."
+
+            geometry.geometryType = VK_GEOMETRY_TYPE_AABBS_NV;
+            geometry.geometry.aabbs = aabbs;
+
+            VkGeometryTrianglesNV triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
+            triangles.vertexCount = 0;
+            triangles.indexCount = 0;
+            geometry.geometry.triangles = triangles;
+
+            geometries.push_back(geometry);
         }
-
-        triangles.transformData = transformBuffer;
-        triangles.transformOffset = geoIdx * singleTransformSize;
-
-        VkGeometryNV geometry { VK_STRUCTURE_TYPE_GEOMETRY_NV };
-        geometry.flags = VK_GEOMETRY_OPAQUE_BIT_NV; // "indicates that this geometry does not invoke the any-hit shaders even if present in a hit group."
-        geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
-        geometry.geometry.triangles = triangles;
-        geometry.geometry.aabbs = aabbs;
-
-        geometries.push_back(geometry);
     }
 
     VkAccelerationStructureInfoNV accelerationStructureInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
@@ -2308,8 +2341,10 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
     info.memory = memory;
     info.handle = handle;
 
-    // (should persist for the lifetime of this BLAS)
-    info.associatedBuffers.push_back({ transformBuffer, transformBufferAllocation });
+    if (isTriangleBLAS) {
+        // (should persist for the lifetime of this BLAS)
+        info.associatedBuffers.push_back({ transformBuffer, transformBufferAllocation });
+    }
 
     size_t index = m_accStructInfos.add(info);
     blas.registerBackend(backendBadge(), index);

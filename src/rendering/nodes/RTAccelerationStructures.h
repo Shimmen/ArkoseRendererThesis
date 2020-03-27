@@ -3,6 +3,8 @@
 #include "../RenderGraphNode.h"
 #include "utility/Scene.h"
 
+class SphereSetModel;
+
 class RTAccelerationStructures final : public RenderGraphNode {
 public:
     explicit RTAccelerationStructures(const Scene&);
@@ -15,6 +17,8 @@ public:
 
 private:
     RTGeometry createGeometryForTriangleMesh(const Mesh&, Registry&) const;
+    RTGeometry createGeometryForSphereSet(const SphereSetModel&, Registry&) const;
+
     RTGeometryInstance createGeometryInstance(const RTGeometry&, const Transform&, Registry&) const;
 
 private:
