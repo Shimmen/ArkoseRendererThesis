@@ -15,9 +15,9 @@ layout(binding = 3, set = 1) uniform sampler2D baseColorSamplers[RT_MAX_TEXTURES
 
 void unpack(out RTMesh mesh, out RTVertex v0, out RTVertex v1, out RTVertex v2)
 {
-	mesh = meshes[gl_InstanceID];
+	mesh = meshes[gl_InstanceCustomIndexNV];
 	uint objId = mesh.objectId;
-	
+
 	ivec3 idx = ivec3(indices[objId].idx[3 * gl_PrimitiveID + 0],
 					  indices[objId].idx[3 * gl_PrimitiveID + 1],
 					  indices[objId].idx[3 * gl_PrimitiveID + 2]);
