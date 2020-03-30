@@ -8,13 +8,13 @@
       "name": "cornell-box",
       "gltf": "assets/CornellBox/CornellBoxEmpty.gltf",
       "transform": {
-        "translation": [ 0, 0, 0 ],
+        "translation": [ 0, -10, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
           "angle": 0.3
         },
-        "scale": [ 6, 6, 6 ]
+        "scale": [ 60, 60, 60 ]
       }
     }
   ],

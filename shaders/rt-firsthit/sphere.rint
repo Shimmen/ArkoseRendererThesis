@@ -46,19 +46,13 @@ void main()
 {
 	RTSphere sphere = sets[gl_InstanceCustomIndexNV].spheres[gl_PrimitiveID];
 
-	vec3 aabbMin = vec3(sphere.aabbMinX, sphere.aabbMinY, sphere.aabbMinZ);
-	vec3 aabbMax = vec3(sphere.aabbMaxX, sphere.aabbMaxY, sphere.aabbMaxZ);
-
-	vec3 sphereCenter = (aabbMin + aabbMax) / 2.0;
-	float sphereRadius = abs(aabbMax.x - aabbMin.x) / 2.0;
-
 	vec3 rayOrigin = gl_WorldRayOriginNV;
 	vec3 rayDirection = normalize(gl_WorldRayDirectionNV);
 
 	float t;
-	if (raySphereIntersection(sphereCenter, sphereRadius, rayOrigin, rayDirection, t)) {
+	if (raySphereIntersection(sphere.center, sphere.radius, rayOrigin, rayDirection, t)) {
 		vec3 hitPoint = rayOrigin + t * rayDirection;
-		hit.normal = normalize(hitPoint - sphereCenter);
+		hit.normal = normalize(hitPoint - sphere.center);
 		hit.materialIndex = 0; // TODO!
 
 		const uint hitKind = 0u;

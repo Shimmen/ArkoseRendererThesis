@@ -2262,6 +2262,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
 
             VkGeometryAABBNV aabbs { VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV };
             aabbs.offset = 0;
+            aabbs.stride = aabbGeo.aabbStride;
             aabbs.aabbData = bufferInfo(aabbGeo.aabbBuffer).buffer;
             aabbs.numAABBs = aabbGeo.aabbBuffer.size() / aabbGeo.aabbStride;
 

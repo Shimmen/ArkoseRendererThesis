@@ -73,20 +73,11 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                 std::vector<RTSphere> spheresData;
                 for (const auto& sphere : sphereSetModel->spheres()) {
 
-                    vec3 center = vec3(sphere);
-                    float radius = sphere.w;
-                    vec3 min = center - vec3(radius);
-                    vec3 max = center + vec3(radius);
+                    RTSphere rtSphere;
+                    rtSphere.center = vec3(sphere);
+                    rtSphere.radius = sphere.w;
 
-                    RTSphere sphere;
-                    sphere.aabbMinX = min.x;
-                    sphere.aabbMinY = min.y;
-                    sphere.aabbMinZ = min.z;
-                    sphere.aabbMaxX = max.x;
-                    sphere.aabbMaxY = max.y;
-                    sphere.aabbMaxZ = max.z;
-
-                    spheresData.push_back(sphere);
+                    spheresData.push_back(rtSphere);
                 }
                 sphereBuffers.push_back(&nodeReg.createBuffer(std::move(spheresData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
             } else {

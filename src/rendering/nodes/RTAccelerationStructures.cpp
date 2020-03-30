@@ -1,5 +1,6 @@
 #include "RTAccelerationStructures.h"
 
+#include "RTData.h"
 #include "utility/models/SphereSetModel.h"
 
 RTAccelerationStructures::RTAccelerationStructures(const Scene& scene)
@@ -74,22 +75,23 @@ RTGeometry RTAccelerationStructures::createGeometryForTriangleMesh(const Mesh& m
 
 RTGeometry RTAccelerationStructures::createGeometryForSphereSet(const SphereSetModel& set, Registry& reg) const
 {
-    std::vector<aabb3> aabbData;
+    std::vector<RTAABB> aabbData;
     for (const auto& sphere : set.spheres()) {
         vec3 center = vec3(sphere);
         float radius = sphere.w;
 
-        vec3 min = center - vec3(radius);
-        vec3 max = center + vec3(radius);
+        RTAABB sphereAabb;
+        sphereAabb.min = center - vec3(radius);
+        sphereAabb.max = center + vec3(radius);
 
-        aabbData.emplace_back(min, max);
+        aabbData.push_back(sphereAabb);
     }
 
-    constexpr size_t sphereStride = sizeof(aabb3);
-    static_assert(sphereStride % 8 == 0);
+    constexpr size_t aabbStride = sizeof(RTAABB);
+    static_assert(aabbStride % 8 == 0);
 
     RTAABBGeometry geometry { .aabbBuffer = reg.createBuffer(std::move(aabbData), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                              .aabbStride = sphereStride };
+                              .aabbStride = aabbStride };
     return geometry;
 }
 

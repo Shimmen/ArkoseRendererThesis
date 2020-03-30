@@ -10,14 +10,14 @@ struct RTMesh {
     //int pad0, pad1;
 };
 
+struct RTAABB {
+	vec3 min;
+	vec3 max;
+};
+
 struct RTSphere {
-	// (RTX forces us to have this type of structure)
-	float aabbMinX;
-	float aabbMinY;
-	float aabbMinZ;
-	float aabbMaxX;
-	float aabbMaxY;
-	float aabbMaxZ;
+	vec3 center;
+	float radius;
 	// TODO: Maybe put some material stuff here?
 };
 
