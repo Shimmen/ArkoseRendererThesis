@@ -44,15 +44,7 @@ bool raySphereIntersection(vec3 center, float radius, vec3 origin, vec3 directio
 
 void main()
 {
-	// TODO: Make sure that gl_InstanceCustomIndexNV counts the first *sphere set* as index 0,
-	// i.e. keep a separate index count for each type of instances.
-
-	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
-	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
-	//RTSphere sphere = sets[gl_InstanceCustomIndexNV].spheres[gl_PrimitiveID];     // TODO // TODO // TODO // TODO // TODO //
-	RTSphere sphere = sets[0].spheres[0];                                           // TODO // TODO // TODO // TODO // TODO //
-	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
-	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
+	RTSphere sphere = sets[gl_InstanceCustomIndexNV].spheres[gl_PrimitiveID];
 
 	vec3 aabbMin = vec3(sphere.aabbMinX, sphere.aabbMinY, sphere.aabbMinZ);
 	vec3 aabbMax = vec3(sphere.aabbMaxX, sphere.aabbMaxY, sphere.aabbMaxZ);

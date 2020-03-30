@@ -3308,7 +3308,7 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
 
         // TODO: We already have gl_InstanceID for this running index, and this sets gl_InstanceCustomIndexNV.
         //  Here we instead want some other type of data. Probably something that can be passed in.
-        data.instanceId = instanceIdx;
+        data.instanceId = instance.customInstanceId;
 
         data.mask = 0xff;
         data.instanceOffset = instance.shaderBindingTableOffset;

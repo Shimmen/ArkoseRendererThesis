@@ -25,43 +25,49 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
     std::vector<const Texture*> allTextures {};
     std::vector<RTMesh> rtMeshes {};
 
+    auto createTriangleMeshVertexBuffer = [&](const Mesh& mesh) {
+        std::vector<RTVertex> vertices {};
+        {
+            auto posData = mesh.positionData();
+            auto normalData = mesh.normalData();
+            auto texCoordData = mesh.texcoordData();
+
+            ASSERT(posData.size() == normalData.size());
+            ASSERT(posData.size() == texCoordData.size());
+
+            for (int i = 0; i < posData.size(); ++i) {
+                vertices.push_back({ .position = vec4(posData[i], 0.0f),
+                                     .normal = vec4(normalData[i], 0.0f),
+                                     .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
+            }
+        }
+
+        const Material& material = mesh.material();
+        Texture* baseColorTexture = material.baseColor.empty()
+            ? &nodeReg.createPixelTexture(material.baseColorFactor, true)
+            : &nodeReg.loadTexture2D(material.baseColor, true, true);
+
+        size_t texIndex = allTextures.size();
+        allTextures.push_back(baseColorTexture);
+
+        rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
+                             .baseColor = (int)texIndex });
+
+        // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
+        vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+        indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+    };
+
     m_scene.forEachModel([&](size_t, const Model& model) {
-        if (model.hasMeshes()) {
-            model.forEachMesh([&](const Mesh& mesh) {
-                std::vector<RTVertex> vertices {};
-                {
-                    auto posData = mesh.positionData();
-                    auto normalData = mesh.normalData();
-                    auto texCoordData = mesh.texcoordData();
-
-                    ASSERT(posData.size() == normalData.size());
-                    ASSERT(posData.size() == texCoordData.size());
-
-                    for (int i = 0; i < posData.size(); ++i) {
-                        vertices.push_back({ .position = vec4(posData[i], 0.0f),
-                                             .normal = vec4(normalData[i], 0.0f),
-                                             .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
-                    }
-                }
-
-                const Material& material = mesh.material();
-                Texture* baseColorTexture = material.baseColor.empty()
-                    ? &nodeReg.createPixelTexture(material.baseColorFactor, true)
-                    : &nodeReg.loadTexture2D(material.baseColor, true, true);
-
-                size_t texIndex = allTextures.size();
-                allTextures.push_back(baseColorTexture);
-
-                rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
-                                     .baseColor = (int)texIndex });
-
-                // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
-                vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-                indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+        model.forEachMesh([&](const Mesh& mesh) {
+            createTriangleMeshVertexBuffer(mesh);
+        });
+        
+        if (model.proxy().hasMeshes()) {
+            model.proxy().forEachMesh([&](const Mesh& proxyMesh) {
+                createTriangleMeshVertexBuffer(proxyMesh);
             });
-
         } else {
-
             const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model);
             if (sphereSetModel) {
                 std::vector<RTSphere> spheresData;

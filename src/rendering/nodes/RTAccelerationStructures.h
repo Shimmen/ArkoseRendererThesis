@@ -26,7 +26,7 @@ private:
     RTGeometry createGeometryForTriangleMesh(const Mesh&, Registry&) const;
     RTGeometry createGeometryForSphereSet(const SphereSetModel&, Registry&) const;
 
-    RTGeometryInstance createGeometryInstance(const RTGeometry&, const Transform&, uint32_t sbtOffset, Registry&) const;
+    RTGeometryInstance createGeometryInstance(const RTGeometry&, const Transform&, uint32_t customId, uint32_t sbtOffset, Registry&) const;
 
 private:
     const Scene& m_scene;

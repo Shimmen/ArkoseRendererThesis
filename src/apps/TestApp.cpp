@@ -21,7 +21,11 @@ void TestApp::setup(RenderGraph& graph)
     m_scene = Scene::loadFromFile("assets/Scenes/proxy-test.json");
     //m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
 
-    std::vector<SphereSetModel::Sphere> testSpheres { { 0, 5, 0, 2.5 } };
+    std::vector<SphereSetModel::Sphere> testSpheres {
+        { 0, 5.0, 0, 2.5 },
+        { 0, 7.5, 0, 1.5 },
+        { 0, 9.0, 0, 0.5 },
+    };
     m_scene->addModel(std::make_unique<SphereSetModel>(testSpheres));
 
     graph.addNode<SceneUniformNode>(*m_scene);

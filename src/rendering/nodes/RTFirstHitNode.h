@@ -16,6 +16,9 @@ public:
     ExecuteCallback constructFrame(Registry&) const override;
 
 private:
+    Buffer& createTriangleMeshVertexBuffer(const Mesh&) const;
+
+private:
     const Scene& m_scene;
     BindingSet* m_objectDataBindingSet {};
 };
