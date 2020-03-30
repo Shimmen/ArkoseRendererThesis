@@ -362,7 +362,7 @@ void VulkanCommandList::traceRays(Extent2D extent)
 
     uint32_t hitGroupOffset = raygenOffset + (numRaygenShaders * raygenStride);
     uint32_t hitGroupStride = baseAlignment; // since we have no data and a single shader for now => TODO! ALSO CONSIDER IF THIS SHOULD SIMPLY BE PASSED IN TO HERE?!
-    size_t numHitGroups = 1; // for now, but not for very long => TODO!
+    size_t numHitGroups = activeRayTracingState->shaderBindingTable().hitGroups().size();
 
     uint32_t missOffset = hitGroupOffset + (numHitGroups * hitGroupStride);
     uint32_t missStride = baseAlignment; // since we have no data => TODO!

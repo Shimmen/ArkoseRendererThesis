@@ -1571,6 +1571,10 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
                 binding.stageFlags |= VK_SHADER_STAGE_MISS_BIT_NV;
             if (bindingInfo.shaderStage & ShaderStageRTClosestHit)
                 binding.stageFlags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
+            if (bindingInfo.shaderStage & ShaderStageRTAnyHit)
+                binding.stageFlags |= VK_SHADER_STAGE_ANY_HIT_BIT_NV;
+            if (bindingInfo.shaderStage & ShaderStageRTIntersection)
+                binding.stageFlags |= VK_SHADER_STAGE_INTERSECTION_BIT_NV;
 
             ASSERT(binding.stageFlags != 0);
 
@@ -2269,7 +2273,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
 
             VkGeometryTrianglesNV triangles { VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV };
             triangles.vertexCount = 0;
-            triangles.indexCount = 0;
+            //triangles.indexCount = 0;
             geometry.geometry.triangles = triangles;
 
             geometries.push_back(geometry);
@@ -2547,9 +2551,9 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
 
         VkRayTracingShaderGroupCreateInfoNV shaderGroup = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV };
 
-        // TODO: Add support for non-triangle hit groups!
-        shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV;
-        //shaderGroup.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_NV;
+        shaderGroup.type = hitGroup.hasIntersectionShader()
+            ? VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_NV
+            : VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_NV;
 
         shaderGroup.generalShader = VK_SHADER_UNUSED_NV;
         shaderGroup.closestHitShader = VK_SHADER_UNUSED_NV;
@@ -2579,7 +2583,27 @@ void VulkanBackend::newRayTracingState(const RayTracingState& rtState)
         }
 
         ASSERT(!hitGroup.hasAnyHitShader()); // for now!
-        ASSERT(!hitGroup.hasIntersectionShader()); // for now!
+
+        if (hitGroup.hasIntersectionShader()) {
+            VkShaderModuleCreateInfo moduleCreateInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+            const std::vector<uint32_t>& spirv = ShaderManager::instance().spirv(hitGroup.intersection().path());
+            moduleCreateInfo.codeSize = sizeof(uint32_t) * spirv.size();
+            moduleCreateInfo.pCode = spirv.data();
+
+            // FIXME: this module is currently leaked!
+            VkShaderModule shaderModule {};
+            if (vkCreateShaderModule(device(), &moduleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+                LogErrorAndExit("Error trying to create shader module for intersection shader for ray tracing state\n");
+            }
+
+            VkPipelineShaderStageCreateInfo stageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+            stageCreateInfo.stage = VK_SHADER_STAGE_INTERSECTION_BIT_NV;
+            stageCreateInfo.module = shaderModule;
+            stageCreateInfo.pName = "main";
+
+            shaderGroup.intersectionShader = shaderStages.size();
+            shaderStages.push_back(stageCreateInfo);
+        }
 
         shaderGroups.push_back(shaderGroup);
     }
@@ -3282,7 +3306,10 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
         const auto& blasInfo = accelerationStructureInfo(instance.blas);
         data.accelerationStructureHandle = blasInfo.handle;
 
+        // TODO: We already have gl_InstanceID for this running index, and this sets gl_InstanceCustomIndexNV.
+        //  Here we instead want some other type of data. Probably something that can be passed in.
         data.instanceId = instanceIdx;
+
         data.mask = 0xff;
         data.instanceOffset = instance.shaderBindingTableOffset;
         data.flags = 0; //VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
@@ -3343,8 +3370,14 @@ std::pair<std::vector<VkDescriptorSetLayout>, std::optional<VkPushConstantRange>
         case ShaderFileType::RTClosestHit:
             stageFlag = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
             break;
+        case ShaderFileType::RTAnyHit:
+            stageFlag = VK_SHADER_STAGE_ANY_HIT_BIT_NV;
+            break;
         case ShaderFileType::RTMiss:
             stageFlag = VK_SHADER_STAGE_MISS_BIT_NV;
+            break;
+        case ShaderFileType::RTIntersection:
+            stageFlag = VK_SHADER_STAGE_INTERSECTION_BIT_NV;
             break;
         default:
             ASSERT_NOT_REACHED();

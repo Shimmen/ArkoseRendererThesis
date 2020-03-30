@@ -180,6 +180,8 @@ shaderc_shader_kind ShaderManager::shaderKindForPath(const std::string& path) co
         return shaderc_raygen_shader;
     } else if (ext5 == ".comp") {
         return shaderc_compute_shader;
+    } else if (ext5 == ".rint") {
+        return shaderc_intersection_shader;
     }
 
     if (path.length() < 6) {

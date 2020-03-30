@@ -21,7 +21,7 @@ void TestApp::setup(RenderGraph& graph)
     m_scene = Scene::loadFromFile("assets/Scenes/proxy-test.json");
     //m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
 
-    std::vector<SphereSetModel::Sphere> testSpheres { { 0, 0, 0, 1 } };
+    std::vector<SphereSetModel::Sphere> testSpheres { { 0, 5, 0, 2.5 } };
     m_scene->addModel(std::make_unique<SphereSetModel>(testSpheres));
 
     graph.addNode<SceneUniformNode>(*m_scene);
@@ -29,8 +29,8 @@ void TestApp::setup(RenderGraph& graph)
     graph.addNode<RTAccelerationStructures>(*m_scene);
     graph.addNode<RTFirstHitNode>(*m_scene);
     graph.addNode<SlowForwardRenderNode>(*m_scene);
-    //graph.addNode<RTReflectionsNode>(*m_scene);
-    graph.addNode<RTDiffuseGINode>(*m_scene);
+    graph.addNode<RTReflectionsNode>(*m_scene);
+    //graph.addNode<RTDiffuseGINode>(*m_scene);
     graph.addNode<FinalPostFxNode>(*m_scene);
 }
 

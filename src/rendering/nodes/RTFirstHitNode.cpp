@@ -2,6 +2,7 @@
 
 #include "RTAccelerationStructures.h"
 #include "SceneUniformNode.h"
+#include "utility/models/SphereSetModel.h"
 #include <imgui.h>
 
 RTFirstHitNode::RTFirstHitNode(const Scene& scene)
@@ -19,52 +20,81 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
 {
     std::vector<const Buffer*> vertexBuffers {};
     std::vector<const Buffer*> indexBuffers {};
-    std::vector<RTMesh> rtMeshes {};
+    std::vector<const Buffer*> sphereBuffers {};
+
     std::vector<const Texture*> allTextures {};
+    std::vector<RTMesh> rtMeshes {};
 
     m_scene.forEachModel([&](size_t, const Model& model) {
-        model.forEachMesh([&](const Mesh& mesh) {
-            std::vector<RTVertex> vertices {};
-            {
-                auto posData = mesh.positionData();
-                auto normalData = mesh.normalData();
-                auto texCoordData = mesh.texcoordData();
+        if (model.hasMeshes()) {
+            model.forEachMesh([&](const Mesh& mesh) {
+                std::vector<RTVertex> vertices {};
+                {
+                    auto posData = mesh.positionData();
+                    auto normalData = mesh.normalData();
+                    auto texCoordData = mesh.texcoordData();
 
-                ASSERT(posData.size() == normalData.size());
-                ASSERT(posData.size() == texCoordData.size());
+                    ASSERT(posData.size() == normalData.size());
+                    ASSERT(posData.size() == texCoordData.size());
 
-                for (int i = 0; i < posData.size(); ++i) {
-                    vertices.push_back({ .position = vec4(posData[i], 0.0f),
-                                         .normal = vec4(normalData[i], 0.0f),
-                                         .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
+                    for (int i = 0; i < posData.size(); ++i) {
+                        vertices.push_back({ .position = vec4(posData[i], 0.0f),
+                                             .normal = vec4(normalData[i], 0.0f),
+                                             .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
+                    }
                 }
-            }
 
-            const Material& material = mesh.material();
-            Texture* baseColorTexture { nullptr };
-            if (material.baseColor.empty()) {
-                baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, true);
+                const Material& material = mesh.material();
+                Texture* baseColorTexture = material.baseColor.empty()
+                    ? &nodeReg.createPixelTexture(material.baseColorFactor, true)
+                    : &nodeReg.loadTexture2D(material.baseColor, true, true);
+
+                size_t texIndex = allTextures.size();
+                allTextures.push_back(baseColorTexture);
+
+                rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
+                                     .baseColor = (int)texIndex });
+
+                // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
+                vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+                indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+            });
+
+        } else {
+
+            const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model);
+            if (sphereSetModel) {
+                std::vector<RTSphere> spheresData;
+                for (const auto& sphere : sphereSetModel->spheres()) {
+
+                    vec3 center = vec3(sphere);
+                    float radius = sphere.w;
+                    vec3 min = center - vec3(radius);
+                    vec3 max = center + vec3(radius);
+
+                    RTSphere sphere;
+                    sphere.aabbMinX = min.x;
+                    sphere.aabbMinY = min.y;
+                    sphere.aabbMinZ = min.z;
+                    sphere.aabbMaxX = max.x;
+                    sphere.aabbMaxY = max.y;
+                    sphere.aabbMaxZ = max.z;
+
+                    spheresData.push_back(sphere);
+                }
+                sphereBuffers.push_back(&nodeReg.createBuffer(std::move(spheresData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
             } else {
-                baseColorTexture = &nodeReg.loadTexture2D(material.baseColor, true, true);
+                ASSERT_NOT_REACHED();
             }
-
-            size_t texIndex = allTextures.size();
-            allTextures.push_back(baseColorTexture);
-
-            rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
-                                 .baseColor = (int)texIndex });
-
-            // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
-            vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-            indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-        });
+        }
     });
 
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
-                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
+                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
+                                                         { 4, ShaderStageRTIntersection, sphereBuffers } });
 }
 
 RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) const
@@ -72,12 +102,7 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
     Texture& storageImage = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
     reg.publish("image", storageImage);
 
-    ShaderFile raygen = ShaderFile("rt-firsthit/raygen.rgen", ShaderFileType::RTRaygen);
-    ShaderFile miss = ShaderFile("rt-firsthit/miss.rmiss", ShaderFileType::RTMiss);
-    ShaderFile closestHit = ShaderFile("rt-firsthit/closestHit.rchit", ShaderFileType::RTClosestHit);
-
     Buffer& timeBuffer = reg.createBuffer(sizeof(float), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-
     BindingSet& environmentBindingSet = reg.createBindingSet({ { 0, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") } });
 
     auto createStateForTLAS = [&](const TopLevelAS& tlas) -> std::pair<BindingSet&, RayTracingState&> {
@@ -88,8 +113,9 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
 
         ShaderFile raygen = ShaderFile("rt-firsthit/raygen.rgen", ShaderFileType::RTRaygen);
         HitGroup mainHitGroup { ShaderFile("rt-firsthit/closestHit.rchit", ShaderFileType::RTClosestHit) };
+        HitGroup sphereHitGroup { ShaderFile("rt-firsthit/sphere.rchit", ShaderFileType::RTClosestHit), {}, ShaderFile("rt-firsthit/sphere.rint", ShaderFileType::RTIntersection) };
         ShaderFile missShader { ShaderFile("rt-firsthit/miss.rmiss", ShaderFileType::RTMiss) };
-        ShaderBindingTable sbt { raygen, { mainHitGroup }, { missShader } };
+        ShaderBindingTable sbt { raygen, { mainHitGroup, sphereHitGroup }, { missShader } };
 
         uint32_t maxRecursionDepth = 1;
         RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);
@@ -104,7 +130,7 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
     auto& [frameBindingSetProxy, rtStateProxy] = createStateForTLAS(proxyTLAS);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        static bool useProxies = false;
+        static bool useProxies = true;
         if (ImGui::CollapsingHeader("RT first-hit")) {
             ImGui::Checkbox("Use proxies", &useProxies);
         }

@@ -251,6 +251,8 @@ enum ShaderStage : uint8_t {
     ShaderStageRTRayGen = 0x08,
     ShaderStageRTMiss = 0x10,
     ShaderStageRTClosestHit = 0x20,
+    ShaderStageRTAnyHit = 0x40,
+    ShaderStageRTIntersection = 0x80,
 };
 
 enum class ShaderBindingType {

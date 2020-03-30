@@ -16,20 +16,6 @@
         },
         "scale": [ 6, 6, 6 ]
       }
-    },
-    {
-      "name": "bunny",
-      "gltf": "assets/Bunny/bunny.gltf",
-      "proxy":  "assets/Bunny/bunny_lowres.gltf",
-      "transform": {
-        "translation": [ 1, 0, 0 ],
-        "rotation": {
-          "type": "axis-angle",
-          "axis": [ 0, 1, 0 ],
-          "angle": 0.0
-        },
-        "scale": [ 4, 4, 4 ]
-      }
     }
   ],
   "lights": [

@@ -1,0 +1,75 @@
+#version 460
+#extension GL_NV_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_scalar_block_layout : require
+
+#include <shared/RTData.h>
+#include <common.glsl>
+
+layout(set = 1, binding = 4) buffer readonly SphereSets { RTSphere spheres[]; } sets[];
+
+struct SphereHit {
+	vec3 normal;
+	uint materialIndex;
+};
+
+hitAttributeNV SphereHit hit;
+
+bool raySphereIntersection(vec3 center, float radius, vec3 origin, vec3 direction, out float t){
+
+	vec3 relOrigin = origin - center;
+
+	// (quadratic formula)
+	float a = dot(direction, direction);
+	float b = 2.0 * dot(direction, relOrigin);
+	float c = dot(relOrigin, relOrigin) - square(radius);
+
+	float descriminant = b * b - 4.0 * a * c;
+	if (descriminant < 0.0) {
+		return false;
+	}
+
+	t = (-b - sqrt(descriminant)) / (2.0 * a);
+	if (t >= gl_RayTminNV && t <= gl_RayTmaxNV) {
+		return true;
+	}
+
+	t = (-b + sqrt(descriminant)) / (2.0 * a);
+	if (t >= gl_RayTminNV && t <= gl_RayTmaxNV) {
+		return true;
+	}
+
+	return false;
+}
+
+void main()
+{
+	// TODO: Make sure that gl_InstanceCustomIndexNV counts the first *sphere set* as index 0,
+	// i.e. keep a separate index count for each type of instances.
+
+	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
+	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
+	//RTSphere sphere = sets[gl_InstanceCustomIndexNV].spheres[gl_PrimitiveID];     // TODO // TODO // TODO // TODO // TODO //
+	RTSphere sphere = sets[0].spheres[0];                                           // TODO // TODO // TODO // TODO // TODO //
+	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
+	// TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO // TODO //
+
+	vec3 aabbMin = vec3(sphere.aabbMinX, sphere.aabbMinY, sphere.aabbMinZ);
+	vec3 aabbMax = vec3(sphere.aabbMaxX, sphere.aabbMaxY, sphere.aabbMaxZ);
+
+	vec3 sphereCenter = (aabbMin + aabbMax) / 2.0;
+	float sphereRadius = abs(aabbMax.x - aabbMin.x) / 2.0;
+
+	vec3 rayOrigin = gl_WorldRayOriginNV;
+	vec3 rayDirection = normalize(gl_WorldRayDirectionNV);
+
+	float t;
+	if (raySphereIntersection(sphereCenter, sphereRadius, rayOrigin, rayDirection, t)) {
+		vec3 hitPoint = rayOrigin + t * rayDirection;
+		hit.normal = normalize(hitPoint - sphereCenter);
+		hit.materialIndex = 0; // TODO!
+
+		const uint hitKind = 0u;
+		reportIntersectionNV(t, hitKind);
+	}
+}

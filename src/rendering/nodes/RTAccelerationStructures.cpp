@@ -82,8 +82,11 @@ RTGeometry RTAccelerationStructures::createGeometryForSphereSet(const SphereSetM
         aabbData.emplace_back(min, max);
     }
 
+    constexpr size_t sphereStride = sizeof(aabb3);
+    static_assert(sphereStride % 8 == 0);
+
     RTAABBGeometry geometry { .aabbBuffer = reg.createBuffer(std::move(aabbData), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
-                              .aabbStride = sizeof(aabb3) };
+                              .aabbStride = sphereStride };
     return geometry;
 }
 
