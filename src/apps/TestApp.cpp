@@ -61,9 +61,15 @@ void TestApp::update(float elapsedTime, float deltaTime)
     const Input& input = Input::instance();
     m_scene->camera().update(input, GlobalState::get().windowExtent(), deltaTime);
 
-    if (m_boomBox) {
-        mat4 matrix = mathkit::translate(1.4f, 2.4f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(50);
-        m_boomBox->transform().setLocalMatrix(matrix);
+    if (!m_spinningObject) {
+        m_scene->forEachModel([&](size_t, const Model& model) {
+            if (model.name() == "bunny") {
+                m_spinningObject = &const_cast<Model&>(model);
+            }
+        });
+    } else {
+        mat4 matrix = mathkit::translate(1.4f, 2.4f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(8);
+        m_spinningObject->transform().setLocalMatrix(matrix);
     }
 
     float st = 0.4f * elapsedTime;

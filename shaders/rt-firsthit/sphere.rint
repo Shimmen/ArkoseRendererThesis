@@ -49,10 +49,16 @@ void main()
 	vec3 rayOrigin = gl_WorldRayOriginNV;
 	vec3 rayDirection = normalize(gl_WorldRayDirectionNV);
 
+	vec3 sphereCenter = gl_ObjectToWorldNV * vec4(sphere.center, 1.0);
+
+	// TODO: There is probably a faster way of doing this!s
+	vec3 radiiPoint = gl_ObjectToWorldNV * vec4(sphere.center + vec3(sphere.radius, 0.0, 0.0), 1.0);
+	float sphereRadius = distance(radiiPoint, sphereCenter);
+
 	float t;
-	if (raySphereIntersection(sphere.center, sphere.radius, rayOrigin, rayDirection, t)) {
+	if (raySphereIntersection(sphereCenter, sphereRadius, rayOrigin, rayDirection, t)) {
 		vec3 hitPoint = rayOrigin + t * rayDirection;
-		hit.normal = normalize(hitPoint - sphere.center);
+		hit.normal = normalize(hitPoint - sphereCenter);
 		hit.materialIndex = 0; // TODO!
 
 		const uint hitKind = 0u;

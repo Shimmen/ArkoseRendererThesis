@@ -41,6 +41,9 @@ std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
             continue;
         }
 
+        std::string name = jsonModel.at("name");
+        model->setName(name);
+
         if (jsonModel.find("proxy") != jsonModel.end()) {
             std::string proxyPath = jsonModel.at("proxy");
             auto proxy = loadProxy(proxyPath);

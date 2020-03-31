@@ -100,6 +100,9 @@ public:
     Model() = default;
     virtual ~Model() = default;
 
+    const std::string& name() const { return m_name; }
+    void setName(std::string name) { m_name = std::move(name); }
+
     Transform& transform() { return m_transform; }
     const Transform& transform() const { return m_transform; }
 
@@ -111,6 +114,7 @@ public:
     void setProxy(std::unique_ptr<Model>);
 
 private:
+    std::string m_name;
     Transform m_transform {};
     std::unique_ptr<Model> m_proxy {};
 };
