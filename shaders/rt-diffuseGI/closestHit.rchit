@@ -3,9 +3,10 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_scalar_block_layout : require
 
-#include "shared/RTData.h"
-#include "shared/LightData.h"
-#include "brdf.glsl"
+#include <shared/RTData.h>
+#include <shared/LightData.h>
+#include <brdf.glsl>
+#include <lighting.glsl>
 
 layout(location = 0) rayPayloadInNV vec3 hitValue;
 hitAttributeNV vec3 attribs;
@@ -55,18 +56,6 @@ bool hitPointInShadow(vec3 L)
 	return inShadow;
 }
 
-vec3 evaluateDirectionalLight(DirectionalLight light, vec3 baseColor, vec3 N)
-{
-    vec3 lightColor = light.colorAndIntensity.a * light.colorAndIntensity.rgb;
-    vec3 L = -normalize(light.worldSpaceDirection.xyz);
-
-    float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
-    vec3 directLight = lightColor * shadowFactor;
-    float LdotN = max(dot(L, N), 0.0);
-
-    return baseColor * diffuseBRDF() * LdotN * directLight;
-}
-
 void main()
 {
 	RTMesh mesh;
@@ -78,8 +67,11 @@ void main()
 	vec3 N = normalize(v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z);
 	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
 
+	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
+	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
+
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
-	vec3 color = evaluateDirectionalLight(dirLight, baseColor, N);
+	vec3 color = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);
 
 	//hitValue = N * 0.5 + 0.5;
 	//hitValue = vec3(uv, 0.0);

@@ -5,6 +5,7 @@
 #include "RTAccelerationStructures.h"
 #include "SceneUniformNode.h"
 #include "utility/GlobalState.h"
+#include "utility/models/SphereSetModel.h"
 #include <imgui.h>
 
 RTDiffuseGINode::RTDiffuseGINode(const Scene& scene)
@@ -22,8 +23,10 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
 {
     std::vector<const Buffer*> vertexBuffers {};
     std::vector<const Buffer*> indexBuffers {};
-    std::vector<RTMesh> rtMeshes {};
+    std::vector<const Buffer*> sphereBuffers {};
+
     std::vector<const Texture*> allTextures {};
+    std::vector<RTMesh> rtMeshes {};
 
     auto createTriangleMeshVertexBuffer = [&](const Mesh& mesh) {
         std::vector<RTVertex> vertices {};
@@ -70,7 +73,6 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                 createTriangleMeshVertexBuffer(proxyMesh);
             });
         } else {
-            /*
             const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model.proxy());
             if (sphereSetModel) {
                 std::vector<RTSphere> spheresData;
@@ -86,7 +88,6 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
             } else {
                 ASSERT_NOT_REACHED();
             }
-            */
             LogInfo("Ignoring sphere sets in RTDiffuseGINode\n");
         }
     });
@@ -95,7 +96,8 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
-                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES } });
+                                                         { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
+                                                         { 4, ShaderStageRTIntersection, sphereBuffers } });
 
     Extent2D windowExtent = GlobalState::get().windowExtent();
     m_accumulationTexture = &nodeReg.createTexture2D(windowExtent, Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
@@ -112,26 +114,36 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4); // TODO: There are still problems with using GpuOptimal.. Not sure why.
     Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
 
-    const TopLevelAS& tlas = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "scene");
-    BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
-                                                         { 1, ShaderStageRTRayGen, m_accumulationTexture, ShaderBindingType::StorageImage },
-                                                         { 2, ShaderStageRTRayGen, gBufferColor, ShaderBindingType::TextureSampler },
-                                                         { 3, ShaderStageRTRayGen, gBufferNormal, ShaderBindingType::TextureSampler },
-                                                         { 4, ShaderStageRTRayGen, gBufferDepth, ShaderBindingType::TextureSampler },
-                                                         { 5, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
-                                                         { 6, ShaderStageRTMiss, reg.getBuffer(SceneUniformNode::name(), "environmentData") },
-                                                         { 7, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
-                                                         { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") },
-                                                         { 9, ShaderStageRTRayGen, &sphereSampleBuffer, ShaderBindingType::StorageBuffer } });
+    auto createStateForTLAS = [&](const TopLevelAS& tlas) -> std::pair<BindingSet&, RayTracingState&> {
+        BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
+                                                             { 1, ShaderStageRTRayGen, m_accumulationTexture, ShaderBindingType::StorageImage },
+                                                             { 2, ShaderStageRTRayGen, gBufferColor, ShaderBindingType::TextureSampler },
+                                                             { 3, ShaderStageRTRayGen, gBufferNormal, ShaderBindingType::TextureSampler },
+                                                             { 4, ShaderStageRTRayGen, gBufferDepth, ShaderBindingType::TextureSampler },
+                                                             { 5, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
+                                                             { 6, ShaderStageRTMiss, reg.getBuffer(SceneUniformNode::name(), "environmentData") },
+                                                             { 7, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
+                                                             { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") },
+                                                             { 9, ShaderStageRTRayGen, &sphereSampleBuffer, ShaderBindingType::StorageBuffer } });
 
-    ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen", ShaderFileType::RTRaygen);
-    HitGroup mainHitGroup { ShaderFile("rt-diffuseGI/closestHit.rchit", ShaderFileType::RTClosestHit) };
-    std::vector<ShaderFile> missShaders { ShaderFile("rt-diffuseGI/miss.rmiss", ShaderFileType::RTMiss),
-                                          ShaderFile("rt-diffuseGI/shadow.rmiss", ShaderFileType::RTMiss) };
-    ShaderBindingTable sbt { raygen, { mainHitGroup }, missShaders };
+        ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen");
+        HitGroup mainHitGroup { ShaderFile("rt-diffuseGI/closestHit.rchit") };
+        HitGroup sphereSetHitGroup { ShaderFile("rt-diffuseGI/sphere.rchit"), {}, ShaderFile("rt-diffuseGI/sphere.rint") };
+        std::vector<ShaderFile> missShaders { ShaderFile("rt-diffuseGI/miss.rmiss"),
+                                              ShaderFile("rt-diffuseGI/shadow.rmiss") };
+        ShaderBindingTable sbt { raygen, { mainHitGroup, sphereSetHitGroup }, missShaders };
 
-    uint32_t maxRecursionDepth = 2;
-    RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
+        uint32_t maxRecursionDepth = 2;
+        RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
+
+        return { frameBindingSet, rtState };
+    };
+
+    const TopLevelAS& mainTLAS = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "scene");
+    auto& [frameBindingSet, rtState] = createStateForTLAS(mainTLAS);
+
+    const TopLevelAS& proxyTLAS = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "proxy");
+    auto& [frameBindingSetProxy, rtStateProxy] = createStateForTLAS(proxyTLAS);
 
     Texture& diffuseGI = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
     reg.publish("diffuseGI", diffuseGI);
@@ -142,8 +154,10 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
     return [&](const AppState& appState, CommandList& cmdList) {
         static bool ignoreColor = false;
+        static bool useProxies = false;
         if (ImGui::CollapsingHeader("Diffuse GI")) {
             ImGui::Checkbox("Ignore color", &ignoreColor);
+            ImGui::Checkbox("Use proxies", &useProxies);
         }
 
         std::vector<float> sphereSamples;
@@ -169,9 +183,14 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
         //  and then just index into it & update every once in a while. Or something like that..
         cmdList.updateBufferImmediately(sphereSampleBuffer, sphereSamples.data(), totalSphereSamplesSize);
 
-        cmdList.setRayTracingState(rtState);
+        if (useProxies) {
+            cmdList.setRayTracingState(rtStateProxy);
+            cmdList.bindSet(frameBindingSetProxy, 0);
+        } else {
+            cmdList.setRayTracingState(rtState);
+            cmdList.bindSet(frameBindingSet, 0);
+        }
 
-        cmdList.bindSet(frameBindingSet, 0);
         cmdList.bindSet(*m_objectDataBindingSet, 1);
         cmdList.pushConstant(ShaderStageRTRayGen, ignoreColor);
 
