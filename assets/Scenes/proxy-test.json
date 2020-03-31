@@ -8,13 +8,13 @@
       "name": "cornell-box",
       "gltf": "assets/CornellBox/CornellBoxEmpty.gltf",
       "transform": {
-        "translation": [ 0, -6, 0 ],
+        "translation": [ 0, 0, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
           "angle": 0.3
         },
-        "scale": [ 16, 16, 16 ]
+        "scale": [ 6, 6, 6 ]
       }
     },
     {
@@ -22,13 +22,13 @@
       "gltf": "assets/Bunny/bunny.gltf",
       "proxy":  "assets/Bunny/bunny_lowres_spheres.json",
       "transform": {
-        "translation": [ 0, 0, 0 ],
+        "translation": [ 1, 0, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
-          "angle": 0.0
+          "angle": 0.3
         },
-        "scale": [ 8, 8, 8 ]
+        "scale": [ 4, 4, 4 ]
       }
     }
   ],
@@ -38,7 +38,7 @@
       "type": "directional",
       "color": [ 1, 1, 1 ],
       "intensity": 30.0,
-      "direction": [ 0.3, -0.2, -1.0 ],
+      "direction": [ 0.1, 0.05, -0.6 ],
       "worldExtent": 30.0,
       "shadowMapSize": [ 2048, 2048 ]
     }
@@ -46,8 +46,8 @@
   "cameras": [
     {
       "name": "main",
-      "origin": [ 0, 6, 20 ],
-      "target": [ 0, 3, 0 ]
+      "origin": [ 5, 10, 16 ],
+      "target": [ 0, 5, 0 ]
     }
   ],
   "camera": "main"

@@ -25,42 +25,70 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
     std::vector<RTMesh> rtMeshes {};
     std::vector<const Texture*> allTextures {};
 
+    auto createTriangleMeshVertexBuffer = [&](const Mesh& mesh) {
+        std::vector<RTVertex> vertices {};
+        {
+            auto posData = mesh.positionData();
+            auto normalData = mesh.normalData();
+            auto texCoordData = mesh.texcoordData();
+
+            ASSERT(posData.size() == normalData.size());
+            ASSERT(posData.size() == texCoordData.size());
+
+            for (int i = 0; i < posData.size(); ++i) {
+                vertices.push_back({ .position = vec4(posData[i], 0.0f),
+                                     .normal = vec4(normalData[i], 0.0f),
+                                     .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
+            }
+        }
+
+        const Material& material = mesh.material();
+        Texture* baseColorTexture { nullptr };
+        if (material.baseColor.empty()) {
+            baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, true);
+        } else {
+            baseColorTexture = &nodeReg.loadTexture2D(material.baseColor, true, true);
+        }
+
+        size_t texIndex = allTextures.size();
+        allTextures.push_back(baseColorTexture);
+
+        rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
+                             .baseColor = (int)texIndex });
+
+        // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
+        vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+        indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+    };
+
     m_scene.forEachModel([&](size_t, const Model& model) {
         model.forEachMesh([&](const Mesh& mesh) {
-            std::vector<RTVertex> vertices {};
-            {
-                auto posData = mesh.positionData();
-                auto normalData = mesh.normalData();
-                auto texCoordData = mesh.texcoordData();
-
-                ASSERT(posData.size() == normalData.size());
-                ASSERT(posData.size() == texCoordData.size());
-
-                for (int i = 0; i < posData.size(); ++i) {
-                    vertices.push_back({ .position = vec4(posData[i], 0.0f),
-                                         .normal = vec4(normalData[i], 0.0f),
-                                         .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
-                }
-            }
-
-            const Material& material = mesh.material();
-            Texture* baseColorTexture { nullptr };
-            if (material.baseColor.empty()) {
-                baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, true);
-            } else {
-                baseColorTexture = &nodeReg.loadTexture2D(material.baseColor, true, true);
-            }
-
-            size_t texIndex = allTextures.size();
-            allTextures.push_back(baseColorTexture);
-
-            rtMeshes.push_back({ .objectId = (int)rtMeshes.size(),
-                                 .baseColor = (int)texIndex });
-
-            // TODO: Later, we probably want to have combined vertex/ssbo and index/ssbo buffers instead!
-            vertexBuffers.push_back(&nodeReg.createBuffer((std::byte*)vertices.data(), vertices.size() * sizeof(RTVertex), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-            indexBuffers.push_back(&nodeReg.createBuffer(mesh.indexData(), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+            createTriangleMeshVertexBuffer(mesh);
         });
+        if (model.proxy().hasMeshes()) {
+            model.proxy().forEachMesh([&](const Mesh& proxyMesh) {
+                createTriangleMeshVertexBuffer(proxyMesh);
+            });
+        } else {
+            /*
+            const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model.proxy());
+            if (sphereSetModel) {
+                std::vector<RTSphere> spheresData;
+                for (const auto& sphere : sphereSetModel->spheres()) {
+
+                    RTSphere rtSphere;
+                    rtSphere.center = vec3(sphere);
+                    rtSphere.radius = sphere.w;
+
+                    spheresData.push_back(rtSphere);
+                }
+                sphereBuffers.push_back(&nodeReg.createBuffer(std::move(spheresData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+            } else {
+                ASSERT_NOT_REACHED();
+            }
+            */
+            LogInfo("Ignoring sphere sets in RTDiffuseGINode\n");
+        }
     });
 
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);

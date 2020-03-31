@@ -24,10 +24,10 @@ void TestApp::setup(RenderGraph& graph)
     graph.addNode<SceneUniformNode>(*m_scene);
     graph.addNode<ShadowMapNode>(*m_scene);
     graph.addNode<RTAccelerationStructures>(*m_scene);
-    graph.addNode<RTFirstHitNode>(*m_scene);
+    //graph.addNode<RTFirstHitNode>(*m_scene);
     graph.addNode<SlowForwardRenderNode>(*m_scene);
-    graph.addNode<RTReflectionsNode>(*m_scene);
-    //graph.addNode<RTDiffuseGINode>(*m_scene);
+    //graph.addNode<RTReflectionsNode>(*m_scene);
+    graph.addNode<RTDiffuseGINode>(*m_scene);
     graph.addNode<FinalPostFxNode>(*m_scene);
 }
 
@@ -62,11 +62,13 @@ void TestApp::update(float elapsedTime, float deltaTime)
     m_scene->camera().update(input, GlobalState::get().windowExtent(), deltaTime);
 
     if (!m_spinningObject) {
+        /*
         m_scene->forEachModel([&](size_t, const Model& model) {
             if (model.name() == "bunny") {
                 m_spinningObject = &const_cast<Model&>(model);
             }
         });
+        */
     } else {
         mat4 matrix = mathkit::translate(1.4f, 2.4f, 0.8f) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(8);
         m_spinningObject->transform().setLocalMatrix(matrix);

@@ -1,10 +1,10 @@
 #include "FinalPostFxNode.h"
 
-#include "SceneUniformNode.h"
 #include "ForwardRenderNode.h"
+#include "RTDiffuseGINode.h"
 #include "RTFirstHitNode.h"
 #include "RTReflectionsNode.h"
-#include "RTDiffuseGINode.h"
+#include "SceneUniformNode.h"
 #include "imgui.h"
 
 FinalPostFxNode::FinalPostFxNode(const Scene& scene)
@@ -40,8 +40,8 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     BindingSet& sourceImage = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTexture } });
     BindingSet& sourceImageRt = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTextureRt } });
 
-    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
-    //BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTDiffuseGINode::name(), "diffuseGI") } });
+    //BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
+    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTDiffuseGINode::name(), "diffuseGI") } });
 
     BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                        { 1, ShaderStageFragment, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
@@ -56,8 +56,8 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        static bool useRtFirstHit = true;
-        static bool includeDiffuseGI = false;
+        static bool useRtFirstHit = false;
+        static bool includeDiffuseGI = true;
         if (ImGui::CollapsingHeader("Final PostFX")) {
             ImGui::Checkbox("Use ray traced first-hit", &useRtFirstHit);
             ImGui::Checkbox("Include diffuse GI", &includeDiffuseGI);
