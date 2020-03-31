@@ -3,6 +3,11 @@
 #include "rendering/ShaderManager.h"
 #include <utility/Logging.h>
 
+ShaderFile::ShaderFile(std::string path)
+    : ShaderFile(path, shaderFileTypeFromPath(path))
+{
+}
+
 ShaderFile::ShaderFile(std::string path, ShaderFileType type)
     : m_path(std::move(path))
     , m_type(type)
@@ -30,6 +35,41 @@ const std::string& ShaderFile::path() const
 ShaderFileType ShaderFile::type() const
 {
     return m_type;
+}
+
+ShaderFileType ShaderFile::shaderFileTypeFromPath(const std::string& path)
+{
+    if (path.length() < 5) {
+        return ShaderFileType::Unknown;
+    }
+    std::string ext5 = path.substr(path.length() - 5);
+
+    if (ext5 == ".vert") {
+        return ShaderFileType::Vertex;
+    } else if (ext5 == ".frag") {
+        return ShaderFileType::Fragment;
+    } else if (ext5 == ".rgen") {
+        return ShaderFileType::RTRaygen;
+    } else if (ext5 == ".comp") {
+        return ShaderFileType::Compute;
+    } else if (ext5 == ".rint") {
+        return ShaderFileType::RTIntersection;
+    }
+
+    if (path.length() < 6) {
+        return ShaderFileType::Unknown;
+    }
+    std::string ext6 = path.substr(path.length() - 6);
+
+    if (ext6 == ".rmiss") {
+        return ShaderFileType::RTMiss;
+    } else if (ext6 == ".rchit") {
+        return ShaderFileType::RTClosestHit;
+    } else if (ext6 == ".rahit") {
+        return ShaderFileType::RTAnyHit;
+    }
+
+    return ShaderFileType::Unknown;
 }
 
 Shader Shader::createVertexOnly(std::string vertexName)

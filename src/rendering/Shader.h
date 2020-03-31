@@ -12,13 +12,17 @@ enum class ShaderFileType {
     RTAnyHit,
     RTIntersection,
     RTMiss,
+    Unknown,
 };
 
 struct ShaderFile {
+    explicit ShaderFile(std::string path);
     ShaderFile(std::string path, ShaderFileType);
 
     [[nodiscard]] const std::string& path() const;
     [[nodiscard]] ShaderFileType type() const;
+
+    static ShaderFileType shaderFileTypeFromPath(const std::string&);
 
 private:
     std::string m_path;

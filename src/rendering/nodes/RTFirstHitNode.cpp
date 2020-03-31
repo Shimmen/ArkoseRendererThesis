@@ -108,10 +108,10 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
                                                              { 2, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                              { 3, ShaderStageRTMiss, &timeBuffer } });
 
-        ShaderFile raygen = ShaderFile("rt-firsthit/raygen.rgen", ShaderFileType::RTRaygen);
-        HitGroup mainHitGroup { ShaderFile("rt-firsthit/closestHit.rchit", ShaderFileType::RTClosestHit) };
-        HitGroup sphereHitGroup { ShaderFile("rt-firsthit/sphere.rchit", ShaderFileType::RTClosestHit), {}, ShaderFile("rt-firsthit/sphere.rint", ShaderFileType::RTIntersection) };
-        ShaderFile missShader { ShaderFile("rt-firsthit/miss.rmiss", ShaderFileType::RTMiss) };
+        ShaderFile raygen = ShaderFile("rt-firsthit/raygen.rgen");
+        HitGroup mainHitGroup { ShaderFile("rt-firsthit/closestHit.rchit") };
+        HitGroup sphereHitGroup { ShaderFile("rt-firsthit/sphere.rchit"), {}, ShaderFile("rt-firsthit/sphere.rint") };
+        ShaderFile missShader { ShaderFile("rt-firsthit/miss.rmiss") };
         ShaderBindingTable sbt { raygen, { mainHitGroup, sphereHitGroup }, { missShader } };
 
         uint32_t maxRecursionDepth = 1;

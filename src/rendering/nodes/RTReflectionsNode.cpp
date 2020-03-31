@@ -78,11 +78,6 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
     Texture& reflections = reg.createTexture2D(reg.windowRenderTarget().extent(), Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
     reg.publish("reflections", reflections);
 
-    //ShaderFile raygen = ShaderFile("rt-reflections/raygen.rgen", ShaderFileType::RTRaygen);
-    //ShaderFile miss = ShaderFile("rt-reflections/miss.rmiss", ShaderFileType::RTMiss);
-    //ShaderFile shadowMiss = ShaderFile("rt-reflections/shadow.rmiss", ShaderFileType::RTMiss);
-    //ShaderFile closestHit = ShaderFile("rt-reflections/closestHit.rchit", ShaderFileType::RTClosestHit);
-
     const TopLevelAS& tlas = *reg.getTopLevelAccelerationStructure(RTAccelerationStructures::name(), "scene");
     BindingSet& frameBindingSet = reg.createBindingSet({ { 0, (ShaderStage)(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
                                                          { 1, ShaderStageRTRayGen, &reflections, ShaderBindingType::StorageImage },
@@ -94,10 +89,10 @@ RenderGraphNode::ExecuteCallback RTReflectionsNode::constructFrame(Registry& reg
                                                          { 7, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
                                                          { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
 
-    ShaderFile raygen = ShaderFile("rt-reflections/raygen.rgen", ShaderFileType::RTRaygen);
-    HitGroup mainHitGroup { ShaderFile("rt-reflections/closestHit.rchit", ShaderFileType::RTClosestHit) };
-    std::vector<ShaderFile> missShaders { ShaderFile("rt-reflections/miss.rmiss", ShaderFileType::RTMiss),
-                                          ShaderFile("rt-reflections/shadow.rmiss", ShaderFileType::RTMiss) };
+    ShaderFile raygen = ShaderFile("rt-reflections/raygen.rgen");
+    HitGroup mainHitGroup { ShaderFile("rt-reflections/closestHit.rchit") };
+    std::vector<ShaderFile> missShaders { ShaderFile("rt-reflections/miss.rmiss"),
+                                          ShaderFile("rt-reflections/shadow.rmiss") };
     ShaderBindingTable sbt { raygen, { mainHitGroup }, missShaders };
 
     uint32_t maxRecursionDepth = 2;
