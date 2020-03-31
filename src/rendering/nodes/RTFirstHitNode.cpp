@@ -62,13 +62,13 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
         model.forEachMesh([&](const Mesh& mesh) {
             createTriangleMeshVertexBuffer(mesh);
         });
-        
+
         if (model.proxy().hasMeshes()) {
             model.proxy().forEachMesh([&](const Mesh& proxyMesh) {
                 createTriangleMeshVertexBuffer(proxyMesh);
             });
         } else {
-            const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model);
+            const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model.proxy());
             if (sphereSetModel) {
                 std::vector<RTSphere> spheresData;
                 for (const auto& sphere : sphereSetModel->spheres()) {

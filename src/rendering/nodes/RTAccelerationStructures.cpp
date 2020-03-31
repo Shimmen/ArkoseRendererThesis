@@ -36,7 +36,7 @@ void RTAccelerationStructures::constructNode(Registry& nodeReg)
                 m_proxyInstances.push_back(instance);
             });
         } else {
-            const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model);
+            const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model.proxy());
             if (sphereSetModel) {
                 RTGeometry sphereSetGeometry = createGeometryForSphereSet(*sphereSetModel, nodeReg);
                 RTGeometryInstance instance = createGeometryInstance(sphereSetGeometry, model.transform(), nextSphereInstanceId++, HitGroupIndex::Sphere, nodeReg);

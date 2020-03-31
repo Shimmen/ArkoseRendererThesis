@@ -3,6 +3,7 @@
 #include "utility/FileIO.h"
 #include "utility/Logging.h"
 #include "utility/models/GltfModel.h"
+#include "utility/models/SphereSetModel.h"
 #include <fstream>
 #include <imgui.h>
 #include <json.hpp>
@@ -41,8 +42,8 @@ std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
         }
 
         if (jsonModel.find("proxy") != jsonModel.end()) {
-            std::string proxyGltf = jsonModel.at("proxy");
-            auto proxy = GltfModel::load(proxyGltf);
+            std::string proxyPath = jsonModel.at("proxy");
+            auto proxy = loadProxy(proxyPath);
             if (proxy) {
                 model->setProxy(std::move(proxy));
             }
@@ -252,4 +253,41 @@ void Scene::loadAdditionalCameras()
 
         m_allCameras[name] = camera;
     }
+}
+
+std::unique_ptr<Model> Scene::loadProxy(const std::string& path)
+{
+    using json = nlohmann::json;
+
+    std::string extension = path.substr(path.length() - 4);
+    if (extension == "json") {
+        std::ifstream proxyStream(path);
+        json jsonProxy;
+        proxyStream >> jsonProxy;
+        if (jsonProxy.at("proxy") == "sphere-set") {
+            return loadSphereSetProxy(jsonProxy);
+        } else {
+            ASSERT_NOT_REACHED();
+        }
+    }
+
+    // Else, assume it's a gltf and simply fail if it isn't..
+    return GltfModel::load(path);
+}
+
+std::unique_ptr<Model> Scene::loadSphereSetProxy(const nlohmann::json& proxy)
+{
+    using json = nlohmann::json;
+
+    std::vector<SphereSetModel::Sphere> spheres;
+
+    for (auto& jsonSphere : proxy.at("spheres")) {
+        std::vector<float> center = jsonSphere.at("center");
+        float radius = jsonSphere.at("radius");
+
+        SphereSetModel::Sphere sphere { -center[0], -center[2], -center[1], radius };
+        spheres.push_back(sphere);
+    }
+
+    return std::make_unique<SphereSetModel>(spheres);
 }

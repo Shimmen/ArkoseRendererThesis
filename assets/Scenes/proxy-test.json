@@ -8,13 +8,27 @@
       "name": "cornell-box",
       "gltf": "assets/CornellBox/CornellBoxEmpty.gltf",
       "transform": {
-        "translation": [ 0, -10, 0 ],
+        "translation": [ 0, -6, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
           "angle": 0.3
         },
-        "scale": [ 60, 60, 60 ]
+        "scale": [ 16, 16, 16 ]
+      }
+    },
+    {
+      "name": "bunny",
+      "gltf": "assets/Bunny/bunny.gltf",
+      "proxy":  "assets/Bunny/bunny_lowres_spheres.json",
+      "transform": {
+        "translation": [ 0, 0, 0 ],
+        "rotation": {
+          "type": "axis-angle",
+          "axis": [ 0, 1, 0 ],
+          "angle": 0.0
+        },
+        "scale": [ 1, 1, 1 ]
       }
     }
   ],

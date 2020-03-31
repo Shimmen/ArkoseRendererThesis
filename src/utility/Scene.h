@@ -2,6 +2,7 @@
 
 #include "Model.h"
 #include "utility/mathkit.h"
+#include <json.hpp>
 #include <memory>
 #include <string>
 
@@ -48,6 +49,9 @@ public:
 
 private:
     void loadAdditionalCameras();
+    
+    static std::unique_ptr<Model> loadProxy(const std::string&);
+    static std::unique_ptr<Model> loadSphereSetProxy(const nlohmann::json&);
 
 private:
     std::string m_loadedPath {};
