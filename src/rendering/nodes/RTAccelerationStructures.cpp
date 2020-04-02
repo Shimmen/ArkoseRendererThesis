@@ -2,6 +2,7 @@
 
 #include "RTData.h"
 #include "utility/models/SphereSetModel.h"
+#include "utility/models/VoxelContourModel.h"
 
 RTAccelerationStructures::RTAccelerationStructures(const Scene& scene)
     : RenderGraphNode(RTAccelerationStructures::name())
@@ -21,6 +22,7 @@ void RTAccelerationStructures::constructNode(Registry& nodeReg)
 
     uint32_t nextTriangleInstanceId = 0;
     uint32_t nextSphereInstanceId = 0;
+    uint32_t nextVoxelContourInstanceId = 0;
 
     m_scene.forEachModel([&](size_t, const Model& model) {
         model.forEachMesh([&](const Mesh& mesh) {
@@ -41,9 +43,18 @@ void RTAccelerationStructures::constructNode(Registry& nodeReg)
                 RTGeometry sphereSetGeometry = createGeometryForSphereSet(*sphereSetModel, nodeReg);
                 RTGeometryInstance instance = createGeometryInstance(sphereSetGeometry, model.transform(), nextSphereInstanceId++, HitGroupIndex::Sphere, nodeReg);
                 m_proxyInstances.push_back(instance);
-            } else {
-                ASSERT_NOT_REACHED();
+                return;
             }
+
+            const auto* voxelContourModel = dynamic_cast<const VoxelContourModel*>(&model.proxy());
+            if (voxelContourModel) {
+                RTGeometry voxelContourGeometry = createGeometryForVoxelContours(*voxelContourModel, nodeReg);
+                RTGeometryInstance instance = createGeometryInstance(voxelContourGeometry, model.transform(), nextVoxelContourInstanceId++, HitGroupIndex::VoxelContour, nodeReg);
+                m_proxyInstances.push_back(instance);
+                return;
+            }
+
+            ASSERT_NOT_REACHED();
         }
     });
 }
@@ -85,6 +96,26 @@ RTGeometry RTAccelerationStructures::createGeometryForSphereSet(const SphereSetM
         sphereAabb.max = center + vec3(radius);
 
         aabbData.push_back(sphereAabb);
+    }
+
+    constexpr size_t aabbStride = sizeof(RTAABB);
+    static_assert(aabbStride % 8 == 0);
+
+    RTAABBGeometry geometry { .aabbBuffer = reg.createBuffer(std::move(aabbData), Buffer::Usage::Vertex, Buffer::MemoryHint::GpuOptimal),
+                              .aabbStride = aabbStride };
+    return geometry;
+}
+
+RTGeometry RTAccelerationStructures::createGeometryForVoxelContours(const VoxelContourModel& contourModel, Registry& reg) const
+{
+    std::vector<RTAABB> aabbData;
+    for (const auto& contour : contourModel.contours()) {
+
+        RTAABB aabb;
+        aabb.min = contour.aabb.min;
+        aabb.max = contour.aabb.max;
+
+        aabbData.push_back(aabb);
     }
 
     constexpr size_t aabbStride = sizeof(RTAABB);

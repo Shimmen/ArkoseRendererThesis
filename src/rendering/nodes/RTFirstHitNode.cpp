@@ -3,6 +3,7 @@
 #include "RTAccelerationStructures.h"
 #include "SceneUniformNode.h"
 #include "utility/models/SphereSetModel.h"
+#include "utility/models/VoxelContourModel.h"
 #include <imgui.h>
 
 RTFirstHitNode::RTFirstHitNode(const Scene& scene)
@@ -80,9 +81,16 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                     spheresData.push_back(rtSphere);
                 }
                 sphereBuffers.push_back(&nodeReg.createBuffer(std::move(spheresData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-            } else {
-                ASSERT_NOT_REACHED();
+                return;
             }
+
+            const auto* voxelContourModel = dynamic_cast<const VoxelContourModel*>(&model.proxy());
+            if (voxelContourModel) {
+                // TODO: Add custom data for voxel contour stuff here. But for now we just render the full voxels
+                return;
+            }
+
+            ASSERT_NOT_REACHED();
         }
     });
 
@@ -111,8 +119,9 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
         ShaderFile raygen = ShaderFile("rt-firsthit/raygen.rgen");
         HitGroup mainHitGroup { ShaderFile("rt-firsthit/closestHit.rchit") };
         HitGroup sphereHitGroup { ShaderFile("rt-firsthit/sphere.rchit"), {}, ShaderFile("rt-firsthit/sphere.rint") };
+        HitGroup contourHitGroup { ShaderFile("rt-firsthit/contour.rchit"), {}, ShaderFile("rt-firsthit/contour.rint") };
         ShaderFile missShader { ShaderFile("rt-firsthit/miss.rmiss") };
-        ShaderBindingTable sbt { raygen, { mainHitGroup, sphereHitGroup }, { missShader } };
+        ShaderBindingTable sbt { raygen, { mainHitGroup, sphereHitGroup, contourHitGroup }, { missShader } };
 
         uint32_t maxRecursionDepth = 1;
         RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet, &environmentBindingSet }, maxRecursionDepth);

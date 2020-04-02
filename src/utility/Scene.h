@@ -52,6 +52,7 @@ private:
     
     static std::unique_ptr<Model> loadProxy(const std::string&);
     static std::unique_ptr<Model> loadSphereSetProxy(const nlohmann::json&);
+    static std::unique_ptr<Model> loadVoxelContourProxy(const nlohmann::json&);
 
 private:
     std::string m_loadedPath {};

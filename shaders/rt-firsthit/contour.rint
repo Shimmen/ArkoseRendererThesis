@@ -1,0 +1,18 @@
+#version 460
+#extension GL_NV_ray_tracing : require
+
+struct ContourHit {
+	vec3 normal;
+};
+
+hitAttributeNV ContourHit hit;
+
+void main()
+{
+	// TODO: Implement actual contour test!
+
+	hit.normal = vec3(0, 1, 0);
+
+	const float t = gl_RayTminNV;
+	reportIntersectionNV(t, 0u);
+}

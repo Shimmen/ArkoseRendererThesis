@@ -4,6 +4,7 @@
 #include "utility/Logging.h"
 #include "utility/models/GltfModel.h"
 #include "utility/models/SphereSetModel.h"
+#include "utility/models/VoxelContourModel.h"
 #include <fstream>
 #include <imgui.h>
 #include <json.hpp>
@@ -267,8 +268,12 @@ std::unique_ptr<Model> Scene::loadProxy(const std::string& path)
         std::ifstream proxyStream(path);
         json jsonProxy;
         proxyStream >> jsonProxy;
-        if (jsonProxy.at("proxy") == "sphere-set") {
+
+        std::string type = jsonProxy.at("proxy");
+        if (type == "sphere-set") {
             return loadSphereSetProxy(jsonProxy);
+        } else if (type == "voxel-contours") {
+            return loadVoxelContourProxy(jsonProxy);
         } else {
             ASSERT_NOT_REACHED();
         }
@@ -293,4 +298,47 @@ std::unique_ptr<Model> Scene::loadSphereSetProxy(const nlohmann::json& proxy)
     }
 
     return std::make_unique<SphereSetModel>(spheres);
+}
+
+std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
+{
+    using json = nlohmann::json;
+
+    std::vector<VoxelContourModel::VoxelContour> contours;
+
+    for (auto& jsonContour : proxy.at("contours")) {
+
+        std::vector<float> minC = jsonContour.at("aabbMin");
+        std::vector<float> maxC = jsonContour.at("aabbMax");
+
+        // Yikes..
+
+        vec3 tmpMin = { -minC[0], -minC[2], -minC[1] };
+        vec3 tmpMax = { -maxC[0], -maxC[2], -maxC[1] };
+
+        vec3 min = glm::min(tmpMin, tmpMax);
+        vec3 max = glm::max(tmpMin, tmpMax);
+
+        vec3 diff = max - min;
+        min.y += 64.0f * diff.y;
+        max.y += 64.0f * diff.y;
+
+        min.x += 26.0f * diff.x;
+        max.x += 26.0f * diff.x;
+
+        min.z += 34.0f * diff.z;
+        max.z += 34.0f * diff.z;
+
+        aabb3 aabb { min, max };
+
+        std::vector<float> norm = jsonContour.at("normal");
+        vec3 normal = { -norm[0], -norm[2], -norm[1] };
+
+        float centerOffset = jsonContour.at("centerOffset");
+
+        VoxelContourModel::VoxelContour contour { aabb, normal, centerOffset };
+        contours.push_back(contour);
+    }
+
+    return std::make_unique<VoxelContourModel>(contours);
 }

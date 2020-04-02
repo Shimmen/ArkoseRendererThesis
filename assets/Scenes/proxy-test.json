@@ -8,25 +8,39 @@
       "name": "cornell-box",
       "gltf": "assets/CornellBox/CornellBoxEmpty.gltf",
       "transform": {
-        "translation": [ 0, 0, 0 ],
+        "translation": [ 0, -1, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
-          "angle": 0.3
+          "angle": 0.0
         },
-        "scale": [ 6, 6, 6 ]
+        "scale": [ 30, 10, 10 ]
       }
     },
     {
       "name": "bunny",
       "gltf": "assets/Bunny/bunny.gltf",
-      "proxy":  "assets/Bunny/bunny_lowres_spheres.json",
+      "proxy": "assets/Bunny/bunny_lowres_spheres.json",
       "transform": {
-        "translation": [ 1, 0, 0 ],
+        "translation": [ -11, 0, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
           "angle": 0.3
+        },
+        "scale": [ 4, 4, 4 ]
+      }
+    },
+    {
+      "name": "bunny",
+      "gltf": "assets/Bunny/bunny.gltf",
+      "proxy": "assets/Bunny/bunny_contours.json",
+      "transform": {
+        "translation": [ 12, 0, 0 ],
+        "rotation": {
+          "type": "axis-angle",
+          "axis": [ 0, 1, 0 ],
+          "angle": 0.0
         },
         "scale": [ 4, 4, 4 ]
       }
