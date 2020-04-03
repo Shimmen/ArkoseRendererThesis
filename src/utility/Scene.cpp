@@ -308,6 +308,29 @@ std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
 
     for (auto& jsonContour : proxy.at("contours")) {
 
+#if 0
+
+        std::vector<float> sizeC = proxy.at("size");
+        vec3 size = { sizeC[0], sizeC[2], sizeC[1] };
+
+        std::vector<float> point = jsonContour.at("point");
+        vec3 center { -point[0], -point[2], -point[1] };
+
+        center.x += 0.5f * size.x;
+        center.y += size.y;
+        center.z += 0.5f * size.z;
+        
+        float voxelSize = jsonContour.at("size");
+        voxelSize *= 0.5f;
+
+        vec3 min = center - vec3(voxelSize);
+        vec3 max = center + vec3(voxelSize);
+
+        vec3 normal = { 0, 1, 0 };
+        float centerOffset = 0.0f;
+
+#else
+
         std::vector<float> minC = jsonContour.at("aabbMin");
         std::vector<float> maxC = jsonContour.at("aabbMax");
 
@@ -329,12 +352,14 @@ std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
         min.z += 34.0f * diff.z;
         max.z += 34.0f * diff.z;
 
-        aabb3 aabb { min, max };
-
         std::vector<float> norm = jsonContour.at("normal");
         vec3 normal = { -norm[0], -norm[2], -norm[1] };
 
         float centerOffset = jsonContour.at("centerOffset");
+
+#endif
+
+        aabb3 aabb { min, max };
 
         VoxelContourModel::VoxelContour contour { aabb, normal, centerOffset };
         contours.push_back(contour);

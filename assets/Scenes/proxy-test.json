@@ -14,7 +14,7 @@
           "axis": [ 0, 1, 0 ],
           "angle": 0.0
         },
-        "scale": [ 30, 10, 10 ]
+        "scale": [ 20, 10, 10 ]
       }
     },
     {
@@ -34,9 +34,23 @@
     {
       "name": "bunny",
       "gltf": "assets/Bunny/bunny.gltf",
+      "proxy": "assets/Bunny/bunny_bad_lowres.gltf",
+      "transform": {
+        "translation": [ 0, 0, 0 ],
+        "rotation": {
+          "type": "axis-angle",
+          "axis": [ 0, 1, 0 ],
+          "angle": 0.3
+        },
+        "scale": [ 4, 4, 4 ]
+      }
+    },
+    {
+      "name": "bunny",
+      "gltf": "assets/Bunny/bunny.gltf",
       "proxy": "assets/Bunny/bunny_contours.json",
       "transform": {
-        "translation": [ 12, 0, 0 ],
+        "translation": [ 11, 0, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],

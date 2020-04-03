@@ -86,7 +86,7 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                 }
                 sphereBuffers.push_back(&nodeReg.createBuffer(std::move(spheresData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
             } else {
-                ASSERT_NOT_REACHED();
+                //ASSERT_NOT_REACHED();
             }
             LogInfo("Ignoring sphere sets in RTDiffuseGINode\n");
         }
