@@ -23,7 +23,9 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
 {
     std::vector<const Buffer*> vertexBuffers {};
     std::vector<const Buffer*> indexBuffers {};
+
     std::vector<const Buffer*> sphereBuffers {};
+    std::vector<const Buffer*> shBuffers {};
 
     std::vector<const Texture*> allTextures {};
     std::vector<RTMesh> rtMeshes {};
@@ -85,6 +87,9 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                     spheresData.push_back(rtSphere);
                 }
                 sphereBuffers.push_back(&nodeReg.createBuffer(std::move(spheresData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+
+                auto shData = sphereSetModel->sphericalHarmonics();
+                shBuffers.push_back(&nodeReg.createBuffer(std::move(shData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
             } else {
                 //ASSERT_NOT_REACHED();
             }
@@ -97,7 +102,8 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
                                                          { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
-                                                         { 4, ShaderStageRTIntersection, sphereBuffers } });
+                                                         { 4, ShaderStageRTIntersection, sphereBuffers },
+                                                         { 5, ShaderStageRTIntersection, shBuffers } });
 
     Extent2D windowExtent = GlobalState::get().windowExtent();
     m_accumulationTexture = &nodeReg.createTexture2D(windowExtent, Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);

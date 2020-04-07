@@ -4,14 +4,16 @@
 #extension GL_EXT_scalar_block_layout : require
 
 #include <shared/RTData.h>
+#include <shared/SphericalHarmonics.h>
 #include <common.glsl>
 #include <intersections.glsl>
 
 layout(set = 1, binding = 4) buffer readonly SphereSets { RTSphere spheres[]; } sets[];
+layout(set = 1, binding = 5) buffer readonly SphereSH { SphericalHarmonics SHs[]; } setSHs[];
 
 struct SphereHit {
 	vec3 normal;
-	uint materialIndex;
+	vec3 color;
 };
 
 hitAttributeNV SphereHit hit;
@@ -33,9 +35,10 @@ void main()
 	if (raySphereIntersection(sphereCenter, sphereRadius, rayOrigin, rayDirection, t)) {
 		vec3 hitPoint = rayOrigin + t * rayDirection;
 		hit.normal = normalize(hitPoint - sphereCenter);
-		hit.materialIndex = 0; // TODO!
 
-		const uint hitKind = 0u;
-		reportIntersectionNV(t, hitKind);
+		SphericalHarmonics sh = setSHs[gl_InstanceCustomIndexNV].SHs[gl_PrimitiveID];
+		hit.color = sampleSphericalHarmonic(sh, hit.normal);
+
+		reportIntersectionNV(t, 0u);
 	}
 }
