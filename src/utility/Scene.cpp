@@ -341,58 +341,18 @@ std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
 
     for (auto& jsonContour : proxy.at("contours")) {
 
-#if 0
-
-        std::vector<float> sizeC = proxy.at("size");
-        vec3 size = { sizeC[0], sizeC[2], sizeC[1] };
-
-        std::vector<float> point = jsonContour.at("point");
-        vec3 center { -point[0], -point[2], -point[1] };
-
-        center.x += 0.5f * size.x;
-        center.y += size.y;
-        center.z += 0.5f * size.z;
-        
-        float voxelSize = jsonContour.at("size");
-        voxelSize *= 0.5f;
-
-        vec3 min = center - vec3(voxelSize);
-        vec3 max = center + vec3(voxelSize);
-
-        vec3 normal = { 0, 1, 0 };
-        float centerOffset = 0.0f;
-
-#else
 
         std::vector<float> minC = jsonContour.at("aabbMin");
         std::vector<float> maxC = jsonContour.at("aabbMax");
 
-        // Yikes..
-
-        vec3 tmpMin = { -minC[0], -minC[2], -minC[1] };
-        vec3 tmpMax = { -maxC[0], -maxC[2], -maxC[1] };
-
-        vec3 min = glm::min(tmpMin, tmpMax);
-        vec3 max = glm::max(tmpMin, tmpMax);
-
-        vec3 diff = max - min;
-        min.y += 64.0f * diff.y;
-        max.y += 64.0f * diff.y;
-
-        min.x += 26.0f * diff.x;
-        max.x += 26.0f * diff.x;
-
-        min.z += 34.0f * diff.z;
-        max.z += 34.0f * diff.z;
+        vec3 min = { minC[0], minC[1], minC[2] };
+        vec3 max = { maxC[0], maxC[1], maxC[2] };
+        aabb3 aabb { min, max };
 
         std::vector<float> norm = jsonContour.at("normal");
-        vec3 normal = { -norm[0], -norm[2], -norm[1] };
+        vec3 normal = { norm[0], norm[1], norm[2] };
 
         float centerOffset = jsonContour.at("centerOffset");
-
-#endif
-
-        aabb3 aabb { min, max };
 
         VoxelContourModel::VoxelContour contour { aabb, normal, centerOffset };
         contours.push_back(contour);
