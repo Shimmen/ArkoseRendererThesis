@@ -288,16 +288,49 @@ std::unique_ptr<Model> Scene::loadSphereSetProxy(const nlohmann::json& proxy)
     using json = nlohmann::json;
 
     std::vector<SphereSetModel::Sphere> spheres;
+    std::vector<SphericalHarmonics> sphereSH;
 
     for (auto& jsonSphere : proxy.at("spheres")) {
         std::vector<float> center = jsonSphere.at("center");
         float radius = jsonSphere.at("radius");
 
-        SphereSetModel::Sphere sphere { -center[0], -center[2], -center[1], radius };
+        SphereSetModel::Sphere sphere { center[0], center[1], center[2], radius };
         spheres.push_back(sphere);
+
+        auto jsonSh = jsonSphere.at("sh");
+        SphericalHarmonics sh;
+
+        std::vector<float> L00 = jsonSh.at("L00");
+        sh.L00 = { L00[0], L00[1], L00[2], 0 };
+
+        std::vector<float> L11 = jsonSh.at("L11");
+        sh.L11 = { L11[0], L11[1], L11[2], 0 };
+
+        std::vector<float> L10 = jsonSh.at("L10");
+        sh.L10 = { L10[0], L10[1], L10[2], 0 };
+
+        std::vector<float> L1_1 = jsonSh.at("L1_1");
+        sh.L1_1 = { L1_1[0], L1_1[1], L1_1[2], 0 };
+
+        std::vector<float> L21 = jsonSh.at("L21");
+        sh.L21 = { L21[0], L21[1], L21[2], 0 };
+
+        std::vector<float> L2_1 = jsonSh.at("L2_1");
+        sh.L2_1 = { L2_1[0], L2_1[1], L2_1[2], 0 };
+
+        std::vector<float> L2_2 = jsonSh.at("L2_2");
+        sh.L2_2 = { L2_2[0], L2_2[1], L2_2[2], 0 };
+
+        std::vector<float> L20 = jsonSh.at("L20");
+        sh.L20 = { L20[0], L20[1], L20[2], 0 };
+
+        std::vector<float> L22 = jsonSh.at("L22");
+        sh.L22 = { L22[0], L22[1], L22[2], 0 };
+
+        sphereSH.push_back(sh);
     }
 
-    return std::make_unique<SphereSetModel>(spheres);
+    return std::make_unique<SphereSetModel>(spheres, sphereSH);
 }
 
 std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
