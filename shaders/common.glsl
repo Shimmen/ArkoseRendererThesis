@@ -4,6 +4,8 @@
 #define PI     (3.14159265358979323846)
 #define TWO_PI (2.0 * PI)
 
+#include <shared/SphericalHarmonics.h>
+
 float luminance(vec3 color)
 {
     return dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -62,29 +64,18 @@ vec2 hammersley(uint i, uint n)
     return vec2(xi0, xi1);
 }
 
-vec3 sampleShIrradiance(vec3 N, sampler2D shMap)
+vec3 sampleSphericalHarmonic(SphericalHarmonics sh, vec3 dir)
 {
     // SH basis
     float Y00     = 0.282095;
-    float Y11     = 0.488603 * N.x;
-    float Y10     = 0.488603 * N.z;
-    float Y1_1    = 0.488603 * N.y;
-    float Y21     = 1.092548 * N.x * N.z;
-    float Y2_1    = 1.092548 * N.y * N.z;
-    float Y2_2    = 1.092548 * N.y * N.x;
-    float Y20     = 0.946176 * N.z * N.z - 0.315392;
-    float Y22     = 0.546274 * (N.x * N.x - N.y * N.y);
-
-    // SH coefficients as RGB
-    vec3 L00  = texelFetch(shMap, ivec2(0, 0), 0).rgb;
-    vec3 L11  = texelFetch(shMap, ivec2(1, 0), 0).rgb;
-    vec3 L10  = texelFetch(shMap, ivec2(2, 0), 0).rgb;
-    vec3 L1_1 = texelFetch(shMap, ivec2(0, 1), 0).rgb;
-    vec3 L21  = texelFetch(shMap, ivec2(1, 1), 0).rgb;
-    vec3 L2_1 = texelFetch(shMap, ivec2(2, 1), 0).rgb;
-    vec3 L2_2 = texelFetch(shMap, ivec2(0, 2), 0).rgb;
-    vec3 L20  = texelFetch(shMap, ivec2(1, 2), 0).rgb;
-    vec3 L22  = texelFetch(shMap, ivec2(2, 2), 0).rgb;
+    float Y11     = 0.488603 * dir.x;
+    float Y10     = 0.488603 * dir.z;
+    float Y1_1    = 0.488603 * dir.y;
+    float Y21     = 1.092548 * dir.x * dir.z;
+    float Y2_1    = 1.092548 * dir.y * dir.z;
+    float Y2_2    = 1.092548 * dir.y * dir.x;
+    float Y20     = 0.946176 * dir.z * dir.z - 0.315392;
+    float Y22     = 0.546274 * (dir.x * dir.x - dir.y * dir.y);
 
     // Used for extracting irradiance from the SH, see paper:
     // https://graphics.stanford.edu/papers/envmap/envmap.pdf
@@ -92,9 +83,9 @@ vec3 sampleShIrradiance(vec3 N, sampler2D shMap)
     float A1 = 2.0 / 3.0 * PI;
     float A2 = 1.0 / 4.0 * PI;
 
-    return A0*Y00*L00
-         + A1*Y1_1*L1_1 + A1*Y10*L10 + A1*Y11*L11
-         + A2*Y2_2*L2_2 + A2*Y2_1*L2_1 + A2*Y20*L20 + A2*Y21*L21 + A2*Y22*L22;
+    return A0*Y00*sh.L00.xyz
+         + A1*Y1_1*sh.L1_1.xyz + A1*Y10*sh.L10.xyz + A1*Y11*sh.L11.xyz
+         + A2*Y2_2*sh.L2_2.xyz + A2*Y2_1*sh.L2_1.xyz + A2*Y20*sh.L20.xyz + A2*Y21*sh.L21.xyz + A2*Y22*sh.L22.xyz;
 }
 
 // Source: http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
