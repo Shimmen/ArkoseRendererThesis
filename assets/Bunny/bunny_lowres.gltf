@@ -66,7 +66,7 @@
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
                     0,
-                    0.1503153294324875,
+                    0.7633774876594543,
                     0.8000000715255737,
                     1
                 ],
@@ -96,74 +96,74 @@
         {
             "bufferView" : 0,
             "componentType" : 5126,
-            "count" : 213,
+            "count" : 1357,
             "max" : [
-                0.6741176843643188,
-                0.6924213767051697,
-                -0.024863464757800102
+                0.6544046998023987,
+                0.6940433979034424,
+                -0.020571157336235046
             ],
             "min" : [
-                -0.9375619292259216,
-                -0.4833698868751526,
-                -1.6554118394851685
+                -0.9511781930923462,
+                -0.5442226529121399,
+                -1.6422256231307983
             ],
             "type" : "VEC3"
         },
         {
             "bufferView" : 1,
             "componentType" : 5126,
-            "count" : 213,
+            "count" : 1357,
             "type" : "VEC3"
         },
         {
             "bufferView" : 2,
             "componentType" : 5126,
-            "count" : 213,
+            "count" : 1357,
             "type" : "VEC4"
         },
         {
             "bufferView" : 3,
             "componentType" : 5126,
-            "count" : 213,
+            "count" : 1357,
             "type" : "VEC2"
         },
         {
             "bufferView" : 4,
             "componentType" : 5123,
-            "count" : 432,
+            "count" : 4320,
             "type" : "SCALAR"
         }
     ],
     "bufferViews" : [
         {
             "buffer" : 0,
-            "byteLength" : 2556,
+            "byteLength" : 16284,
             "byteOffset" : 0
         },
         {
             "buffer" : 0,
-            "byteLength" : 2556,
-            "byteOffset" : 2556
+            "byteLength" : 16284,
+            "byteOffset" : 16284
         },
         {
             "buffer" : 0,
-            "byteLength" : 3408,
-            "byteOffset" : 5112
+            "byteLength" : 21712,
+            "byteOffset" : 32568
         },
         {
             "buffer" : 0,
-            "byteLength" : 1704,
-            "byteOffset" : 8520
+            "byteLength" : 10856,
+            "byteOffset" : 54280
         },
         {
             "buffer" : 0,
-            "byteLength" : 864,
-            "byteOffset" : 10224
+            "byteLength" : 8640,
+            "byteOffset" : 65136
         }
     ],
     "buffers" : [
         {
-            "byteLength" : 11088,
+            "byteLength" : 73776,
             "uri" : "bunny_lowres.bin"
         }
     ]
