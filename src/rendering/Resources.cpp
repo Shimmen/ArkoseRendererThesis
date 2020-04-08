@@ -31,14 +31,17 @@ void Resource::registerBackend(Badge<Backend>, uint64_t id) const
     m_id = id;
 }
 
-Texture::Texture(Badge<Registry>, Extent2D extent, Format format, Usage usage, MinFilter minFilter, MagFilter magFilter, Mipmap mipmap)
+Texture::Texture(Badge<Registry>, Extent2D extent, Format format, Usage usage, MinFilter minFilter, MagFilter magFilter, Mipmap mipmap, Multisampling multisampling)
     : m_extent(extent)
     , m_format(format)
     , m_usage(usage)
     , m_minFilter(minFilter)
     , m_magFilter(magFilter)
     , m_mipmap(mipmap)
+    , m_multisampling(multisampling)
 {
+    // (according to most specifications we can't have both multisampling and mipmapping)
+    ASSERT(multisampling == Multisampling::None || mipmap == Mipmap::None);
 }
 
 bool Texture::hasMipmaps() const
@@ -55,6 +58,16 @@ uint32_t Texture::mipLevels() const
     } else {
         return 1;
     }
+}
+
+bool Texture::isMultisampled() const
+{
+    return m_multisampling != Multisampling::None;
+}
+
+Texture::Multisampling Texture::multisampling() const
+{
+    return m_multisampling;
 }
 
 RenderTarget::RenderTarget(Badge<Registry>, Texture& colorTexture, LoadOp loadOp, StoreOp storeOp)

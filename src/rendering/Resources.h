@@ -85,9 +85,18 @@ struct Texture : public Resource {
         Linear,
     };
 
+    enum class Multisampling : uint32_t {
+        None = 1,
+        X2 = 2,
+        X4 = 4,
+        X8 = 8,
+        X16 = 16,
+        X32 = 32,
+    };
+
     Texture() = default;
     Texture(const Texture&) = default;
-    Texture(Badge<Registry>, Extent2D, Format, Usage, MinFilter, MagFilter, Mipmap);
+    Texture(Badge<Registry>, Extent2D, Format, Usage, MinFilter, MagFilter, Mipmap, Multisampling);
 
     [[nodiscard]] const Extent2D& extent() const { return m_extent; }
     [[nodiscard]] Format format() const { return m_format; }
@@ -98,6 +107,9 @@ struct Texture : public Resource {
     [[nodiscard]] Mipmap mipmap() const { return m_mipmap; }
     [[nodiscard]] bool hasMipmaps() const;
     [[nodiscard]] uint32_t mipLevels() const;
+
+    [[nodiscard]] bool isMultisampled() const;
+    [[nodiscard]] Multisampling multisampling() const;
 
     [[nodiscard]] bool hasDepthFormat() const
     {
@@ -111,6 +123,7 @@ private:
     MinFilter m_minFilter;
     MagFilter m_magFilter;
     Mipmap m_mipmap;
+    Multisampling m_multisampling;
 };
 
 enum class LoadOp {

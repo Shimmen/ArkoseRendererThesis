@@ -252,7 +252,7 @@ void VulkanBackend::createAndSetupSwapchain(VkPhysicalDevice physicalDevice, VkD
     // TODO: This is clearly stupid.. again....!!
     Registry badgeGiver {};
     m_swapchainDepthTexture = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Depth32F, Texture::Usage::Attachment,
-                                      Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
+                                      Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None, Texture::Multisampling::None);
     newTexture(m_swapchainDepthTexture);
     setupWindowRenderTargets();
 
@@ -335,8 +335,8 @@ void VulkanBackend::createWindowRenderTargetFrontend()
         if (m_swapchainMockColorTextures[i].hasBackend()) {
             m_textureInfos.remove(m_swapchainMockColorTextures[i].id());
         }
-        m_swapchainMockColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown,
-                                                  Texture::Usage::Attachment, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None);
+        m_swapchainMockColorTextures[i] = Texture(badgeGiver.exchangeBadges(backendBadge()), m_swapchainExtent, Texture::Format::Unknown, Texture::Usage::Attachment,
+                                                  Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None, Texture::Multisampling::None);
         size_t colorIndex = m_textureInfos.add(colorInfo);
         m_swapchainMockColorTextures[i].registerBackend(backendBadge(), colorIndex);
 
@@ -839,7 +839,7 @@ void VulkanBackend::newTexture(const Texture& texture)
     imageCreateInfo.format = format;
     imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.samples = static_cast<VkSampleCountFlagBits>(texture.multisampling());
     imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkImage image;

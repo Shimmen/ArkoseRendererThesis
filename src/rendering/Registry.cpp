@@ -30,9 +30,9 @@ RenderTarget& Registry::createRenderTarget(std::initializer_list<RenderTarget::A
     return m_renderTargets.back();
 }
 
-Texture& Registry::createTexture2D(Extent2D extent, Texture::Format format, Texture::Usage usage)
+Texture& Registry::createTexture2D(Extent2D extent, Texture::Format format, Texture::Usage usage, Texture::Multisampling ms)
 {
-    Texture texture { {}, extent, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, Texture::Mipmap::None };
+    Texture texture { {}, extent, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, Texture::Mipmap::None, ms };
     m_textures.push_back(texture);
     return m_textures.back();
 }
@@ -69,7 +69,7 @@ Texture& Registry::createPixelTexture(vec4 pixelValue, bool srgb)
         : Texture::Format::RGBA8;
     auto usage = Texture::Usage::Sampled;
 
-    m_textures.push_back({ {}, { 1, 1 }, format, usage, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None });
+    m_textures.push_back({ {}, { 1, 1 }, format, usage, Texture::MinFilter::Nearest, Texture::MagFilter::Nearest, Texture::Mipmap::None, Texture::Multisampling::None });
     Texture& texture = m_textures.back();
 
     m_immediateTextureUpdates.emplace_back(texture, pixelValue);
@@ -106,7 +106,7 @@ Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool g
 
     auto mipmapMode = generateMipmaps ? Texture::Mipmap::Linear : Texture::Mipmap::None;
 
-    m_textures.push_back({ {}, { width, height }, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, mipmapMode });
+    m_textures.push_back({ {}, { width, height }, format, usage, Texture::MinFilter::Linear, Texture::MagFilter::Linear, mipmapMode, Texture::Multisampling::None });
     Texture& texture = m_textures.back();
 
     m_immediateTextureUpdates.emplace_back(texture, imagePath, generateMipmaps);
@@ -117,7 +117,7 @@ Texture& Registry::loadTexture2D(const std::string& imagePath, bool srgb, bool g
 RenderState& Registry::createRenderState(const RenderStateBuilder& builder)
 {
     return createRenderState(builder.renderTarget, builder.vertexLayout, builder.shader,
-                             builder.bindingSets(), builder.viewport(), builder.blendState(), builder.rasterState(), builder.depthState() );
+                             builder.bindingSets(), builder.viewport(), builder.blendState(), builder.rasterState(), builder.depthState());
 }
 
 RenderState& Registry::createRenderState(
