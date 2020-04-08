@@ -1725,6 +1725,11 @@ void VulkanBackend::newBindingSet(const BindingSet& bindingSet)
             case ShaderBindingType::StorageBufferArray: {
 
                 ASSERT(bindingInfo.count == bindingInfo.buffers.size());
+
+                if (bindingInfo.count == 0) {
+                    continue;
+                }
+
                 for (const Buffer* buffer : bindingInfo.buffers) {
 
                     ASSERT(buffer);

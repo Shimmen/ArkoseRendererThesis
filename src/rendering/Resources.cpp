@@ -283,7 +283,7 @@ ShaderBinding::ShaderBinding(uint32_t index, ShaderStage shaderStage, const std:
     , textures()
 {
     if (count < 1) {
-        LogErrorAndExit("ShaderBinding error: too few buffers in list\n");
+        //LogErrorAndExit("ShaderBinding error: too few buffers in list\n");
     }
 
     for (auto buffer : buffers) {
