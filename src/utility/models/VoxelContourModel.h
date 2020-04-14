@@ -9,9 +9,10 @@ public:
         aabb3 aabb;
         vec3 normal;
         float distance;
+        uint32_t colorIndex;
     };
 
-    explicit VoxelContourModel(std::vector<VoxelContour>);
+    VoxelContourModel(std::vector<VoxelContour>, std::vector<vec3> colors);
     VoxelContourModel() = default;
     ~VoxelContourModel() = default;
 
@@ -19,7 +20,9 @@ public:
     void forEachMesh(std::function<void(const Mesh&)>) const override;
 
     const std::vector<VoxelContour>& contours() const { return m_contours; }
+    const std::vector<vec3>& colors() const { return m_colors; }
 
 private:
     std::vector<VoxelContour> m_contours;
+    std::vector<vec3> m_colors;
 };

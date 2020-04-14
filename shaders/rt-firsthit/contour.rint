@@ -8,9 +8,10 @@
 
 layout(set = 1, binding = 6) buffer readonly VoxelContours  { RTVoxelContour contours[]; } sets[];
 layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABB_packable aabbs[]; } aabbSets[];
+layout(set = 1, binding = 8, scalar) buffer readonly ColorIdx { uint colorIndices[]; } colorSets[];
 
 struct ContourHit {
-	vec3 normal;
+	uint colorIndex;
 };
 
 hitAttributeNV ContourHit hit;
@@ -38,7 +39,7 @@ void main()
 		vec3 aabbMax = gl_ObjectToWorldNV * vec4(aabb.maxX, aabb.maxY, aabb.maxZ, 1.0);
 
 		if (all(greaterThanEqual(hitPoint, aabbMin)) && all(lessThanEqual(hitPoint, aabbMax))) {
-			hit.normal = normalize(plane.xyz);
+			hit.colorIndex = colorSets[gl_InstanceCustomIndexNV].colorIndices[gl_PrimitiveID];
 			reportIntersectionNV(t, 0u);
 		}
 	}
@@ -58,11 +59,10 @@ void main()
 	// Does work, but that's just for testing..
 	float tmin, tmax;
 	if (rayAabbIntersection(aabbMin, aabbMax, gl_WorldRayOriginNV, gl_WorldRayDirectionNV, tmin, tmax)) {
+		hit.colorIndex = colorSets[gl_InstanceCustomIndexNV].colorIndices[gl_PrimitiveID];
 		if (tmin >= gl_RayTminNV && tmin <= gl_RayTmaxNV) {
-			hit.normal = normalize(contour.plane.xyz);
 			reportIntersectionNV(tmin, 0u);
 		} else if (tmax >= gl_RayTminNV && tmax <= gl_RayTmaxNV) {
-			hit.normal = normalize(contour.plane.xyz);
 			reportIntersectionNV(tmax, 0u);
 		}
 	}

@@ -338,7 +338,6 @@ std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
     using json = nlohmann::json;
 
     std::vector<VoxelContourModel::VoxelContour> contours;
-
     for (auto& jsonContour : proxy.at("contours")) {
 
         std::vector<float> minC = jsonContour.at("aabbMin");
@@ -353,9 +352,18 @@ std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
 
         float distance = jsonContour.at("distance");
 
-        VoxelContourModel::VoxelContour contour { aabb, normal, distance };
+        uint32_t colorIndex = jsonContour.at("colorIndex");
+
+        VoxelContourModel::VoxelContour contour { aabb, normal, distance, colorIndex };
         contours.push_back(contour);
     }
 
-    return std::make_unique<VoxelContourModel>(contours);
+    std::vector<vec3> colors;
+    for (auto& jsonColor : proxy.at("colors")) {
+
+        vec3 color = { jsonColor[0], jsonColor[1], jsonColor[2] };
+        colors.push_back(color);
+    }
+
+    return std::make_unique<VoxelContourModel>(contours, colors);
 }

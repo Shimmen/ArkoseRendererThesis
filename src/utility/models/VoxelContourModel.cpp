@@ -1,7 +1,8 @@
 #include "VoxelContourModel.h"
 
-VoxelContourModel::VoxelContourModel(std::vector<VoxelContour> contours)
+VoxelContourModel::VoxelContourModel(std::vector<VoxelContour> contours, std::vector<vec3> colors)
     : m_contours(std::move(contours))
+    , m_colors(std::move(colors))
 {
 }
 

@@ -28,6 +28,9 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
     std::vector<const Buffer*> contourPlaneBuffers {};
     std::vector<const Buffer*> contourAabbBuffers {};
 
+    std::vector<vec4> contourColors {};
+    std::vector<const Buffer*> contourColorIdxBuffers {};
+
     std::vector<const Texture*> allTextures {};
     std::vector<RTMesh> rtMeshes {};
 
@@ -97,6 +100,7 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
             if (voxelContourModel) {
                 std::vector<RTVoxelContour> contourPlaneData;
                 std::vector<RTAABB_packable> contourAabbData;
+                std::vector<uint32_t> contourColorIdxData;
                 for (const auto& contour : voxelContourModel->contours()) {
 
                     RTVoxelContour rtContour;
@@ -112,9 +116,18 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
 
                     contourPlaneData.push_back(rtContour);
                     contourAabbData.push_back(rtAabb);
+
+                    size_t colorIdxOffset = contourColors.size();
+                    contourColorIdxData.push_back(colorIdxOffset + contour.colorIndex);
                 }
+
+                for (const vec3& color : voxelContourModel->colors()) {
+                    contourColors.push_back(vec4(color, 0.0));
+                }
+
                 contourPlaneBuffers.push_back(&nodeReg.createBuffer(std::move(contourPlaneData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
                 contourAabbBuffers.push_back(&nodeReg.createBuffer(std::move(contourAabbData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+                contourColorIdxBuffers.push_back(&nodeReg.createBuffer(std::move(contourColorIdxData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
 
                 return;
             }
@@ -124,6 +137,7 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
     });
 
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
+    Buffer& contourColorBuffer = nodeReg.createBuffer(std::move(contourColors), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
@@ -131,7 +145,9 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                                                          { 4, ShaderStageRTIntersection, sphereBuffers },
                                                          { 5, ShaderStageRTIntersection, shBuffers },
                                                          { 6, ShaderStageRTIntersection, contourPlaneBuffers },
-                                                         { 7, ShaderStageRTIntersection, contourAabbBuffers } });
+                                                         { 7, ShaderStageRTIntersection, contourAabbBuffers },
+                                                         { 8, ShaderStageRTIntersection, contourColorIdxBuffers },
+                                                         { 9, ShaderStageRTClosestHit, &contourColorBuffer, ShaderBindingType::StorageBuffer } });
 }
 
 RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) const
