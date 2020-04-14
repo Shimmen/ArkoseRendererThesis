@@ -8,7 +8,7 @@ public:
     struct VoxelContour {
         aabb3 aabb;
         vec3 normal;
-        float centerOffset;
+        float distance;
     };
 
     explicit VoxelContourModel(std::vector<VoxelContour>);

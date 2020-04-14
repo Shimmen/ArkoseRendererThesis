@@ -25,6 +25,9 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
     std::vector<const Buffer*> sphereBuffers {};
     std::vector<const Buffer*> shBuffers {};
 
+    std::vector<const Buffer*> contourPlaneBuffers {};
+    std::vector<const Buffer*> contourAabbBuffers {};
+
     std::vector<const Texture*> allTextures {};
     std::vector<RTMesh> rtMeshes {};
 
@@ -92,7 +95,23 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
 
             const auto* voxelContourModel = dynamic_cast<const VoxelContourModel*>(&model.proxy());
             if (voxelContourModel) {
-                // TODO: Add custom data for voxel contour stuff here. But for now we just render the full voxels
+                std::vector<RTVoxelContour> contourPlaneData;
+                std::vector<RTAABB> contourAabbData;
+                for (const auto& contour : voxelContourModel->contours()) {
+
+                    RTVoxelContour rtContour;
+                    rtContour.plane = vec4(contour.normal, contour.distance);
+
+                    RTAABB rtAabb;
+                    rtAabb.min = contour.aabb.min;
+                    rtAabb.max = contour.aabb.max;
+
+                    contourPlaneData.push_back(rtContour);
+                    contourAabbData.push_back(rtAabb);
+                }
+                contourPlaneBuffers.push_back(&nodeReg.createBuffer(std::move(contourPlaneData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+                contourAabbBuffers.push_back(&nodeReg.createBuffer(std::move(contourAabbData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+
                 return;
             }
 
@@ -106,7 +125,9 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
                                                          { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
                                                          { 4, ShaderStageRTIntersection, sphereBuffers },
-                                                         { 5, ShaderStageRTIntersection, shBuffers } });
+                                                         { 5, ShaderStageRTIntersection, shBuffers },
+                                                         { 6, ShaderStageRTIntersection, contourPlaneBuffers },
+                                                         { 7, ShaderStageRTIntersection, contourAabbBuffers } });
 }
 
 RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) const

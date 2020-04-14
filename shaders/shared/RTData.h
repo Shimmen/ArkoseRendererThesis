@@ -21,6 +21,10 @@ struct RTSphere {
 	// TODO: Maybe put some material stuff here?
 };
 
+struct RTVoxelContour {
+    vec4 plane;
+};
+
 struct RTVertex {
     // TODO: we could fit the tex coord data in .w of position & normal!
     vec4 position;

@@ -20,15 +20,15 @@
     {
       "name": "barrel",
       "gltf": "assets/Barrel/barrel.gltf",
-      "proxy": "assets/Barrel/barrel_spheres.json",
+      "proxy": "assets/Barrel/barrel_contours.json",
       "transform": {
-        "translation": [ 0, -0.5, 0 ],
+        "translation": [ 0, 0, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
           "angle": 0.0
         },
-        "scale": [ 8, 8, 8 ]
+        "scale": [ 1, 1, 1 ]
       }
     }
   ],

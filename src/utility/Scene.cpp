@@ -341,7 +341,6 @@ std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
 
     for (auto& jsonContour : proxy.at("contours")) {
 
-
         std::vector<float> minC = jsonContour.at("aabbMin");
         std::vector<float> maxC = jsonContour.at("aabbMax");
 
@@ -352,9 +351,9 @@ std::unique_ptr<Model> Scene::loadVoxelContourProxy(const nlohmann::json& proxy)
         std::vector<float> norm = jsonContour.at("normal");
         vec3 normal = { norm[0], norm[1], norm[2] };
 
-        float centerOffset = jsonContour.at("centerOffset");
+        float distance = jsonContour.at("distance");
 
-        VoxelContourModel::VoxelContour contour { aabb, normal, centerOffset };
+        VoxelContourModel::VoxelContour contour { aabb, normal, distance };
         contours.push_back(contour);
     }
 

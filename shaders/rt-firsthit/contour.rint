@@ -1,5 +1,13 @@
 #version 460
 #extension GL_NV_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_scalar_block_layout : require
+
+#include <shared/RTData.h>
+#include <intersections.glsl>
+
+layout(set = 1, binding = 6) buffer readonly VoxelContours  { RTVoxelContour contours[]; } sets[];
+layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABB aabbs[]; } aabbSets[];
 
 struct ContourHit {
 	vec3 normal;
@@ -9,10 +17,39 @@ hitAttributeNV ContourHit hit;
 
 void main()
 {
-	// TODO: Implement actual contour test!
+	RTVoxelContour contour = sets[gl_InstanceCustomIndexNV].contours[gl_PrimitiveID];
 
-	hit.normal = vec3(0, 1, 0);
+	vec4 plane = contour.plane;
+	plane = transpose(mat4(gl_WorldToObjectNV)) * plane;
 
-	const float t = gl_RayTminNV;
-	reportIntersectionNV(t, 0u);
+	vec3 N = plane.xyz;
+	float d = plane.w;
+
+	float t;
+	if (rayPlaneIntersection(N, -d, gl_WorldRayOriginNV, gl_WorldRayDirectionNV, t) && t >= gl_RayTminNV && t <= gl_RayTmaxNV) {
+		vec3 hitPoint = gl_WorldRayOriginNV + t * gl_WorldRayDirectionNV;
+		RTAABB aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
+		if (all(greaterThanEqual(hitPoint, aabb.min)) && all(lessThanEqual(hitPoint, aabb.max))) {
+			hit.normal = N;
+			reportIntersectionNV(t, 0u);
+		}
+	}
+
+/*
+	// Doesn't work, since gl_RayTminNV is not set relative to our AABB!
+	//hit.normal = N;
+	//reportIntersectionNV(gl_RayTminNV, 0u);
+
+	// Does work, but that's just for testing..
+	float tmin, tmax;
+	if (rayAabbIntersection(aabbMin, aabbMax, gl_WorldRayOriginNV, gl_WorldRayDirectionNV, tmin, tmax)) {
+		if (tmin >= gl_RayTminNV && tmin <= gl_RayTmaxNV) {
+			hit.normal = N;
+			reportIntersectionNV(tmin, 0u);
+		} else if (tmax >= gl_RayTminNV && tmax <= gl_RayTmaxNV) {
+			hit.normal = N;
+			reportIntersectionNV(tmax, 0u);
+		}
+	}
+*/
 }
