@@ -8,7 +8,7 @@
       "name": "cornell-box",
       "gltf": "assets/CornellBox/CornellBoxEmpty.gltf",
       "transform": {
-        "translation": [ 0, -1, 0 ],
+        "translation": [ 0, 0, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
@@ -22,13 +22,13 @@
       "gltf": "assets/Barrel/barrel.gltf",
       "proxy": "assets/Barrel/barrel_contours.json",
       "transform": {
-        "translation": [ 0, 0, 0 ],
+        "translation": [ 0, 1, 0 ],
         "rotation": {
           "type": "axis-angle",
           "axis": [ 0, 1, 0 ],
           "angle": 0.0
         },
-        "scale": [ 1, 1, 1 ]
+        "scale": [ 4, 4, 4 ]
       }
     }
   ],
