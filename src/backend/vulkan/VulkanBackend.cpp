@@ -658,6 +658,16 @@ void VulkanBackend::drawFrame(const AppState& appState, double elapsedTime, doub
 
 void VulkanBackend::newBuffer(const Buffer& buffer)
 {
+    // NOTE: Vulkan doesn't seem to like to create buffers of size 0. Of course, it's correct
+    //  in that it is stupid, but it can be useful when debugging and testing to just not supply
+    //  any data and create an empty buffer while not having to change any shader code or similar.
+    //  To get around this here we simply force a size of 1 instead, but as far as the frontend
+    //  is conserned we don't have access to that one byte.
+    size_t bufferSize = buffer.size();
+    if (bufferSize == 0) {
+        bufferSize = 1;
+    }
+
     VkBufferUsageFlags usageFlags = 0u;
     switch (buffer.usage()) {
     case Buffer::Usage::Vertex:
@@ -698,7 +708,7 @@ void VulkanBackend::newBuffer(const Buffer& buffer)
 
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    bufferCreateInfo.size = buffer.size();
+    bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usageFlags;
 
     VkBuffer vkBuffer;
@@ -3072,6 +3082,10 @@ bool VulkanBackend::copyBuffer(VkBuffer source, VkBuffer destination, VkDeviceSi
 
 bool VulkanBackend::setBufferMemoryUsingMapping(VmaAllocation allocation, const void* data, VkDeviceSize size)
 {
+    if (size == 0) {
+        return true;
+    }
+
     void* mappedMemory;
     if (vmaMapMemory(m_memoryAllocator, allocation, &mappedMemory) != VK_SUCCESS) {
         LogError("VulkanBackend::setBufferMemoryUsingMapping(): could not map staging buffer.\n");
@@ -3084,6 +3098,10 @@ bool VulkanBackend::setBufferMemoryUsingMapping(VmaAllocation allocation, const 
 
 bool VulkanBackend::setBufferDataUsingStagingBuffer(VkBuffer buffer, const void* data, VkDeviceSize size, VkCommandBuffer* commandBuffer)
 {
+    if (size == 0) {
+        return true;
+    }
+
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;

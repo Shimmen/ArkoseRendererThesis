@@ -114,6 +114,5 @@ template<typename T>
 {
     size_t dataSize = inData.size() * sizeof(T);
     auto* binaryData = reinterpret_cast<const std::byte*>(inData.data());
-    ASSERT(binaryData != nullptr);
     return createBuffer(binaryData, dataSize, usage, memoryHint);
 }

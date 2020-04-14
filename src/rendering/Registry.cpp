@@ -39,7 +39,9 @@ Texture& Registry::createTexture2D(Extent2D extent, Texture::Format format, Text
 
 Buffer& Registry::createBuffer(size_t size, Buffer::Usage usage, Buffer::MemoryHint memoryHint)
 {
-    ASSERT(size > 0);
+    if (size == 0) {
+        LogWarning("Warning: creating buffer of size 0!\n");
+    }
     Buffer buffer = { {}, size, usage, memoryHint };
     m_buffers.push_back(buffer);
     return m_buffers.back();
