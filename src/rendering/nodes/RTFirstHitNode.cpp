@@ -96,15 +96,19 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
             const auto* voxelContourModel = dynamic_cast<const VoxelContourModel*>(&model.proxy());
             if (voxelContourModel) {
                 std::vector<RTVoxelContour> contourPlaneData;
-                std::vector<RTAABB> contourAabbData;
+                std::vector<RTAABB_packable> contourAabbData;
                 for (const auto& contour : voxelContourModel->contours()) {
 
                     RTVoxelContour rtContour;
                     rtContour.plane = vec4(contour.normal, contour.distance);
 
-                    RTAABB rtAabb;
-                    rtAabb.min = contour.aabb.min;
-                    rtAabb.max = contour.aabb.max;
+                    RTAABB_packable rtAabb;
+                    rtAabb.minX = contour.aabb.min.x;
+                    rtAabb.minY = contour.aabb.min.y;
+                    rtAabb.minZ = contour.aabb.min.z;
+                    rtAabb.maxX = contour.aabb.max.x;
+                    rtAabb.maxY = contour.aabb.max.y;
+                    rtAabb.maxZ = contour.aabb.max.z;
 
                     contourPlaneData.push_back(rtContour);
                     contourAabbData.push_back(rtAabb);

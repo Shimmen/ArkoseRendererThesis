@@ -15,6 +15,11 @@ struct RTAABB {
 	vec3 max;
 };
 
+struct RTAABB_packable {
+	float minX, minY, minZ;
+	float maxX, maxY, maxZ;
+};
+
 struct RTSphere {
 	vec3 center;
 	float radius;

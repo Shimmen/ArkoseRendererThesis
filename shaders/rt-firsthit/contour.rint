@@ -7,7 +7,7 @@
 #include <intersections.glsl>
 
 layout(set = 1, binding = 6) buffer readonly VoxelContours  { RTVoxelContour contours[]; } sets[];
-layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABB aabbs[]; } aabbSets[];
+layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABB_packable aabbs[]; } aabbSets[];
 
 struct ContourHit {
 	vec3 normal;
@@ -28,8 +28,12 @@ void main()
 	float t;
 	if (rayPlaneIntersection(N, -d, gl_WorldRayOriginNV, gl_WorldRayDirectionNV, t) && t >= gl_RayTminNV && t <= gl_RayTmaxNV) {
 		vec3 hitPoint = gl_WorldRayOriginNV + t * gl_WorldRayDirectionNV;
-		RTAABB aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
-		if (all(greaterThanEqual(hitPoint, aabb.min)) && all(lessThanEqual(hitPoint, aabb.max))) {
+
+		RTAABB_packable aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
+		vec3 aabbMin = vec3(aabb.minX, aabb.minY, aabb.minZ);
+		vec3 aabbMax = vec3(aabb.maxX, aabb.maxY, aabb.maxZ);
+
+		if (all(greaterThanEqual(hitPoint, aabbMin)) && all(lessThanEqual(hitPoint, aabbMax))) {
 			hit.normal = N;
 			reportIntersectionNV(t, 0u);
 		}
