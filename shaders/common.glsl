@@ -73,26 +73,24 @@ vec2 hammersley(uint i, uint n)
 
 vec3 sampleSphericalHarmonic(SphericalHarmonics sh, vec3 dir)
 {
-    // SH basis
-    float Y00     = 0.282095;
-    float Y11     = 0.488603 * dir.x;
-    float Y10     = 0.488603 * dir.z;
-    float Y1_1    = 0.488603 * dir.y;
-    float Y21     = 1.092548 * dir.x * dir.z;
-    float Y2_1    = 1.092548 * dir.y * dir.z;
-    float Y2_2    = 1.092548 * dir.y * dir.x;
-    float Y20     = 0.946176 * dir.z * dir.z - 0.315392;
-    float Y22     = 0.546274 * (dir.x * dir.x - dir.y * dir.y);
+    // See https://github.com/google/spherical-harmonics/blob/master/sh/spherical_harmonics.cc#L103
+    // This function uses second order SH
 
-    // Used for extracting irradiance from the SH, see paper:
-    // https://graphics.stanford.edu/papers/envmap/envmap.pdf
-    float A0 = PI;
-    float A1 = 2.0 / 3.0 * PI;
-    float A2 = 1.0 / 4.0 * PI;
+    float Y00     = +0.282095;
 
-    return A0*Y00*sh.L00.xyz
-         + A1*Y1_1*sh.L1_1.xyz + A1*Y10*sh.L10.xyz + A1*Y11*sh.L11.xyz
-         + A2*Y2_2*sh.L2_2.xyz + A2*Y2_1*sh.L2_1.xyz + A2*Y20*sh.L20.xyz + A2*Y21*sh.L21.xyz + A2*Y22*sh.L22.xyz;
+    float Y1_1    = -0.488603 * dir.y;
+    float Y10     = +0.488603 * dir.z;
+    float Y11     = -0.488603 * dir.x;
+
+    float Y2_2    = +1.092548 * dir.x * dir.y;
+    float Y2_1    = -1.092548 * dir.y * dir.z;
+    float Y20     = +0.315392 * (-dir.x * dir.x - dir.y * dir.y + 2.0 * dir.z * dir.z);
+    float Y21     = +1.092548 * dir.x * dir.z;
+    float Y22     = +0.546274 * (dir.x * dir.x - dir.y * dir.y);
+
+    return Y00  * sh.L00.xyz
+         + Y1_1 * sh.L1_1.xyz +  Y10 * sh.L10.xyz  + Y11 * sh.L11.xyz
+         + Y2_2 * sh.L2_2.xyz + Y2_1 * sh.L2_1.xyz + Y20 * sh.L20.xyz + Y21 * sh.L21.xyz + Y22 * sh.L22.xyz;
 }
 
 // Source: http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
