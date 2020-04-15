@@ -63,17 +63,14 @@ void main()
 	unpack(mesh, v0, v1, v2);
 
 	const vec3 b = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
-
-	vec3 N = normalize(v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z);
 	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
+
+	mat3 normalMatrix = transpose(mat3(gl_WorldToObjectNV));
+	vec3 N = normalize(normalMatrix * (v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z));
 
 	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
 
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
-	vec3 color = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);
-
-	//hitValue = N * 0.5 + 0.5;
-	//hitValue = vec3(uv, 0.0);
-	hitValue = color;
+	hitValue = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);
 }
