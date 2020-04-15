@@ -45,12 +45,11 @@ bool hitPointInShadow(vec3 L)
 void main()
 {
 	vec3 N = normalize(hit.normal);
-
-	vec3 baseColor = pow(hit.color, vec3(1.0 / 2.2));
-	//vec3 baseColor = pow(vec3(0.0, 0.15, 0.80), vec3(2.2)); // (hardcoded blue for the bunny test)
+	vec3 baseColor = hit.color;
 
 	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
+
 	vec3 color = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);
 
 	hitValue = color;
