@@ -4,9 +4,9 @@ if (APPLE)
 elseif(WIN32)
     # TODO: Don't assume SDK version like this! Do something proper
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(VULKAN_SDK_SEARCH_PATHS "C:/VulkanSDK/1.2.131.2/Lib")
+        set(VULKAN_SDK_SEARCH_PATHS "C:/VulkanSDK/1.2.131.1/Lib")
     else()
-        set(VULKAN_SDK_SEARCH_PATHS "C:/VulkanSDK/1.2.131.2/Lib32")
+        set(VULKAN_SDK_SEARCH_PATHS "C:/VulkanSDK/1.2.131.1/Lib32")
     endif()
 endif()
 
