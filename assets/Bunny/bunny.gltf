@@ -65,9 +65,9 @@
             "name" : "Default OBJ",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
-                    0,
-                    0.14995987713336945,
-                    0.7991029620170593,
+                    0.5880700945854187,
+                    0.5298890471458435,
+                    0.6087254881858826,
                     1
                 ],
                 "metallicFactor" : 0,
