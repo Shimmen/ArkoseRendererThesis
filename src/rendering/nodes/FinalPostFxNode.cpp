@@ -40,8 +40,13 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     BindingSet& sourceImage = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTexture } });
     BindingSet& sourceImageRt = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTextureRt } });
 
-    //BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTReflectionsNode::name(), "reflections") } });
-    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(RTDiffuseGINode::name(), "diffuseGI") } });
+    // TODO: Maybe return an optional instead, so we can use value_or(..)
+    const Texture* glossyGI = reg.getTexture(RTReflectionsNode::name(), "reflections");
+    const Texture* diffuseGI = reg.getTexture(RTDiffuseGINode::name(), "diffuseGI");
+    if (!diffuseGI) {
+        diffuseGI = &reg.createPixelTexture(vec4(0, 0, 0, 1), true);
+    }
+    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, diffuseGI } });
 
     BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                        { 1, ShaderStageFragment, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
