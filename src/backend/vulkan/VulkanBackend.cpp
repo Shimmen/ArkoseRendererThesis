@@ -2298,6 +2298,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
 
     VkAccelerationStructureInfoNV accelerationStructureInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     accelerationStructureInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+    accelerationStructureInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV;
     accelerationStructureInfo.instanceCount = 0;
     accelerationStructureInfo.geometryCount = geometries.size();
     accelerationStructureInfo.pGeometries = geometries.data();
@@ -2395,7 +2396,7 @@ void VulkanBackend::newTopLevelAccelerationStructure(const TopLevelAS& tlas)
     }
 
     // Something more here maybe? Like fast to build/traverse, can be compacted, etc.
-    VkBuildAccelerationStructureFlagBitsNV flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
+    auto flags = VkBuildAccelerationStructureFlagBitsNV(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV | VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV);
 
     VkAccelerationStructureInfoNV accelerationStructureInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     accelerationStructureInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
