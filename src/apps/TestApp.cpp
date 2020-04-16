@@ -20,7 +20,7 @@ void TestApp::setup(RenderGraph& graph)
     //m_scene = Scene::loadFromFile("assets/Scenes/test.json");
     //m_scene = Scene::loadFromFile("assets/Scenes/proxy-test.json");
     //m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
-    m_scene = Scene::loadFromFile("assets/Scenes/eval/small_contours.json");
+    m_scene = Scene::loadFromFile("assets/Scenes/eval/small_spheres.json");
     m_scene->camera().setMaxSpeed(2.0f);
 
     graph.addNode<SceneUniformNode>(*m_scene);
