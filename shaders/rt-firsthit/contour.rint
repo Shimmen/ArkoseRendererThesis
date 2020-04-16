@@ -18,39 +18,37 @@ hitAttributeNV ContourHit hit;
 
 void main()
 {
-
 	RTVoxelContour contour = sets[gl_InstanceCustomIndexNV].contours[gl_PrimitiveID];
 
 #if 1
 
 	vec4 plane = contour.plane;
-	plane.w = -plane.w;
-
-	plane = transpose(mat4(gl_WorldToObjectNV)) * plane;
+	plane.w = -plane.w; // TODO: Fix in proxy gen!
 
 	float t;
-	if (rayPlaneIntersection(plane.xyz, plane.w, gl_WorldRayOriginNV, gl_WorldRayDirectionNV, t) && t >= gl_RayTminNV && t <= gl_RayTmaxNV) {
-		vec3 hitPoint = gl_WorldRayOriginNV + t * gl_WorldRayDirectionNV;
+	if (rayPlaneIntersection(plane.xyz, plane.w, gl_ObjectRayOriginNV, gl_ObjectRayDirectionNV, t) && t >= gl_RayTminNV && t <= gl_RayTmaxNV) {
+		vec3 hitPoint = gl_ObjectRayOriginNV + t * gl_ObjectRayDirectionNV;
 
-		// FIXME: To support arbitrary rotation we need to do something like this:
-		//  http://dev.theomader.com/transform-bounding-boxes/, not just transform the corners.
-		RTAABB_packable aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
-		vec3 aabbMin = gl_ObjectToWorldNV * vec4(aabb.minX, aabb.minY, aabb.minZ, 1.0);
-		vec3 aabbMax = gl_ObjectToWorldNV * vec4(aabb.maxX, aabb.maxY, aabb.maxZ, 1.0);
+		RTAABB_packable _aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
+		vec3 aabbMin = vec3(_aabb.minX, _aabb.minY, _aabb.minZ);
+		vec3 aabbMax = vec3(_aabb.maxX, _aabb.maxY, _aabb.maxZ);
 
 		if (all(greaterThanEqual(hitPoint, aabbMin)) && all(lessThanEqual(hitPoint, aabbMax))) {
 			hit.colorIndex = colorSets[gl_InstanceCustomIndexNV].colorIndices[gl_PrimitiveID];
+
+			//float localT = t;
+			//float globalT = distance(gl_WorldRayOriginNV, gl_ObjectToWorldNV * vec4(hitPoint, 1.0));
+			//if (abs(globalT - localT) < 1e-3) { /* yes, this is actually true */ }
+
 			reportIntersectionNV(t, 0u);
 		}
 	}
 
 #else
 
-	// FIXME: To support arbitrary rotation we need to do something like this:
-	//  http://dev.theomader.com/transform-bounding-boxes/, not just transform the corners.
-	RTAABB_packable aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
-	vec3 aabbMin = gl_ObjectToWorldNV * vec4(aabb.minX, aabb.minY, aabb.minZ, 1.0);
-	vec3 aabbMax = gl_ObjectToWorldNV * vec4(aabb.maxX, aabb.maxY, aabb.maxZ, 1.0);
+	RTAABB_packable _aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
+	vec3 aabbMin = vec3(_aabb.minX, _aabb.minY, _aabb.minZ);
+	vec3 aabbMax = vec3(_aabb.maxX, _aabb.maxY, _aabb.maxZ);
 
 	// Doesn't work, since gl_RayTminNV is not set relative to our AABB!
 	//hit.normal = N;
@@ -58,7 +56,7 @@ void main()
 
 	// Does work, but that's just for testing..
 	float tmin, tmax;
-	if (rayAabbIntersection(aabbMin, aabbMax, gl_WorldRayOriginNV, gl_WorldRayDirectionNV, tmin, tmax)) {
+	if (rayAabbIntersection(aabbMin, aabbMax, gl_ObjectRayOriginNV, gl_ObjectRayDirectionNV, tmin, tmax)) {
 		hit.colorIndex = colorSets[gl_InstanceCustomIndexNV].colorIndices[gl_PrimitiveID];
 		if (tmin >= gl_RayTminNV && tmin <= gl_RayTmaxNV) {
 			reportIntersectionNV(tmin, 0u);

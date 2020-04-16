@@ -69,7 +69,9 @@ void TestApp::update(float elapsedTime, float deltaTime)
             }
         });
     } else {
-        mat4 matrix = mathkit::translate(0, 1, 0) * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f) * mathkit::scale(6);
+        mat4 matrix = mathkit::translate(0, 2.0f + sinf(elapsedTime), 0)
+            * mathkit::axisAngleMatrix({ 0, 1, 0 }, elapsedTime * 3.1415f / 2.0f)
+            * mathkit::scale(6.0f + 1.0f * cosf(elapsedTime));
         m_spinningObject->transform().setLocalMatrix(matrix);
     }
 
