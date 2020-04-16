@@ -9,6 +9,8 @@ public:
     FpsCamera() = default;
     ~FpsCamera() = default;
 
+    void setMaxSpeed(float);
+
     void update(const Input&, const Extent2D& screenExtent, float deltaTime);
 
     void setDidModify(bool);
@@ -43,7 +45,7 @@ private:
 
     static constexpr float zNear { 0.25f };
 
-    static constexpr float maxSpeed { 10.0f };
+    float maxSpeed { 10.0f };
     static constexpr float timeToMaxSpeed { 0.25f };
     static constexpr float timeFromMaxSpeed { 0.60f };
     static constexpr float stopThreshold { 0.02f };

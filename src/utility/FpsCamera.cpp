@@ -2,6 +2,11 @@
 
 #include "GlobalState.h"
 
+void FpsCamera::setMaxSpeed(float newMaxSpeed)
+{
+    maxSpeed = newMaxSpeed;
+}
+
 void FpsCamera::update(const Input& input, const Extent2D& screenExtent, float dt)
 {
     m_didModify = false;

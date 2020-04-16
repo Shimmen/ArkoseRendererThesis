@@ -211,11 +211,17 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("rt-diffuseGI/averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
+        static bool doRender = true;
         static bool ignoreColor = false;
         static bool useProxies = false;
         if (ImGui::CollapsingHeader("Diffuse GI")) {
+            ImGui::Checkbox("Render", &doRender);
             ImGui::Checkbox("Ignore color", &ignoreColor);
             ImGui::Checkbox("Use proxies", &useProxies);
+        }
+
+        if (!doRender) {
+            return;
         }
 
         std::vector<float> sphereSamples;
