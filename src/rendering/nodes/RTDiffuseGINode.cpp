@@ -6,6 +6,7 @@
 #include "SceneUniformNode.h"
 #include "utility/GlobalState.h"
 #include "utility/models/SphereSetModel.h"
+#include "utility/models/VoxelContourModel.h"
 #include <imgui.h>
 
 RTDiffuseGINode::RTDiffuseGINode(const Scene& scene)
@@ -26,6 +27,12 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
 
     std::vector<const Buffer*> sphereBuffers {};
     std::vector<const Buffer*> shBuffers {};
+
+    std::vector<const Buffer*> contourPlaneBuffers {};
+    std::vector<const Buffer*> contourAabbBuffers {};
+
+    std::vector<vec4> contourColors {};
+    std::vector<const Buffer*> contourColorIdxBuffers {};
 
     std::vector<const Texture*> allTextures {};
     std::vector<RTMesh> rtMeshes {};
@@ -90,20 +97,64 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
 
                 auto shData = sphereSetModel->sphericalHarmonics();
                 shBuffers.push_back(&nodeReg.createBuffer(std::move(shData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
-            } else {
-                //ASSERT_NOT_REACHED();
+
+                return;
             }
-            LogInfo("Ignoring sphere sets in RTDiffuseGINode\n");
+
+            const auto* voxelContourModel = dynamic_cast<const VoxelContourModel*>(&model.proxy());
+            if (voxelContourModel) {
+                std::vector<RTVoxelContour> contourPlaneData;
+                std::vector<RTAABB_packable> contourAabbData;
+                std::vector<uint32_t> contourColorIdxData;
+                for (const auto& contour : voxelContourModel->contours()) {
+
+                    RTVoxelContour rtContour;
+                    rtContour.plane = vec4(contour.normal, contour.distance);
+
+                    RTAABB_packable rtAabb;
+                    rtAabb.minX = contour.aabb.min.x;
+                    rtAabb.minY = contour.aabb.min.y;
+                    rtAabb.minZ = contour.aabb.min.z;
+                    rtAabb.maxX = contour.aabb.max.x;
+                    rtAabb.maxY = contour.aabb.max.y;
+                    rtAabb.maxZ = contour.aabb.max.z;
+
+                    contourPlaneData.push_back(rtContour);
+                    contourAabbData.push_back(rtAabb);
+
+                    size_t colorIdxOffset = contourColors.size();
+                    size_t index = colorIdxOffset + contour.colorIndex;
+                    ASSERT(index < UINT32_MAX);
+                    contourColorIdxData.push_back(static_cast<uint32_t>(index));
+                }
+
+                for (const vec3& color : voxelContourModel->colors()) {
+                    contourColors.push_back(vec4(color, 0.0));
+                }
+
+                contourPlaneBuffers.push_back(&nodeReg.createBuffer(std::move(contourPlaneData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+                contourAabbBuffers.push_back(&nodeReg.createBuffer(std::move(contourAabbData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+                contourColorIdxBuffers.push_back(&nodeReg.createBuffer(std::move(contourColorIdxData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
+
+                return;
+            }
+
+            ASSERT_NOT_REACHED();
         }
     });
 
     Buffer& meshBuffer = nodeReg.createBuffer(std::move(rtMeshes), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
+    Buffer& contourColorBuffer = nodeReg.createBuffer(std::move(contourColors), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal);
     m_objectDataBindingSet = &nodeReg.createBindingSet({ { 0, ShaderStageRTClosestHit, &meshBuffer, ShaderBindingType::StorageBuffer },
                                                          { 1, ShaderStageRTClosestHit, vertexBuffers },
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
                                                          { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
                                                          { 4, ShaderStageRTIntersection, sphereBuffers },
-                                                         { 5, ShaderStageRTIntersection, shBuffers } });
+                                                         { 5, ShaderStageRTIntersection, shBuffers },
+                                                         { 6, ShaderStageRTIntersection, contourPlaneBuffers },
+                                                         { 7, ShaderStageRTIntersection, contourAabbBuffers },
+                                                         { 8, ShaderStageRTIntersection, contourColorIdxBuffers },
+                                                         { 9, ShaderStageRTClosestHit, &contourColorBuffer, ShaderBindingType::StorageBuffer } });
 
     Extent2D windowExtent = GlobalState::get().windowExtent();
     m_accumulationTexture = &nodeReg.createTexture2D(windowExtent, Texture::Format::RGBA16F, Texture::Usage::StorageAndSample);
@@ -135,9 +186,10 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
         ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen");
         HitGroup mainHitGroup { ShaderFile("rt-diffuseGI/closestHit.rchit") };
         HitGroup sphereSetHitGroup { ShaderFile("rt-diffuseGI/sphere.rchit"), {}, ShaderFile("rt-diffuseGI/sphere.rint") };
+        HitGroup contourHitGroup { ShaderFile("rt-diffuseGI/contour.rchit"), {}, ShaderFile("rt-diffuseGI/contour.rint") };
         std::vector<ShaderFile> missShaders { ShaderFile("rt-diffuseGI/miss.rmiss"),
                                               ShaderFile("rt-diffuseGI/shadow.rmiss") };
-        ShaderBindingTable sbt { raygen, { mainHitGroup, sphereSetHitGroup }, missShaders };
+        ShaderBindingTable sbt { raygen, { mainHitGroup, sphereSetHitGroup, contourHitGroup }, missShaders };
 
         uint32_t maxRecursionDepth = 2;
         RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);

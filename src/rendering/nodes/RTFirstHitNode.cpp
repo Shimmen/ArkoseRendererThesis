@@ -118,7 +118,9 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                     contourAabbData.push_back(rtAabb);
 
                     size_t colorIdxOffset = contourColors.size();
-                    contourColorIdxData.push_back(colorIdxOffset + contour.colorIndex);
+                    size_t index = colorIdxOffset + contour.colorIndex;
+                    ASSERT(index < UINT32_MAX);
+                    contourColorIdxData.push_back(static_cast<uint32_t>(index));
                 }
 
                 for (const vec3& color : voxelContourModel->colors()) {

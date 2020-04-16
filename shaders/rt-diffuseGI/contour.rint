@@ -11,7 +11,7 @@ layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABB_packable aa
 layout(set = 1, binding = 8, scalar) buffer readonly ColorIdx { uint colorIndices[]; } colorSets[];
 
 struct ContourHit {
-	vec3 normal;
+    vec3 normal;
 	uint colorIndex;
 };
 
@@ -20,8 +20,6 @@ hitAttributeNV ContourHit hit;
 void main()
 {
 	RTVoxelContour contour = sets[gl_InstanceCustomIndexNV].contours[gl_PrimitiveID];
-
-#if 1
 
 	vec4 plane = contour.plane;
 	plane.w = -plane.w; // TODO: Fix in proxy gen!
@@ -45,27 +43,4 @@ void main()
 			reportIntersectionNV(t, 0u);
 		}
 	}
-
-#else
-
-	RTAABB_packable _aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
-	vec3 aabbMin = vec3(_aabb.minX, _aabb.minY, _aabb.minZ);
-	vec3 aabbMax = vec3(_aabb.maxX, _aabb.maxY, _aabb.maxZ);
-
-	// Doesn't work, since gl_RayTminNV is not set relative to our AABB!
-	//hit.normal = N;
-	//reportIntersectionNV(gl_RayTminNV, 0u);
-
-	// Does work, but that's just for testing..
-	float tmin, tmax;
-	if (rayAabbIntersection(aabbMin, aabbMax, gl_ObjectRayOriginNV, gl_ObjectRayDirectionNV, tmin, tmax)) {
-		hit.colorIndex = colorSets[gl_InstanceCustomIndexNV].colorIndices[gl_PrimitiveID];
-		if (tmin >= gl_RayTminNV && tmin <= gl_RayTmaxNV) {
-			reportIntersectionNV(tmin, 0u);
-		} else if (tmax >= gl_RayTminNV && tmax <= gl_RayTmaxNV) {
-			reportIntersectionNV(tmax, 0u);
-		}
-	}
-
-#endif
 }
