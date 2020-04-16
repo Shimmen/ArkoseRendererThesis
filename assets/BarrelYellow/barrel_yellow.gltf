@@ -1,0 +1,172 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v1.1.46",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                0
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "mesh" : 0,
+            "name" : "Barrel_01",
+            "rotation" : [
+                0,
+                0.3826834559440613,
+                0,
+                0.9238795042037964
+            ]
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "emissiveFactor" : [
+                0,
+                0,
+                0
+            ],
+            "name" : "Barrel_01",
+            "normalTexture" : {
+                "index" : 0,
+                "texCoord" : 0
+            },
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 1,
+                    "texCoord" : 0
+                },
+                "metallicRoughnessTexture" : {
+                    "index" : 2,
+                    "texCoord" : 0
+                }
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Mesh",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1,
+                        "TANGENT" : 2,
+                        "TEXCOORD_0" : 3
+                    },
+                    "indices" : 4,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        },
+        {
+            "source" : 1
+        },
+        {
+            "source" : 2
+        }
+    ],
+    "images" : [
+        {
+            "mimeType" : "image/png",
+            "name" : "Barrel_01_Radiation_8-bit_Normal",
+            "uri" : "Barrel_01_Radiation_8-bit_Normal.png"
+        },
+        {
+            "mimeType" : "image/png",
+            "name" : "Barrel_01_Radiation_8-bit_Diffuse",
+            "uri" : "Barrel_01_Radiation_8-bit_Diffuse.png"
+        },
+        {
+            "mimeType" : "image/png",
+            "name" : "Barrel_01_Radiation_8-bit_OcclusionRoughnessMetallic",
+            "uri" : "Barrel_01_Radiation_8-bit_OcclusionRoughnessMetallic.png"
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 2052,
+            "max" : [
+                0.2820320725440979,
+                0.8733856678009033,
+                0.27997586131095886
+            ],
+            "min" : [
+                -0.28203216195106506,
+                -0.0066143060103058815,
+                -0.2799758315086365
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 2052,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 2052,
+            "type" : "VEC4"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5126,
+            "count" : 2052,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 4,
+            "componentType" : 5123,
+            "count" : 8046,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 24624,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 24624,
+            "byteOffset" : 24624
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 32832,
+            "byteOffset" : 49248
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 16416,
+            "byteOffset" : 82080
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 16092,
+            "byteOffset" : 98496
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 114588,
+            "uri" : "barrel_yellow.bin"
+        }
+    ]
+}
