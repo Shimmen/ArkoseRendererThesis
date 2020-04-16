@@ -47,10 +47,7 @@ bool hitPointInShadow(vec3 L)
 void main()
 {
 	vec3 N = normalize(hit.normal);
-
 	vec3 baseColor = colors[hit.colorIndex].rgb;
-	// TODO: Encode linear sRGB in proxy-gen so we don't need to spend shader time on it here!
-	baseColor = pow(baseColor, vec3(2.2));
 
 	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
