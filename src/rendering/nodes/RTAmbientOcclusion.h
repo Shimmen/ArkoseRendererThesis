@@ -12,5 +12,12 @@ public:
 
     static std::string name();
 
+    void constructNode(Registry&) override;
     ExecuteCallback constructFrame(Registry&) const override;
+
+private:
+    const Scene& m_scene;
+
+    Texture* m_accumulatedAO;
+    mutable uint32_t m_numAccumulatedFrames { 0 };
 };

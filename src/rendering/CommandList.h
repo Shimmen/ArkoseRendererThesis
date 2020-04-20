@@ -24,6 +24,7 @@ public:
     virtual void rebuildTopLevelAcceratationStructure(TopLevelAS&) = 0;
     virtual void traceRays(Extent2D) = 0;
 
+    virtual void dispatch(Extent3D globalSize, Extent3D localSize) = 0;
     virtual void dispatch(uint32_t x, uint32_t y, uint32_t z = 1) = 0;
 
     virtual void waitEvent(uint8_t eventId, PipelineStage) = 0;

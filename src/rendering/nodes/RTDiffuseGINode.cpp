@@ -203,7 +203,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
     BindingSet& avgAccumBindingSet = reg.createBindingSet({ { 0, ShaderStageCompute, m_accumulationTexture, ShaderBindingType::StorageImage },
                                                             { 1, ShaderStageCompute, &diffuseGI, ShaderBindingType::StorageImage } });
-    ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("rt-diffuseGI/averageAccum.comp"), { &avgAccumBindingSet });
+    ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
         static bool doRender = true;

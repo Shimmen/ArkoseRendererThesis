@@ -8,7 +8,7 @@
 
 layout(set = 0, binding = 0) uniform accelerationStructureNV topLevelAS;
 layout(set = 0, binding = 1) uniform CameraStateBlock { CameraState camera; };
-layout(set = 0, binding = 2, r16f) uniform writeonly image2D aoImage;
+layout(set = 0, binding = 2, r16f) uniform image2D aoImage;
 layout(set = 0, binding = 3) uniform sampler2D gBufferNormal;
 layout(set = 0, binding = 4) uniform sampler2D gBufferDepth;
 
@@ -27,7 +27,8 @@ void main()
 
 	float nonLinearDepth = texture(gBufferDepth, inUV).r;
 	if (nonLinearDepth >= 1.0 - 1e-6) {
-		imageStore(aoImage, ivec2(gl_LaunchIDNV.xy), vec4(1.0));
+		float currentValue = imageLoad(aoImage, ivec2(gl_LaunchIDNV.xy)).r;
+		imageStore(aoImage, ivec2(gl_LaunchIDNV.xy), vec4(currentValue + 1.0));
 		return;
 	}
 
@@ -57,5 +58,6 @@ void main()
 	}
 
 	float aoValue = 1.0 - (occlusion / float(numSamples));
-	imageStore(aoImage, ivec2(gl_LaunchIDNV.xy), vec4(aoValue));
+	float currentValue = imageLoad(aoImage, ivec2(gl_LaunchIDNV.xy)).r;
+	imageStore(aoImage, ivec2(gl_LaunchIDNV.xy), vec4(currentValue + aoValue));
 }
