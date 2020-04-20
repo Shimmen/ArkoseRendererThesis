@@ -110,7 +110,8 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     const Buffer* cameraUniformBuffer = reg.getBuffer(SceneUniformNode::name(), "camera");
     BindingSet& fixedBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageVertex | ShaderStageFragment), cameraUniformBuffer } });
 
-    BindingSet& dirLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, reg.getTexture(ShadowMapNode::name(), "directional") },
+    const Texture* shadowMap = reg.getTexture(ShadowMapNode::name(), "directional").value_or(&reg.createPixelTexture(vec4(1.0), false));
+    BindingSet& dirLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, shadowMap },
                                                             { 1, ShaderStageFragment, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
 
     Shader shader = Shader::createBasic("forwardSlow.vert", "forwardSlow.frag");

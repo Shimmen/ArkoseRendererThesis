@@ -187,13 +187,13 @@ void Registry::publish(const std::string& name, const TopLevelAS& tlas)
     m_nameTopLevelASMap[fullName] = &tlas;
 }
 
-const Texture* Registry::getTexture(const std::string& renderPass, const std::string& name)
+std::optional<const Texture*> Registry::getTexture(const std::string& renderPass, const std::string& name)
 {
     std::string fullName = makeQualifiedName(renderPass, name);
     auto entry = m_nameTextureMap.find(fullName);
 
     if (entry == m_nameTextureMap.end()) {
-        return nullptr;
+        return {};
     }
 
     ASSERT(m_currentNodeName.has_value());

@@ -43,7 +43,7 @@ public:
     void publish(const std::string& name, const Texture&);
     void publish(const std::string& name, const TopLevelAS&);
 
-    [[nodiscard]] const Texture* getTexture(const std::string& renderPass, const std::string& name);
+    [[nodiscard]] std::optional<const Texture*> getTexture(const std::string& renderPass, const std::string& name);
     [[nodiscard]] const Buffer* getBuffer(const std::string& renderPass, const std::string& name);
     [[nodiscard]] const TopLevelAS* getTopLevelAccelerationStructure(const std::string& renderPass, const std::string& name);
 
