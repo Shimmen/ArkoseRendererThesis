@@ -167,10 +167,6 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     const Texture* gBufferDepth = reg.getTexture(ForwardRenderNode::name(), "depth");
     ASSERT(gBufferColor && gBufferNormal && gBufferDepth);
 
-    constexpr size_t numSphereSamples = 23 * 256;
-    constexpr size_t totalSphereSamplesSize = numSphereSamples * sizeof(vec4); // TODO: There are still problems with using GpuOptimal.. Not sure why.
-    Buffer& sphereSampleBuffer = reg.createBuffer(totalSphereSamplesSize, Buffer::Usage::StorageBuffer, Buffer::MemoryHint::TransferOptimal);
-
     auto createStateForTLAS = [&](const TopLevelAS& tlas) -> std::pair<BindingSet&, RayTracingState&> {
         BindingSet& frameBindingSet = reg.createBindingSet({ { 0, ShaderStage(ShaderStageRTRayGen | ShaderStageRTClosestHit), &tlas },
                                                              { 1, ShaderStageRTRayGen, m_accumulationTexture, ShaderBindingType::StorageImage },
@@ -180,8 +176,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
                                                              { 5, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                              { 6, ShaderStageRTMiss, reg.getBuffer(SceneUniformNode::name(), "environmentData") },
                                                              { 7, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap") },
-                                                             { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") },
-                                                             { 9, ShaderStageRTRayGen, &sphereSampleBuffer, ShaderBindingType::StorageBuffer } });
+                                                             { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
 
         ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen");
         HitGroup mainHitGroup { ShaderFile("rt-diffuseGI/closestHit.rchit") };
@@ -224,29 +219,6 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
             return;
         }
 
-        std::vector<float> sphereSamples;
-        sphereSamples.resize(4 * numSphereSamples);
-        for (size_t i = 0; i < numSphereSamples; ++i) {
-
-            float x, y, z;
-            float lengthSquared;
-
-            do {
-                x = m_bilateral(m_randomGenerator);
-                y = m_bilateral(m_randomGenerator);
-                z = m_bilateral(m_randomGenerator);
-                lengthSquared = x * x + y * y + z * z;
-            } while (lengthSquared > 1.0f);
-
-            float length = std::sqrt(lengthSquared);
-            sphereSamples[4 * i + 0] = x / length;
-            sphereSamples[4 * i + 1] = y / length;
-            sphereSamples[4 * i + 2] = z / length;
-        }
-        // TODO: It's quite slow to transfer all this data every frame. Probably better to instead upload a bunch initially
-        //  and then just index into it & update every once in a while. Or something like that..
-        cmdList.updateBufferImmediately(sphereSampleBuffer, sphereSamples.data(), totalSphereSamplesSize);
-
         if (useProxies) {
             cmdList.setRayTracingState(rtStateProxy);
             cmdList.bindSet(frameBindingSetProxy, 0);
@@ -257,6 +229,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
         cmdList.bindSet(*m_objectDataBindingSet, 1);
         cmdList.pushConstant(ShaderStageRTRayGen, ignoreColor);
+        cmdList.pushConstant(ShaderStageRTRayGen, appState.frameIndex(), 4);
 
         cmdList.waitEvent(0, appState.frameIndex() == 0 ? PipelineStage::Host : PipelineStage::RayTracing);
         cmdList.resetEvent(0, PipelineStage::RayTracing);
