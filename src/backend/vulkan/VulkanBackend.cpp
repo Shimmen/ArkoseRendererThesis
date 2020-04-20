@@ -2341,6 +2341,7 @@ void VulkanBackend::newBottomLevelAccelerationStructure(const BottomLevelAS& bla
 
     VkAccelerationStructureInfoNV buildInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+    buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV;
     buildInfo.geometryCount = geometries.size();
     buildInfo.pGeometries = geometries.data();
 

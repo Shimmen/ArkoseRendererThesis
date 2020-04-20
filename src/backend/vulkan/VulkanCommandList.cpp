@@ -310,7 +310,7 @@ void VulkanCommandList::rebuildTopLevelAcceratationStructure(TopLevelAS& tlas)
 
     VkAccelerationStructureInfoNV buildInfo { VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
     buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
-    buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV;
+    buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_NV | VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NV;
     buildInfo.instanceCount = tlas.instanceCount();
     buildInfo.geometryCount = 0;
     buildInfo.pGeometries = nullptr;
