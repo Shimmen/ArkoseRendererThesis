@@ -248,9 +248,8 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
             cmdList.bindSet(avgAccumBindingSet, 0);
             cmdList.pushConstant(ShaderStageCompute, m_numAccumulatedFrames);
 
-            Extent2D totalSize = appState.windowExtent();
-            constexpr uint32_t localSize = 16;
-            cmdList.dispatch(totalSize.width() / localSize, totalSize.height() / localSize);
+            Extent2D globalSize = appState.windowExtent();
+            cmdList.dispatch(globalSize, Extent3D(16));
         }
         cmdList.signalEvent(0, PipelineStage::RayTracing);
     };
