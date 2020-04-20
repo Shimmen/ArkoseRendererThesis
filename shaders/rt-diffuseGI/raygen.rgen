@@ -15,7 +15,7 @@ layout(binding = 4, set = 0) uniform sampler2D gBufferDepth;
 layout(binding = 5, set = 0) uniform CameraStateBlock { CameraState camera; };
 
 layout(push_constant) uniform PushConstants {
-    bool ignoreColor;
+	bool ignoreColor;
 	uint frameIndex;
 };
 
