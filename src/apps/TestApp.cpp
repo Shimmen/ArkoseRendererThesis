@@ -3,6 +3,7 @@
 #include "rendering/nodes/FinalPostFxNode.h"
 #include "rendering/nodes/ForwardRenderNode.h"
 #include "rendering/nodes/RTAccelerationStructures.h"
+#include "rendering/nodes/RTAmbientOcclusion.h"
 #include "rendering/nodes/RTDiffuseGINode.h"
 #include "rendering/nodes/RTFirstHitNode.h"
 #include "rendering/nodes/RTReflectionsNode.h"
@@ -17,19 +18,23 @@
 
 void TestApp::setup(RenderGraph& graph)
 {
-    //m_scene = Scene::loadFromFile("assets/Scenes/test.json");
-    //m_scene = Scene::loadFromFile("assets/Scenes/proxy-test.json");
-    //m_scene = Scene::loadFromFile("assets/Scenes/sponza.json");
     m_scene = Scene::loadFromFile("assets/Scenes/eval/small_spheres.json");
     m_scene->camera().setMaxSpeed(2.0f);
 
+    bool rtxOn = false;
+    bool firstHit = false;
+
     graph.addNode<SceneUniformNode>(*m_scene);
     graph.addNode<ShadowMapNode>(*m_scene);
-    graph.addNode<RTAccelerationStructures>(*m_scene);
-    graph.addNode<RTFirstHitNode>(*m_scene);
     graph.addNode<SlowForwardRenderNode>(*m_scene);
-    //graph.addNode<RTReflectionsNode>(*m_scene);
-    graph.addNode<RTDiffuseGINode>(*m_scene);
+    if (rtxOn) {
+        graph.addNode<RTAccelerationStructures>(*m_scene);
+        graph.addNode<RTAmbientOcclusion>(*m_scene);
+        graph.addNode<RTDiffuseGINode>(*m_scene);
+        if (firstHit) {
+            graph.addNode<RTFirstHitNode>(*m_scene);
+        }
+    }
     graph.addNode<FinalPostFxNode>(*m_scene);
 }
 

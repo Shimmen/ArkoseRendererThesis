@@ -10,6 +10,7 @@ layout(location = 1) in vec3 vViewRay;
 layout(binding = 0, set = 0) uniform sampler2D uTexture;
 
 layout(binding = 0, set = 1) uniform sampler2D uDiffuseGI;
+layout(binding = 1, set = 1) uniform sampler2D uAmbientOcclusion;
 
 layout(binding = 1, set = 2) uniform sampler2D uEnvironment;
 layout(binding = 2, set = 2) uniform sampler2D uDepth;
@@ -33,7 +34,8 @@ void main()
     } else {
         hdrColor = texture(uTexture, vTexCoord).rgb;
         if (includeDiffuseGI) {
-            hdrColor += texture(uDiffuseGI, vTexCoord).rgb;
+            float ao = texture(uAmbientOcclusion, vTexCoord).r;
+            hdrColor += ao * texture(uDiffuseGI, vTexCoord).rgb;
         }
     }
 

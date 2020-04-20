@@ -58,6 +58,8 @@ void main()
 	}
 
 	float aoValue = 1.0 - (occlusion / float(numSamples));
+	aoValue = pow(aoValue, 8.0);
+
 	float currentValue = imageLoad(aoImage, ivec2(gl_LaunchIDNV.xy)).r;
 	imageStore(aoImage, ivec2(gl_LaunchIDNV.xy), vec4(currentValue + aoValue));
 }

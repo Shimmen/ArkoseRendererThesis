@@ -1,6 +1,7 @@
 #include "FinalPostFxNode.h"
 
 #include "ForwardRenderNode.h"
+#include "RTAmbientOcclusion.h"
 #include "RTDiffuseGINode.h"
 #include "RTFirstHitNode.h"
 #include "RTReflectionsNode.h"
@@ -41,12 +42,16 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
     BindingSet& sourceImageRt = reg.createBindingSet({ { 0, ShaderStageFragment, sourceTextureRt } });
 
     // TODO: Maybe return an optional instead, so we can use value_or(..)
-    const Texture* glossyGI = reg.getTexture(RTReflectionsNode::name(), "reflections");
     const Texture* diffuseGI = reg.getTexture(RTDiffuseGINode::name(), "diffuseGI");
     if (!diffuseGI) {
         diffuseGI = &reg.createPixelTexture(vec4(0, 0, 0, 1), true);
     }
-    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, diffuseGI } });
+    const Texture* ambientOcclusion = reg.getTexture(RTAmbientOcclusion::name(), "AO");
+    if (!ambientOcclusion) {
+        ambientOcclusion = &reg.createPixelTexture(vec4(1, 1, 1, 1), true);
+    }
+    BindingSet& etcBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, diffuseGI },
+                                                       { 1, ShaderStageFragment, ambientOcclusion } });
 
     BindingSet& envBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                        { 1, ShaderStageFragment, reg.getTexture(SceneUniformNode::name(), "environmentMap") },

@@ -52,10 +52,10 @@ RenderGraphNode::ExecuteCallback RTAmbientOcclusion::constructFrame(Registry& re
     ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        static bool enabled = true;
+        static bool enabled = false;
         static float radius = 0.25f;
         static int signedNumSamples = 1;
-        if (ImGui::CollapsingHeader("RT AO")) {
+        if (ImGui::CollapsingHeader("Ambient Occlusion")) {
             ImGui::Checkbox("Enabled", &enabled);
             ImGui::SliderInt("Sample count", &signedNumSamples, 1, 32);
             ImGui::SliderFloat("Max radius", &radius, 0.01f, 2.0f);
