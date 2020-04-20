@@ -27,6 +27,7 @@ add_executable(ArkoseRenderer
         src/rendering/nodes/RTFirstHitNode.cpp
         src/rendering/nodes/RTReflectionsNode.cpp
         src/rendering/nodes/RTDiffuseGINode.cpp
+        src/rendering/nodes/RTAmbientOcclusion.cpp
         src/utility/GlobalState.cpp
         src/utility/models/GltfModel.cpp
         src/utility/models/SphereSetModel.cpp
