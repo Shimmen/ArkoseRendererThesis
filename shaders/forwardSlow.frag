@@ -34,6 +34,7 @@ layout(location = 2) out vec4 oBaseColor;
 layout(push_constant) uniform PushConstants {
     bool writeColor;
     bool forceDiffuse;
+    float ambientAmount;
 };
 
 // TODO: Move to some general location!
@@ -76,7 +77,7 @@ vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseC
     } else {
         brdf = evaluateBRDF(L, V, N, baseColor, roughness, metallic);
     }
-    
+
     float LdotN = max(dot(L, N), 0.0);
     return brdf * LdotN * directLight;
 }
@@ -101,7 +102,7 @@ void main()
 
     vec3 V = -normalize(vPosition);
 
-    vec3 ambient = 0.0 * (writeColor ? baseColor : vec3(1.0)); // TODO!
+    vec3 ambient = ambientAmount * (writeColor ? baseColor : vec3(1.0));
     vec3 color = emissive + ambient;
 
     // TODO: Evaluate ALL lights that will have an effect on this pixel/tile/cluster or whatever we go with

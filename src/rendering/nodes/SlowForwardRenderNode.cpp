@@ -136,7 +136,9 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     return [&](const AppState& appState, CommandList& cmdList) {
         static bool writeColor = true;
         static bool forceDiffuse = false;
+        static float ambientAmount = 0.0f;
         if (ImGui::CollapsingHeader("Forward")) {
+            ImGui::SliderFloat("Ambient", &ambientAmount, 0.0f, 1.0f);
             ImGui::Checkbox("Write color", &writeColor);
             ImGui::Checkbox("Force diffuse materials", &forceDiffuse);
         }
@@ -156,6 +158,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
 
             cmdList.pushConstant(ShaderStageFragment, writeColor, 0);
             cmdList.pushConstant(ShaderStageFragment, forceDiffuse, 4);
+            cmdList.pushConstant(ShaderStageFragment, ambientAmount, 8);
 
             cmdList.bindSet(*drawable.bindingSet, 1);
             cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, drawable.mesh->indexType());
