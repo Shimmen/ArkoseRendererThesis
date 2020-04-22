@@ -32,10 +32,15 @@ public:
 
     void debugBarrier() override;
 
+    void saveTextureToFile(const Texture&, const std::string&) override;
+
     void endNode(Badge<VulkanBackend>);
 
 private:
     void endCurrentRenderPassIfAny();
+
+    VkDevice device() { return m_backend.device(); }
+    VkPhysicalDevice physicalDevice() { return m_backend.physicalDevice(); }
 
     VkEvent getEvent(uint8_t eventId);
     VkPipelineStageFlags stageFlags(PipelineStage) const;

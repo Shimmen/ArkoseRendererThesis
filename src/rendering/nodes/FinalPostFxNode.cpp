@@ -70,5 +70,11 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         cmdList.pushConstant(ShaderStageFragment, includeDiffuseGI);
 
         cmdList.draw(vertexBuffer, 3);
+        
+        if (ImGui::Button("Take screenshot")) {
+            static int imageIdx = 0;
+            const Texture& finalColor = *reg.windowRenderTarget().attachment(RenderTarget::AttachmentType::Color0);
+            cmdList.saveTextureToFile(finalColor, "assets/Screenshots/screenshot_" + std::to_string(imageIdx++) + ".png");
+        }
     };
 }

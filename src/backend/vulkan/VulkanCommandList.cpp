@@ -1,6 +1,7 @@
 #include "VulkanCommandList.h"
 
 #include "VulkanBackend.h"
+#include <stb_image_write.h>
 
 VulkanCommandList::VulkanCommandList(VulkanBackend& backend, VkCommandBuffer commandBuffer)
     : m_backend(backend)
@@ -413,6 +414,94 @@ void VulkanCommandList::signalEvent(uint8_t eventId, PipelineStage stage)
 {
     VkEvent event = getEvent(eventId);
     vkCmdSetEvent(m_commandBuffer, event, stageFlags(stage));
+}
+
+void VulkanCommandList::saveTextureToFile(const Texture& texture, const std::string& filePath)
+{
+    const VkFormat targetFormat = VK_FORMAT_R8G8B8A8_UNORM;
+
+    auto& srcTexInfo = m_backend.textureInfo(texture);
+    VkImageLayout prevSrcLayout = srcTexInfo.currentLayout;
+    VkImage srcImage = srcTexInfo.image;
+
+    VkImageCreateInfo imageCreateInfo { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.format = targetFormat;
+    imageCreateInfo.tiling = VK_IMAGE_TILING_LINEAR;
+    imageCreateInfo.extent.width = texture.extent().width();
+    imageCreateInfo.extent.height = texture.extent().height();
+    imageCreateInfo.extent.depth = 1;
+    imageCreateInfo.arrayLayers = 1;
+    imageCreateInfo.mipLevels = 1;
+    imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    VmaAllocationCreateInfo allocCreateInfo {};
+    allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
+
+    VkImage dstImage;
+    VmaAllocation dstAllocation;
+    VmaAllocationInfo dstAllocationInfo;
+    if (vmaCreateImage(m_backend.m_memoryAllocator, &imageCreateInfo, &allocCreateInfo, &dstImage, &dstAllocation, &dstAllocationInfo) != VK_SUCCESS) {
+        LogErrorAndExit("Failed to create temp image for screenshot\n");
+    }
+
+    bool success = m_backend.issueSingleTimeCommand([&](VkCommandBuffer cmdBuffer) {
+        m_backend.transitionImageLayoutDEBUG(dstImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuffer);
+        m_backend.transitionImageLayoutDEBUG(srcImage, prevSrcLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuffer);
+
+        VkImageCopy imageCopyRegion {};
+        imageCopyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopyRegion.srcSubresource.layerCount = 1;
+        imageCopyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageCopyRegion.dstSubresource.layerCount = 1;
+        imageCopyRegion.extent.width = texture.extent().width();
+        imageCopyRegion.extent.height = texture.extent().height();
+        imageCopyRegion.extent.depth = 1;
+
+        vkCmdCopyImage(cmdBuffer,
+                       srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                       dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                       1, &imageCopyRegion);
+
+        // Transition destination image to general layout, which is the required layout for mapping the image memory
+        m_backend.transitionImageLayoutDEBUG(dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuffer);
+        m_backend.transitionImageLayoutDEBUG(srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, prevSrcLayout, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuffer);
+    });
+
+    if (!success) {
+        LogError("Failed to setup screenshot image & data...\n");
+    }
+
+    // Get layout of the image (including row pitch/stride)
+    VkImageSubresource subResource;
+    subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subResource.mipLevel = 0;
+    subResource.arrayLayer = 0;
+    VkSubresourceLayout subResourceLayout;
+    vkGetImageSubresourceLayout(device(), dstImage, &subResource, &subResourceLayout);
+
+    char* data;
+    vkMapMemory(device(), dstAllocationInfo.deviceMemory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
+    data += subResourceLayout.offset;
+
+    bool shouldSwizzleRedAndBlue = (srcTexInfo.format == VK_FORMAT_B8G8R8A8_SRGB) || (srcTexInfo.format == VK_FORMAT_B8G8R8A8_UNORM) || (srcTexInfo.format == VK_FORMAT_B8G8R8A8_SNORM);
+    if (shouldSwizzleRedAndBlue) {
+        int numPixels = texture.extent().width() * texture.extent().height();
+        for (int i = 0; i < numPixels; ++i) {
+            char tmp = data[4 * i + 0];
+            data[4 * i + 0] = data[4 * i + 2];
+            data[4 * i + 2] = tmp;
+        }
+    }
+
+    if (!stbi_write_png(filePath.c_str(), texture.extent().width(), texture.extent().height(), 4, data, subResourceLayout.rowPitch)) {
+        LogError("Failed to write screenshot to file...\n");
+    }
+
+    vkUnmapMemory(device(), dstAllocationInfo.deviceMemory);
+    vmaDestroyImage(m_backend.m_memoryAllocator, dstImage, dstAllocation);
 }
 
 void VulkanCommandList::debugBarrier()

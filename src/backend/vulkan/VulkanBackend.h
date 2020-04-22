@@ -129,6 +129,8 @@ private:
     bool setBufferMemoryUsingMapping(VmaAllocation, const void* data, VkDeviceSize size);
     bool setBufferDataUsingStagingBuffer(VkBuffer, const void* data, VkDeviceSize size, VkCommandBuffer* = nullptr);
 
+    void transitionImageLayoutDEBUG(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageAspectFlags, VkCommandBuffer) const;
+
     bool transitionImageLayout(VkImage, bool isDepthFormat, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer* = nullptr) const;
     bool copyBufferToImage(VkBuffer, VkImage, uint32_t width, uint32_t height, bool isDepthImage) const;
 

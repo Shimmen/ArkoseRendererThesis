@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rendering/Resources.h"
+#include <string>
 
 class CommandList {
 public:
@@ -33,6 +34,8 @@ public:
 
     //! A barrier for all commands and memory, which probably only should be used for debug stuff.
     virtual void debugBarrier() = 0;
+
+    virtual void saveTextureToFile(const Texture&, const std::string&) = 0;
 };
 
 template<typename T>
