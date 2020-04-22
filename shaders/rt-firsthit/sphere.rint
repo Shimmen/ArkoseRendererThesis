@@ -8,7 +8,14 @@
 #include <common.glsl>
 #include <intersections.glsl>
 
-layout(set = 1, binding = 4) buffer readonly SphereSets { RTSphere spheres[]; } sets[];
+// TODO: It would be nice to put this in the c++/glsl shared context
+#include <half.glsl>
+struct RTSphereHalf {
+	f16vec3 center;
+	half radius;
+};
+
+layout(set = 1, binding = 4) buffer readonly SphereSets { RTSphereHalf spheres[]; } sets[];
 layout(set = 1, binding = 5) buffer readonly SphereSH { SphericalHarmonics SHs[]; } setSHs[];
 
 struct SphereHit {
@@ -19,7 +26,7 @@ hitAttributeNV SphereHit hit;
 
 void main()
 {
-	RTSphere sphere = sets[gl_InstanceCustomIndexNV].spheres[gl_PrimitiveID];
+	RTSphereHalf sphere = sets[gl_InstanceCustomIndexNV].spheres[gl_PrimitiveID];
 
 	vec3 rayOrigin = gl_WorldRayOriginNV;
 	vec3 rayDirection = normalize(gl_WorldRayDirectionNV);

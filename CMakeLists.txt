@@ -58,6 +58,7 @@ target_include_directories(ArkoseRenderer PRIVATE shaders/shared)
 
 target_include_directories(ArkoseRenderer PRIVATE deps/glm-0.9.9.6)
 target_include_directories(ArkoseRenderer PRIVATE deps/nlohmann_json)
+target_include_directories(ArkoseRenderer PRIVATE deps/half/include)
 
 FetchContent_Declare(spirvcross
     GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Cross.git

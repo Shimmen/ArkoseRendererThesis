@@ -4,6 +4,7 @@
 #include "SceneUniformNode.h"
 #include "utility/models/SphereSetModel.h"
 #include "utility/models/VoxelContourModel.h"
+#include <half.hpp>
 #include <imgui.h>
 
 RTFirstHitNode::RTFirstHitNode(const Scene& scene)
@@ -79,14 +80,13 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
         } else {
             const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model.proxy());
             if (sphereSetModel) {
-                std::vector<RTSphere> spheresData;
+                using namespace half_float;
+                std::vector<half> spheresData;
                 for (const auto& sphere : sphereSetModel->spheres()) {
-
-                    RTSphere rtSphere;
-                    rtSphere.center = vec3(sphere);
-                    rtSphere.radius = sphere.w;
-
-                    spheresData.push_back(rtSphere);
+                    spheresData.push_back(half(sphere.x));
+                    spheresData.push_back(half(sphere.y));
+                    spheresData.push_back(half(sphere.z));
+                    spheresData.push_back(half(sphere.w));
                 }
                 sphereBuffers.push_back(&nodeReg.createBuffer(std::move(spheresData), Buffer::Usage::StorageBuffer, Buffer::MemoryHint::GpuOptimal));
 

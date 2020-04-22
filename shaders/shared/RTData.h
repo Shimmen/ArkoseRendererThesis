@@ -23,7 +23,6 @@ struct RTAABB_packable {
 struct RTSphere {
 	vec3 center;
 	float radius;
-	// TODO: Maybe put some material stuff here?
 };
 
 struct RTVoxelContour {
