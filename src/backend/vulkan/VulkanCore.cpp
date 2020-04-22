@@ -269,17 +269,31 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     requestedDeviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
     requestedDeviceFeatures.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
 
-    VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexingFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
+    VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
     indexingFeatures.pNext = nullptr;
     indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
     indexingFeatures.runtimeDescriptorArray = VK_TRUE;
 
-    VkPhysicalDeviceDescriptorIndexingFeatures requestedDescIndexingFeatures = {};
-    requestedDescIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+
+    VkPhysicalDevice8BitStorageFeatures eightBitStorageFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES };
+    eightBitStorageFeatures.storageBuffer8BitAccess = VK_TRUE; // (required if the extention is available)
+    eightBitStorageFeatures.uniformAndStorageBuffer8BitAccess = VK_TRUE;
+    eightBitStorageFeatures.storagePushConstant8 = VK_TRUE;
+
+    VkPhysicalDevice16BitStorageFeatures sixteenBitStorageFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES };
+    sixteenBitStorageFeatures.storageBuffer16BitAccess = VK_TRUE;
+    sixteenBitStorageFeatures.uniformAndStorageBuffer16BitAccess = VK_TRUE;
+    sixteenBitStorageFeatures.storagePushConstant16 = VK_TRUE;
+    sixteenBitStorageFeatures.storageInputOutput16 = VK_FALSE;
+
+    VkPhysicalDeviceShaderFloat16Int8Features shaderSmallTypeFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES };
+    shaderSmallTypeFeatures.shaderFloat16 = VK_TRUE;
+    shaderSmallTypeFeatures.shaderInt8 = VK_TRUE;
 
     std::vector<const char*> deviceExtensions {};
     deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     deviceExtensions.emplace_back(VK_NV_RAY_TRACING_EXTENSION_NAME);
+    deviceExtensions.emplace_back(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
 
     //
 
@@ -296,7 +310,12 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     deviceCreateInfo.pEnabledFeatures = &requestedDeviceFeatures;
+
+    // Device features extention chain
     deviceCreateInfo.pNext = &indexingFeatures;
+    indexingFeatures.pNext = &eightBitStorageFeatures;
+    eightBitStorageFeatures.pNext = &sixteenBitStorageFeatures;
+    sixteenBitStorageFeatures.pNext = &shaderSmallTypeFeatures;
 
     VkDevice device;
     if (vkCreateDevice(physicalDevice, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS) {
