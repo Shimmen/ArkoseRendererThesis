@@ -1,0 +1,96 @@
+{
+    "environment": {
+      "texture": "assets/environments/tiergarten_2k.hdr",
+      "multiplier": 0.4
+    },
+    "models": [
+      {
+        "name": "cornell-box",
+        "gltf": "assets/CornellBox/CornellBoxEmpty.gltf",
+        "transform": {
+          "translation": [ 0, -0.1, 0 ],
+          "rotation": {
+            "type": "axis-angle",
+            "axis": [ 0, 1, 0 ],
+            "angle": 0.0
+          },
+          "scale": [ 2.5, 1.25, 1.4 ]
+        }
+      },
+      {
+        "name": "barrel1",
+        "gltf": "assets/Barrel/barrel.gltf",
+        "proxy": "assets/Barrel/barrel_lowres.gltf",
+        "transform": {
+          "translation": [ -1.5, -0.01, 0 ],
+          "rotation": {
+            "type": "axis-angle",
+            "axis": [ 0, 1, 0 ],
+            "angle": -0.6
+          },
+          "scale": [ 1, 1, 1 ]
+        }
+      },
+      {
+        "name": "barrel2",
+        "gltf": "assets/BarrelYellow/barrel_yellow.gltf",
+        "proxy": "assets/BarrelYellow/barrel_yellow_lowres.gltf",
+        "transform": {
+          "translation": [ -1, 0, -0.21 ],
+          "rotation": {
+            "type": "axis-angle",
+            "axis": [ 0, 1, 0 ],
+            "angle": 0.3
+          },
+          "scale": [ 1, 1, 1 ]
+        }
+      },
+      {
+        "name": "barrel3",
+        "gltf": "assets/Barrel/barrel.gltf",
+        "proxy": "assets/Barrel/barrel_lowres.gltf",
+        "transform": {
+          "translation": [ -1.25, 0.87, 0 ],
+          "rotation": {
+            "type": "axis-angle",
+            "axis": [ 0, 1, 0 ],
+            "angle": 0.9
+          },
+          "scale": [ 1, 1, 1 ]
+        }
+      },
+      {
+        "name": "bunny",
+        "gltf": "assets/Bunny/bunny.gltf",
+        "proxy": "assets/Bunny/bunny_lowres.gltf",
+        "transform": {
+          "translation": [ 1.35, -0.04, 0 ],
+          "rotation": {
+            "type": "axis-angle",
+            "axis": [ 0, 1, 0 ],
+            "angle": -0.6
+          },
+          "scale": [ 1, 1, 1 ]
+        }
+      }
+    ],
+    "lights": [
+      {
+        "name": "sun",
+        "type": "directional",
+        "color": [ 1, 1, 1 ],
+        "intensity": 30.0,
+        "direction": [ 0.3, 0.05, -0.6 ],
+        "worldExtent": 8.0,
+        "shadowMapSize": [ 4096, 4096 ]
+      }
+    ],
+    "cameras": [
+      {
+        "name": "main",
+        "origin": [ 0, 1.8, 3 ],
+        "target": [ 0, 1.0, 0 ]
+      }
+    ],
+    "camera": "main"
+  }

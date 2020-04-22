@@ -15,12 +15,22 @@
     "nodes" : [
         {
             "mesh" : 0,
-            "name" : "bunny_inner",
+            "name" : "barrel_inner",
             "rotation" : [
                 0.7071068286895752,
                 0,
                 0,
                 0.7071067094802856
+            ],
+            "scale" : [
+                0.9971818923950195,
+                0.9971818923950195,
+                0.9971818923950195
+            ],
+            "translation" : [
+                0,
+                0.002236379077658057,
+                0
             ]
         }
     ],
@@ -32,7 +42,7 @@
                 0,
                 0
             ],
-            "name" : "Default OBJ.001",
+            "name" : "Default OBJ",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
                     "index" : 0,
@@ -45,7 +55,7 @@
     ],
     "meshes" : [
         {
-            "name" : "bunny_inner",
+            "name" : "barrel_inner",
             "primitives" : [
                 {
                     "attributes" : {
@@ -76,75 +86,75 @@
         {
             "bufferView" : 0,
             "componentType" : 5126,
-            "count" : 4773,
+            "count" : 1185,
             "max" : [
-                0.6516690254211426,
-                0.6727799773216248,
-                -0.024670299142599106
+                0.2424830049276352,
+                0.24028000235557556,
+                -0.004637000150978565
             ],
             "min" : [
-                -0.9485049843788147,
-                -0.49545198678970337,
-                -1.6126099824905396
+                -0.2417760044336319,
+                -0.2407039999961853,
+                -0.8653439283370972
             ],
             "type" : "VEC3"
         },
         {
             "bufferView" : 1,
             "componentType" : 5126,
-            "count" : 4773,
+            "count" : 1185,
             "type" : "VEC3"
         },
         {
             "bufferView" : 2,
             "componentType" : 5126,
-            "count" : 4773,
+            "count" : 1185,
             "type" : "VEC4"
         },
         {
             "bufferView" : 3,
             "componentType" : 5126,
-            "count" : 4773,
+            "count" : 1185,
             "type" : "VEC2"
         },
         {
             "bufferView" : 4,
             "componentType" : 5123,
-            "count" : 4773,
+            "count" : 1185,
             "type" : "SCALAR"
         }
     ],
     "bufferViews" : [
         {
             "buffer" : 0,
-            "byteLength" : 57276,
+            "byteLength" : 14220,
             "byteOffset" : 0
         },
         {
             "buffer" : 0,
-            "byteLength" : 57276,
-            "byteOffset" : 57276
+            "byteLength" : 14220,
+            "byteOffset" : 14220
         },
         {
             "buffer" : 0,
-            "byteLength" : 76368,
-            "byteOffset" : 114552
+            "byteLength" : 18960,
+            "byteOffset" : 28440
         },
         {
             "buffer" : 0,
-            "byteLength" : 38184,
-            "byteOffset" : 190920
+            "byteLength" : 9480,
+            "byteOffset" : 47400
         },
         {
             "buffer" : 0,
-            "byteLength" : 9546,
-            "byteOffset" : 229104
+            "byteLength" : 2370,
+            "byteOffset" : 56880
         }
     ],
     "buffers" : [
         {
-            "byteLength" : 238652,
-            "uri" : "bunny_lowres.bin"
+            "byteLength" : 59252,
+            "uri" : "barrel_lowres.bin"
         }
     ]
 }
