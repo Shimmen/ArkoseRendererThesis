@@ -3,14 +3,15 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_scalar_block_layout : require
 
+#include <brdf.glsl>
+#include <common.glsl>
+#include <lighting.glsl>
 #include <shared/RTData.h>
 #include <shared/LightData.h>
-#include <brdf.glsl>
-#include <lighting.glsl>
+#include <shared/SphericalHarmonics.h>
 
 struct SphereHit {
 	vec3 normal;
-	vec3 color;
 };
 
 hitAttributeNV SphereHit hit;
@@ -20,6 +21,8 @@ layout(location = 1) rayPayloadNV bool inShadow;
 
 layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
 layout(binding = 8, set = 0) uniform DirLightBlock { DirectionalLight dirLight; };
+
+layout(set = 1, binding = 5) buffer readonly SphereSH { SphericalHarmonics SHs[]; } setSHs[];
 
 bool hitPointInShadow(vec3 L)
 {
@@ -45,7 +48,9 @@ bool hitPointInShadow(vec3 L)
 void main()
 {
 	vec3 N = normalize(hit.normal);
-	vec3 baseColor = hit.color;
+
+	SphericalHarmonics sh = setSHs[gl_InstanceCustomIndexNV].SHs[gl_PrimitiveID];
+	vec3 baseColor = sampleSphericalHarmonic(sh, N);
 
 	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
