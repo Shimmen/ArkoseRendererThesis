@@ -145,7 +145,7 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
                                                          { 2, ShaderStageRTClosestHit, indexBuffers },
                                                          { 3, ShaderStageRTClosestHit, allTextures, RT_MAX_TEXTURES },
                                                          { 4, ShaderStageRTIntersection, sphereBuffers },
-                                                         { 5, ShaderStageRTIntersection, shBuffers },
+                                                         { 5, ShaderStageRTClosestHit, shBuffers },
                                                          { 6, ShaderStageRTIntersection, contourPlaneBuffers },
                                                          { 7, ShaderStageRTIntersection, contourAabbBuffers },
                                                          { 8, ShaderStageRTIntersection, contourColorIdxBuffers },

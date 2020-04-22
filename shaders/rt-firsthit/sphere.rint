@@ -3,8 +3,6 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_scalar_block_layout : require
 
-#include <shared/RTData.h>
-#include <shared/SphericalHarmonics.h>
 #include <common.glsl>
 #include <intersections.glsl>
 
@@ -16,10 +14,9 @@ struct RTSphereHalf {
 };
 
 layout(set = 1, binding = 4) buffer readonly SphereSets { RTSphereHalf spheres[]; } sets[];
-layout(set = 1, binding = 5) buffer readonly SphereSH { SphericalHarmonics SHs[]; } setSHs[];
 
 struct SphereHit {
-	vec3 color;
+	vec3 normal;
 };
 
 hitAttributeNV SphereHit hit;
@@ -40,12 +37,7 @@ void main()
 	float t;
 	if (raySphereIntersection(sphereCenter, sphereRadius, rayOrigin, rayDirection, t)) {
 		vec3 hitPoint = rayOrigin + t * rayDirection;
-		vec3 N = normalize(hitPoint - sphereCenter);
-
-		SphericalHarmonics sh = setSHs[gl_InstanceCustomIndexNV].SHs[gl_PrimitiveID];
-		vec3 color = sampleSphericalHarmonic(sh, N);
-
-		hit.color = color;
+		hit.normal = normalize(hitPoint - sphereCenter);
 		reportIntersectionNV(t, 0u);
 	}
 }
