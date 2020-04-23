@@ -40,10 +40,17 @@ public:
         return m_parent->worldMatrix() * m_localMatrix;
     }
 
-    mat3 normalMatrix() const
+    mat3 worldNormalMatrix() const
     {
         mat3 world3x3 = mat3(worldMatrix());
         mat3 normalMatrix = transpose(inverse(world3x3));
+        return normalMatrix;
+    }
+
+    mat3 localNormalMatrix() const
+    {
+        mat3 local3x3 = mat3(localMatrix());
+        mat3 normalMatrix = transpose(inverse(local3x3));
         return normalMatrix;
     }
 

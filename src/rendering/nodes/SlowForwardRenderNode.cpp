@@ -153,7 +153,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
             // TODO: Hmm, it still looks very much like it happens in line with the other commands..
             PerForwardObject objectData {
                 .worldFromLocal = drawable.mesh->transform().worldMatrix(),
-                .worldFromTangent = mat4(drawable.mesh->transform().normalMatrix())
+                .worldFromTangent = mat4(drawable.mesh->transform().worldNormalMatrix())
             };
             cmdList.updateBufferImmediately(*drawable.objectDataBuffer, &objectData, sizeof(PerForwardObject));
 

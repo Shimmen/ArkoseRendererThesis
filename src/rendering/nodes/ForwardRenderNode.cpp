@@ -153,7 +153,7 @@ RenderGraphNode::ExecuteCallback ForwardRenderNode::constructFrame(Registry& reg
             auto& drawable = m_drawables[i];
             perObjectData[i] = {
                 .worldFromLocal = drawable.mesh->transform().worldMatrix(),
-                .worldFromTangent = mat4(drawable.mesh->transform().normalMatrix()),
+                .worldFromTangent = mat4(drawable.mesh->transform().worldNormalMatrix()),
                 .materialIndex = drawable.materialIndex
             };
         }
