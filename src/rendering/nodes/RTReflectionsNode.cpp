@@ -36,7 +36,7 @@ void RTReflectionsNode::constructNode(Registry& nodeReg)
 
                 for (int i = 0; i < posData.size(); ++i) {
                     vertices.push_back({ .position = vec4(posData[i], 0.0f),
-                                         .normal = vec4(normalData[i], 0.0f),
+                                         .normal = vec4(mesh.transform().localNormalMatrix() * normalData[i], 0.0f),
                                          .texCoord = vec4(texCoordData[i], 0.0f, 0.0f) });
                 }
             }

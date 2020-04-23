@@ -36,8 +36,10 @@ void main()
 	const vec3 b = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
 	vec3 N = normalize(v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z);
-	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
+	mat3 normalMatrix = transpose(mat3(gl_WorldToObjectNV));
+	N = normalize(normalMatrix * N);
 
+	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
 
 	//hitValue = N * 0.5 + 0.5;
