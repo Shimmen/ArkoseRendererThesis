@@ -65,8 +65,9 @@ void main()
 	const vec3 b = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 	vec2 uv = v0.texCoord.xy * b.x + v1.texCoord.xy * b.y + v2.texCoord.xy * b.z;
 
+	vec3 N = normalize(v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z);
 	mat3 normalMatrix = transpose(mat3(gl_WorldToObjectNV));
-	vec3 N = normalize(normalMatrix * (v0.normal.xyz * b.x + v1.normal.xyz * b.y + v2.normal.xyz * b.z));
+	N = normalize(normalMatrix * N);
 
 	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;

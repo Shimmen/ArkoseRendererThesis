@@ -39,6 +39,12 @@ void VulkanCommandList::clearTexture(Texture& colorTexture, ClearColor color)
 
     const auto& texInfo = m_backend.textureInfo(colorTexture);
 
+    std::optional<VkImageLayout> originalLayout;
+    if (texInfo.currentLayout != VK_IMAGE_LAYOUT_GENERAL) {
+        originalLayout = texInfo.currentLayout;
+        m_backend.transitionImageLayout(texInfo.image, false, originalLayout.value(), VK_IMAGE_LAYOUT_GENERAL, &m_commandBuffer);
+    }
+
     VkClearColorValue clearValue {};
     clearValue.float32[0] = color.r;
     clearValue.float32[1] = color.g;
@@ -54,7 +60,11 @@ void VulkanCommandList::clearTexture(Texture& colorTexture, ClearColor color)
     range.baseArrayLayer = 0;
     range.layerCount = 1;
 
-    vkCmdClearColorImage(m_commandBuffer, texInfo.image, texInfo.currentLayout, &clearValue, 1, &range);
+    vkCmdClearColorImage(m_commandBuffer, texInfo.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &range);
+
+    if (originalLayout.has_value()) {
+        m_backend.transitionImageLayout(texInfo.image, false, VK_IMAGE_LAYOUT_GENERAL, originalLayout.value(), &m_commandBuffer);
+    }
 }
 
 void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColor clearColor, float clearDepth, uint32_t clearStencil)

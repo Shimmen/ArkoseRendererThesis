@@ -35,7 +35,8 @@ void main()
 		vec3 aabbMax = vec3(_aabb.maxX, _aabb.maxY, _aabb.maxZ);
 
 		if (all(greaterThanEqual(hitPoint, aabbMin)) && all(lessThanEqual(hitPoint, aabbMax))) {
-			hit.normal = normalize(gl_ObjectToWorldNV * vec4(plane.xyz, 0.0));
+			mat3 normalMatrix = transpose(mat3(gl_WorldToObjectNV));
+			hit.normal = normalize(normalMatrix * plane.xyz);
 			hit.colorIndex = colorSets[gl_InstanceCustomIndexNV].colorIndices[gl_PrimitiveID];
 
 			//float localT = t;
