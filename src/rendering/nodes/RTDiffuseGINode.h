@@ -11,6 +11,8 @@ public:
     explicit RTDiffuseGINode(const Scene&);
     ~RTDiffuseGINode() override = default;
 
+    std::optional<std::string> displayName() const override { return "Diffuse GI"; }
+
     static std::string name();
 
     void constructNode(Registry&) override;

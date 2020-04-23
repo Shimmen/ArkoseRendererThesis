@@ -21,8 +21,8 @@ void TestApp::setup(RenderGraph& graph)
     m_scene = Scene::loadFromFile("assets/Scenes/eval/small_spheres.json");
     m_scene->camera().setMaxSpeed(2.0f);
 
-    bool rtxOn = false;
-    bool firstHit = false;
+    bool rtxOn = true;
+    bool firstHit = true;
 
     graph.addNode<SceneUniformNode>(*m_scene);
     graph.addNode<ShadowMapNode>(*m_scene);
@@ -40,22 +40,6 @@ void TestApp::setup(RenderGraph& graph)
 
 void TestApp::update(float elapsedTime, float deltaTime)
 {
-    static bool showMetrics = false;
-
-    ImGui::BeginMainMenuBar();
-    if (ImGui::BeginMenu("Tools")) {
-        ImGui::MenuItem("Show metrics", nullptr, &showMetrics);
-        ImGui::EndMenu();
-    }
-    ImGui::EndMainMenuBar();
-
-    if (showMetrics) {
-        ImGui::Begin("Metrics");
-        float ms = deltaTime * 1000.0f;
-        ImGui::Text("Frame time: %.3f ms/frame", ms);
-        ImGui::End();
-    }
-
     ImGui::Begin("TestApp");
     ImGui::ColorEdit3("Sun color", value_ptr(m_scene->sun().color));
     ImGui::SliderFloat("Sun intensity", &m_scene->sun().intensity, 0.0f, 50.0f);
@@ -63,6 +47,11 @@ void TestApp::update(float elapsedTime, float deltaTime)
     if (ImGui::CollapsingHeader("Cameras")) {
         m_scene->cameraGui();
     }
+    ImGui::End();
+
+    ImGui::Begin("Metrics");
+    float ms = deltaTime * 1000.0f;
+    ImGui::Text("Frame time: %.3f ms/frame", ms);
     ImGui::End();
 
     const Input& input = Input::instance();

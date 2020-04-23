@@ -56,11 +56,9 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
 
     return [&](const AppState& appState, CommandList& cmdList) {
         static bool useRtFirstHit = false;
+        ImGui::Checkbox("Use ray traced first-hit", &useRtFirstHit);
         static bool includeDiffuseGI = true;
-        if (ImGui::CollapsingHeader("Final PostFX")) {
-            ImGui::Checkbox("Use ray traced first-hit", &useRtFirstHit);
-            ImGui::Checkbox("Include diffuse GI", &includeDiffuseGI);
-        }
+        ImGui::Checkbox("Include diffuse GI", &includeDiffuseGI);
 
         cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
         cmdList.bindSet(useRtFirstHit ? sourceImageRt : sourceImage, 0);
@@ -70,7 +68,7 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         cmdList.pushConstant(ShaderStageFragment, includeDiffuseGI);
 
         cmdList.draw(vertexBuffer, 3);
-        
+
         if (ImGui::Button("Take screenshot")) {
             static int imageIdx = 0;
             const Texture& finalColor = *reg.windowRenderTarget().attachment(RenderTarget::AttachmentType::Color0);

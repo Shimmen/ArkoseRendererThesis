@@ -10,6 +10,8 @@ class ForwardRenderNode final : public RenderGraphNode {
 public:
     explicit ForwardRenderNode(const Scene&);
 
+    std::optional<std::string> displayName() const override { return "Forward"; }
+
     static std::string name();
 
     void constructNode(Registry&) override;

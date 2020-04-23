@@ -52,13 +52,11 @@ RenderGraphNode::ExecuteCallback RTAmbientOcclusion::constructFrame(Registry& re
 
     return [&](const AppState& appState, CommandList& cmdList) {
         static bool enabled = false;
-        static float radius = 0.25f;
+        ImGui::Checkbox("Enabled", &enabled);
         static int signedNumSamples = 1;
-        if (ImGui::CollapsingHeader("Ambient Occlusion")) {
-            ImGui::Checkbox("Enabled", &enabled);
-            ImGui::SliderInt("Sample count", &signedNumSamples, 1, 32);
-            ImGui::SliderFloat("Max radius", &radius, 0.01f, 2.0f);
-        }
+        ImGui::SliderInt("Sample count", &signedNumSamples, 1, 32);
+        static float radius = 0.25f;
+        ImGui::SliderFloat("Max radius", &radius, 0.01f, 2.0f);
 
         if (!enabled) {
             cmdList.clearTexture(ambientOcclusion, ClearColor(1, 1, 1));

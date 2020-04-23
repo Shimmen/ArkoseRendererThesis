@@ -17,6 +17,9 @@ public:
 
     [[nodiscard]] const std::string& name() const;
 
+    //! Optionally return a display name for use in GUI situations
+    virtual std::optional<std::string> displayName() const { return {}; }
+
     //! This is not const since we need to write to members here that are shared for the whole node.
     virtual void constructNode(Registry&) {};
 

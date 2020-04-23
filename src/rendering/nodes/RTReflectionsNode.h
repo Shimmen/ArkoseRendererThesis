@@ -10,6 +10,8 @@ public:
     explicit RTReflectionsNode(const Scene&);
     ~RTReflectionsNode() override = default;
 
+    std::optional<std::string> displayName() const override { return "RT Reflections"; }
+
     static std::string name();
 
     void constructNode(Registry&) override;

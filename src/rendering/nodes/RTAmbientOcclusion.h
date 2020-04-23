@@ -10,6 +10,8 @@ public:
     explicit RTAmbientOcclusion(const Scene&);
     ~RTAmbientOcclusion() override = default;
 
+    std::optional<std::string> displayName() const override { return "Ambient Occlusion"; }
+
     static std::string name();
 
     void constructNode(Registry&) override;

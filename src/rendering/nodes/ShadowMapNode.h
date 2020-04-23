@@ -12,6 +12,8 @@ public:
 
     static std::string name();
 
+    std::optional<std::string> displayName() const override { return "Shadow Mapping"; }
+
     void constructNode(Registry&) override;
     ExecuteCallback constructFrame(Registry&) const override;
 

@@ -8,6 +8,8 @@ public:
     explicit FinalPostFxNode(const Scene&);
     ~FinalPostFxNode() override = default;
 
+    std::optional<std::string> displayName() const override { return "Final PostFX"; }
+
     static std::string name();
     ExecuteCallback constructFrame(Registry&) const override;
 

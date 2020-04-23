@@ -135,14 +135,13 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        static bool writeColor = true;
-        static bool forceDiffuse = false;
+        
         static float ambientAmount = 0.0f;
-        if (ImGui::CollapsingHeader("Forward")) {
-            ImGui::SliderFloat("Ambient", &ambientAmount, 0.0f, 1.0f);
-            ImGui::Checkbox("Write color", &writeColor);
-            ImGui::Checkbox("Force diffuse materials", &forceDiffuse);
-        }
+        ImGui::SliderFloat("Ambient", &ambientAmount, 0.0f, 1.0f);
+        static bool writeColor = true;
+        ImGui::Checkbox("Write color", &writeColor);
+        static bool forceDiffuse = false;
+        ImGui::Checkbox("Force diffuse materials", &forceDiffuse);
 
         cmdList.setRenderState(renderState, ClearColor(0, 0, 0, 0), 1.0f);
         cmdList.bindSet(fixedBindingSet, 0);

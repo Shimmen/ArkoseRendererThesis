@@ -11,6 +11,8 @@ public:
     explicit RTAccelerationStructures(const Scene&);
     ~RTAccelerationStructures() override = default;
 
+    std::optional<std::string> displayName() const override { return "RT Acceleration Structures"; }
+
     static std::string name();
 
     void constructNode(Registry&) override;

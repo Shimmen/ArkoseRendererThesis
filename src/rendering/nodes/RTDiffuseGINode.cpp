@@ -206,13 +206,11 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
 
     return [&](const AppState& appState, CommandList& cmdList) {
         static bool doRender = true;
+        ImGui::Checkbox("Render", &doRender);
         static bool ignoreColor = false;
+        ImGui::Checkbox("Ignore color", &ignoreColor);
         static bool useProxies = false;
-        if (ImGui::CollapsingHeader("Diffuse GI")) {
-            ImGui::Checkbox("Render", &doRender);
-            ImGui::Checkbox("Ignore color", &ignoreColor);
-            ImGui::Checkbox("Use proxies", &useProxies);
-        }
+        ImGui::Checkbox("Use proxies", &useProxies);
 
         if (!doRender) {
             return;

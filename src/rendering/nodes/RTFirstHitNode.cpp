@@ -187,9 +187,7 @@ RenderGraphNode::ExecuteCallback RTFirstHitNode::constructFrame(Registry& reg) c
 
     return [&](const AppState& appState, CommandList& cmdList) {
         static bool useProxies = true;
-        if (ImGui::CollapsingHeader("RT first-hit")) {
-            ImGui::Checkbox("Use proxies", &useProxies);
-        }
+        ImGui::Checkbox("Use proxies", &useProxies);
 
         if (useProxies) {
             cmdList.setRayTracingState(rtStateProxy);
