@@ -270,10 +270,8 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     requestedDeviceFeatures.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
 
     VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
-    indexingFeatures.pNext = nullptr;
     indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
     indexingFeatures.runtimeDescriptorArray = VK_TRUE;
-
 
     VkPhysicalDevice8BitStorageFeatures eightBitStorageFeatures { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES };
     eightBitStorageFeatures.storageBuffer8BitAccess = VK_TRUE; // (required if the extention is available)
@@ -294,6 +292,9 @@ VkDevice VulkanCore::createDevice(VkPhysicalDevice physicalDevice)
     deviceExtensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     deviceExtensions.emplace_back(VK_NV_RAY_TRACING_EXTENSION_NAME);
     deviceExtensions.emplace_back(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
+    deviceExtensions.emplace_back(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+    deviceExtensions.emplace_back(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
+    deviceExtensions.emplace_back(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
 
     //
 
