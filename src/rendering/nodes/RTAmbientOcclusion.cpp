@@ -80,15 +80,17 @@ RenderGraphNode::ExecuteCallback RTAmbientOcclusion::constructFrame(Registry& re
                 m_numAccumulatedFrames = 0;
             }
 
-            cmdList.setRayTracingState(rtState);
-            cmdList.bindSet(frameBindingSet, 0);
-            cmdList.pushConstant(ShaderStageRTRayGen, radius, 0);
-            cmdList.pushConstant(ShaderStageRTRayGen, static_cast<uint32_t>(signedNumSamples), 4);
-            cmdList.pushConstant(ShaderStageRTRayGen, appState.frameIndex(), 8);
-            cmdList.pushConstant(ShaderStageRTRayGen, (uint32_t)RTAccelerationStructures::HitMask::TriangleMeshWithProxy, 12);
-            cmdList.pushConstant(ShaderStageRTRayGen, darkening, 16);
-            cmdList.traceRays(appState.windowExtent());
-            m_numAccumulatedFrames += 1;
+            if (m_numAccumulatedFrames < 256) {
+                cmdList.setRayTracingState(rtState);
+                cmdList.bindSet(frameBindingSet, 0);
+                cmdList.pushConstant(ShaderStageRTRayGen, radius, 0);
+                cmdList.pushConstant(ShaderStageRTRayGen, static_cast<uint32_t>(signedNumSamples), 4);
+                cmdList.pushConstant(ShaderStageRTRayGen, appState.frameIndex(), 8);
+                cmdList.pushConstant(ShaderStageRTRayGen, (uint32_t)RTAccelerationStructures::HitMask::TriangleMeshWithProxy, 12);
+                cmdList.pushConstant(ShaderStageRTRayGen, darkening, 16);
+                cmdList.traceRays(appState.windowExtent());
+                m_numAccumulatedFrames += 1;
+            }
 
             cmdList.debugBarrier(); // TODO: Add fine grained barrier here to make sure ray tracing is done before averaging!
 

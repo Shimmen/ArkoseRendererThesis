@@ -206,6 +206,15 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
+        constexpr int samplesPerPass = 4; // (I don't wanna pass in a uniform for optimization reasons, so keep this up to date!)
+        int currentSamplesPerPixel = samplesPerPass * m_numAccumulatedFrames;
+
+        if (currentSamplesPerPixel < maxSamplesPerPixel) {
+            ImGui::TextColored(ImVec4(1, 0, 0, 1), "Accumulating ... (%i SPP)", currentSamplesPerPixel);
+        } else {
+            ImGui::TextColored(ImVec4(0, 1, 0, 1), "Ready! (%i SPP)", currentSamplesPerPixel);
+        }
+
         static bool doRender = true;
         ImGui::Checkbox("Render", &doRender);
         static bool ignoreColor = false;
@@ -244,8 +253,10 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
                 m_numAccumulatedFrames = 0;
             }
 
-            cmdList.traceRays(appState.windowExtent());
-            m_numAccumulatedFrames += 1;
+            if (currentSamplesPerPixel < maxSamplesPerPixel) {
+                cmdList.traceRays(appState.windowExtent());
+                m_numAccumulatedFrames += 1;
+            }
 
             cmdList.debugBarrier(); // TODO: Add fine grained barrier here to make sure ray tracing is done before averaging!
 
