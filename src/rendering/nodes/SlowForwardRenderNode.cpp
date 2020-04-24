@@ -61,7 +61,8 @@ void SlowForwardRenderNode::constructNode(Registry& nodeReg)
             std::string baseColorPath = material.baseColor;
             Texture* baseColorTexture { nullptr };
             if (baseColorPath.empty()) {
-                baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, true);
+                // the color is already in linear sRGB so we don't want to make an sRGB texture for it!
+                baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, false);
             } else {
                 baseColorTexture = &nodeReg.loadTexture2D(baseColorPath, true, true);
             }

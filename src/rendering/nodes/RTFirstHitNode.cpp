@@ -54,7 +54,7 @@ void RTFirstHitNode::constructNode(Registry& nodeReg)
 
         const Material& material = mesh.material();
         Texture* baseColorTexture = material.baseColor.empty()
-            ? &nodeReg.createPixelTexture(material.baseColorFactor, true)
+            ? &nodeReg.createPixelTexture(material.baseColorFactor, false) // the color is already in linear sRGB so we don't want to make an sRGB texture for it!
             : &nodeReg.loadTexture2D(material.baseColor, true, true);
 
         size_t texIndex = allTextures.size();

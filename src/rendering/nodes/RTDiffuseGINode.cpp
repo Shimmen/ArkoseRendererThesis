@@ -58,7 +58,8 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
         const Material& material = mesh.material();
         Texture* baseColorTexture { nullptr };
         if (material.baseColor.empty()) {
-            baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, true);
+            // the color is already in linear sRGB so we don't want to make an sRGB texture for it!
+            baseColorTexture = &nodeReg.createPixelTexture(material.baseColorFactor, false);
         } else {
             baseColorTexture = &nodeReg.loadTexture2D(material.baseColor, true, true);
         }
