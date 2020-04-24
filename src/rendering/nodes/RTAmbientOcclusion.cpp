@@ -76,6 +76,7 @@ RenderGraphNode::ExecuteCallback RTAmbientOcclusion::constructFrame(Registry& re
             cmdList.pushConstant(ShaderStageRTRayGen, radius, 0);
             cmdList.pushConstant(ShaderStageRTRayGen, static_cast<uint32_t>(signedNumSamples), 4);
             cmdList.pushConstant(ShaderStageRTRayGen, appState.frameIndex(), 8);
+            cmdList.pushConstant(ShaderStageRTRayGen, (uint32_t)RTAccelerationStructures::HitMask::TriangleMeshWithProxy, 12);
             cmdList.traceRays(appState.windowExtent());
             m_numAccumulatedFrames += 1;
 

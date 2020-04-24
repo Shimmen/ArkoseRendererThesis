@@ -16,6 +16,7 @@ layout(push_constant) uniform PushConstants {
 	float radius;
 	uint numSamples;
 	uint frameIndex;
+	uint hitMask;
 };
 
 layout(location = 0) rayPayloadNV float hitT;
@@ -49,7 +50,7 @@ void main()
 		aoDirection *= sign(dot(aoDirection, N));
 
 		uint rayFlags = gl_RayFlagsOpaqueNV | gl_RayFlagsCullBackFacingTrianglesNV | gl_RayFlagsTerminateOnFirstHitNV;
-		traceNV(topLevelAS, rayFlags, 0xff, 0, 0, 0, hitPoint, 0.001, aoDirection, radius, 0);
+		traceNV(topLevelAS, rayFlags, hitMask, 0, 0, 0, hitPoint, 0.001, aoDirection, radius, 0);
 
 		if (hitT > 0.0) {
 			float LdotN = dot(aoDirection, N);
