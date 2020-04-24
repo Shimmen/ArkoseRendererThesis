@@ -27,21 +27,22 @@ void RTAccelerationStructures::constructNode(Registry& nodeReg)
     m_scene.forEachModel([&](size_t, const Model& model) {
         model.forEachMesh([&](const Mesh& mesh) {
             RTGeometry geometry = createGeometryForTriangleMesh(mesh, nodeReg);
-            RTGeometryInstance instance = createGeometryInstance(geometry, model.transform(), nextTriangleInstanceId++, HitGroupIndex::Triangle, nodeReg);
+            uint8_t hitMask = model.hasProxy() ? HitMask::TriangleMeshWithProxy : HitMask::TriangleMeshWithoutProxy;
+            RTGeometryInstance instance = createGeometryInstance(geometry, model.transform(), nextTriangleInstanceId++, hitMask, HitGroupIndex::Triangle, nodeReg);
             m_mainInstances.push_back(instance);
         });
 
         if (model.proxy().hasMeshes()) {
             model.proxy().forEachMesh([&](const Mesh& proxyMesh) {
                 RTGeometry proxyGeometry = createGeometryForTriangleMesh(proxyMesh, nodeReg);
-                RTGeometryInstance instance = createGeometryInstance(proxyGeometry, model.transform(), nextTriangleInstanceId++, HitGroupIndex::Triangle, nodeReg);
+                RTGeometryInstance instance = createGeometryInstance(proxyGeometry, model.transform(), nextTriangleInstanceId++, HitMask::TriangleMeshWithoutProxy, HitGroupIndex::Triangle, nodeReg);
                 m_proxyInstances.push_back(instance);
             });
         } else {
             const auto* sphereSetModel = dynamic_cast<const SphereSetModel*>(&model.proxy());
             if (sphereSetModel) {
                 RTGeometry sphereSetGeometry = createGeometryForSphereSet(*sphereSetModel, nodeReg);
-                RTGeometryInstance instance = createGeometryInstance(sphereSetGeometry, model.transform(), nextSphereInstanceId++, HitGroupIndex::Sphere, nodeReg);
+                RTGeometryInstance instance = createGeometryInstance(sphereSetGeometry, model.transform(), nextSphereInstanceId++, HitMask::SphereSetHitMask, HitGroupIndex::Sphere, nodeReg);
                 m_proxyInstances.push_back(instance);
                 return;
             }
@@ -49,7 +50,7 @@ void RTAccelerationStructures::constructNode(Registry& nodeReg)
             const auto* voxelContourModel = dynamic_cast<const VoxelContourModel*>(&model.proxy());
             if (voxelContourModel) {
                 RTGeometry voxelContourGeometry = createGeometryForVoxelContours(*voxelContourModel, nodeReg);
-                RTGeometryInstance instance = createGeometryInstance(voxelContourGeometry, model.transform(), nextVoxelContourInstanceId++, HitGroupIndex::VoxelContour, nodeReg);
+                RTGeometryInstance instance = createGeometryInstance(voxelContourGeometry, model.transform(), nextVoxelContourInstanceId++, HitMask::VoxelContourHitMask, HitGroupIndex::VoxelContour, nodeReg);
                 m_proxyInstances.push_back(instance);
                 return;
             }
@@ -126,13 +127,14 @@ RTGeometry RTAccelerationStructures::createGeometryForVoxelContours(const VoxelC
     return geometry;
 }
 
-RTGeometryInstance RTAccelerationStructures::createGeometryInstance(const RTGeometry& geometry, const Transform& transform, uint32_t customId, uint32_t sbtOffset, Registry& reg) const
+RTGeometryInstance RTAccelerationStructures::createGeometryInstance(const RTGeometry& geometry, const Transform& transform, uint32_t customId, uint8_t hitMask, uint32_t sbtOffset, Registry& reg) const
 {
     // TODO: Later we probably want to keep all meshes of a model in a single BLAS, but that requires some fancy SBT stuff which I don't wanna mess with now.
     BottomLevelAS& blas = reg.createBottomLevelAccelerationStructure({ geometry });
     RTGeometryInstance instance = { .blas = blas,
                                     .transform = transform,
                                     .shaderBindingTableOffset = sbtOffset,
-                                    .customInstanceId = customId };
+                                    .customInstanceId = customId,
+                                    .hitMask = hitMask };
     return instance;
 }

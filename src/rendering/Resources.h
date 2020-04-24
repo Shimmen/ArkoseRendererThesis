@@ -435,6 +435,7 @@ struct RTGeometryInstance {
     const Transform& transform;
     uint32_t shaderBindingTableOffset;
     uint32_t customInstanceId;
+    uint8_t hitMask;
 };
 
 class TopLevelAS : public Resource {

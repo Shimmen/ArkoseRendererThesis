@@ -26,12 +26,19 @@ public:
         VoxelContour = 2,
     };
 
+    enum HitMask : uint8_t {
+        TriangleMeshWithoutProxy = 0x01,
+        TriangleMeshWithProxy = 0x02,
+        SphereSetHitMask = 0x04,
+        VoxelContourHitMask = 0x08,
+    };
+
 private:
     RTGeometry createGeometryForTriangleMesh(const Mesh&, Registry&) const;
     RTGeometry createGeometryForSphereSet(const SphereSetModel&, Registry&) const;
     RTGeometry createGeometryForVoxelContours(const VoxelContourModel&, Registry&) const;
 
-    RTGeometryInstance createGeometryInstance(const RTGeometry&, const Transform&, uint32_t customId, uint32_t sbtOffset, Registry&) const;
+    RTGeometryInstance createGeometryInstance(const RTGeometry&, const Transform&, uint32_t customId, uint8_t hitMask, uint32_t sbtOffset, Registry&) const;
 
 private:
     const Scene& m_scene;

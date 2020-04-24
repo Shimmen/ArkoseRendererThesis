@@ -3368,9 +3368,10 @@ VkBuffer VulkanBackend::createRTXInstanceBuffer(std::vector<RTGeometryInstance> 
         //  Here we instead want some other type of data. Probably something that can be passed in.
         data.instanceId = instance.customInstanceId;
 
-        data.mask = 0xff;
-        data.instanceOffset = instance.shaderBindingTableOffset;
+        data.mask = instance.hitMask;
         data.flags = 0; //VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV;
+
+        data.instanceOffset = instance.shaderBindingTableOffset;
 
         instanceData.push_back(data);
     }
