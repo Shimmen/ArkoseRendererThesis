@@ -217,6 +217,13 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
             return;
         }
 
+        if (Input::instance().wasKeyPressed(GLFW_KEY_O)) {
+            useProxies = false;
+        }
+        if (Input::instance().wasKeyPressed(GLFW_KEY_P)) {
+            useProxies = true;
+        }
+
         if (useProxies) {
             cmdList.setRayTracingState(rtStateProxy);
             cmdList.bindSet(frameBindingSetProxy, 0);

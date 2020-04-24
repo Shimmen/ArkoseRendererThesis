@@ -17,6 +17,7 @@ layout(push_constant) uniform PushConstants {
 	uint numSamples;
 	uint frameIndex;
 	uint hitMask;
+	float darkening;
 };
 
 layout(location = 0) rayPayloadNV float hitT;
@@ -59,7 +60,7 @@ void main()
 	}
 
 	float aoValue = 1.0 - (occlusion / float(numSamples));
-	aoValue = pow(aoValue, 8.0);
+	aoValue = pow(aoValue, darkening);
 
 	float currentValue = imageLoad(aoImage, ivec2(gl_LaunchIDNV.xy)).r;
 	imageStore(aoImage, ivec2(gl_LaunchIDNV.xy), vec4(currentValue + aoValue));

@@ -55,8 +55,17 @@ RenderGraphNode::ExecuteCallback RTAmbientOcclusion::constructFrame(Registry& re
         ImGui::Checkbox("Enabled", &enabled);
         static int signedNumSamples = 1;
         ImGui::SliderInt("Sample count", &signedNumSamples, 1, 32);
-        static float radius = 0.25f;
-        ImGui::SliderFloat("Max radius", &radius, 0.01f, 2.0f);
+        static float radius = 0.13f;
+        ImGui::SliderFloat("Max radius", &radius, 0.01f, 0.5f);
+        static float darkening = 20.0f;
+        ImGui::SliderFloat("Darkening", &darkening, 1.0f, 40.0f);
+
+        if (Input::instance().wasKeyPressed(GLFW_KEY_O)) {
+            enabled = false;
+        }
+        if (Input::instance().wasKeyPressed(GLFW_KEY_P)) {
+            enabled = true;
+        }
 
         if (!enabled) {
             cmdList.clearTexture(ambientOcclusion, ClearColor(1, 1, 1));
@@ -77,6 +86,7 @@ RenderGraphNode::ExecuteCallback RTAmbientOcclusion::constructFrame(Registry& re
             cmdList.pushConstant(ShaderStageRTRayGen, static_cast<uint32_t>(signedNumSamples), 4);
             cmdList.pushConstant(ShaderStageRTRayGen, appState.frameIndex(), 8);
             cmdList.pushConstant(ShaderStageRTRayGen, (uint32_t)RTAccelerationStructures::HitMask::TriangleMeshWithProxy, 12);
+            cmdList.pushConstant(ShaderStageRTRayGen, darkening, 16);
             cmdList.traceRays(appState.windowExtent());
             m_numAccumulatedFrames += 1;
 
