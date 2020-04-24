@@ -59,6 +59,8 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         ImGui::Checkbox("Use ray traced first-hit", &useRtFirstHit);
         static bool includeDiffuseGI = true;
         ImGui::Checkbox("Include diffuse GI", &includeDiffuseGI);
+        static float exposure = 0.45f;
+        ImGui::SliderFloat("Exposure", &exposure, 0.01f, 10.0f, "%.3f", 3.0f);
 
         cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);
         cmdList.bindSet(useRtFirstHit ? sourceImageRt : sourceImage, 0);
@@ -66,6 +68,7 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         cmdList.bindSet(envBindingSet, 2);
 
         cmdList.pushConstant(ShaderStageFragment, includeDiffuseGI);
+        cmdList.pushConstant(ShaderStageFragment, exposure, 4);
 
         cmdList.draw(vertexBuffer, 3);
 

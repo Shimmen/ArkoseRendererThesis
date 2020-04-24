@@ -20,6 +20,7 @@ layout(location = 0) out vec4 oColor;
 
 layout(push_constant) uniform PushConstants {
 	bool includeDiffuseGI;
+	float exposure;
 };
 
 void main()
@@ -39,6 +40,7 @@ void main()
         }
     }
 
+    hdrColor *= exposure;
     vec3 ldrColor = ACES_tonemap(hdrColor);
     ldrColor = pow(ldrColor, vec3(1.0 / 2.2));
 
