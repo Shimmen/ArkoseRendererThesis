@@ -104,13 +104,16 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
 
             const auto* voxelContourModel = dynamic_cast<const VoxelContourModel*>(&model.proxy());
             if (voxelContourModel) {
-                std::vector<RTVoxelContour> contourPlaneData;
+                using namespace half_float;
+                std::vector<half> contourPlaneData;
                 std::vector<RTAABB_packable> contourAabbData;
                 std::vector<uint32_t> contourColorIdxData;
                 for (const auto& contour : voxelContourModel->contours()) {
 
-                    RTVoxelContour rtContour;
-                    rtContour.plane = vec4(contour.normal, contour.distance);
+                    contourPlaneData.push_back(half(contour.normal.x));
+                    contourPlaneData.push_back(half(contour.normal.y));
+                    contourPlaneData.push_back(half(contour.normal.z));
+                    contourPlaneData.push_back(half(contour.distance));
 
                     RTAABB_packable rtAabb;
                     rtAabb.minX = contour.aabb.min.x;
@@ -119,8 +122,6 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                     rtAabb.maxX = contour.aabb.max.x;
                     rtAabb.maxY = contour.aabb.max.y;
                     rtAabb.maxZ = contour.aabb.max.z;
-
-                    contourPlaneData.push_back(rtContour);
                     contourAabbData.push_back(rtAabb);
 
                     size_t colorIdxOffset = contourColors.size();

@@ -6,7 +6,13 @@
 #include <shared/RTData.h>
 #include <intersections.glsl>
 
-layout(set = 1, binding = 6) buffer readonly VoxelContours  { RTVoxelContour contours[]; } sets[];
+// TODO: It would be nice to put this in the c++/glsl shared context
+#include <half.glsl>
+struct RTVoxelContourHalf {
+	f16vec4 plane;
+};
+
+layout(set = 1, binding = 6) buffer readonly VoxelContours  { RTVoxelContourHalf contours[]; } sets[];
 layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABB_packable aabbs[]; } aabbSets[];
 layout(set = 1, binding = 8, scalar) buffer readonly ColorIdx { uint colorIndices[]; } colorSets[];
 
@@ -19,7 +25,7 @@ hitAttributeNV ContourHit hit;
 
 void main()
 {
-	RTVoxelContour contour = sets[gl_InstanceCustomIndexNV].contours[gl_PrimitiveID];
+	RTVoxelContourHalf contour = sets[gl_InstanceCustomIndexNV].contours[gl_PrimitiveID];
 
 #if 1
 
