@@ -207,7 +207,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        constexpr int samplesPerPass = 4; // (I don't wanna pass in a uniform for optimization reasons, so keep this up to date!)
+        constexpr int samplesPerPass = 1; // (I don't wanna pass in a uniform for optimization reasons, so keep this up to date!)
         int currentSamplesPerPixel = samplesPerPass * m_numAccumulatedFrames;
 
         if (currentSamplesPerPixel < maxSamplesPerPixel) {

@@ -50,7 +50,7 @@ void main()
 	float tmax = 10000.0;
 
 	vec3 diffuse = vec3(0.0);
-	const uint numSamples = 4;
+	const uint numSamples = 1;
 
 	uint seed = (gl_LaunchIDNV.x + gl_LaunchSizeNV.x * gl_LaunchIDNV.y) + frameIndex * (gl_LaunchSizeNV.x * gl_LaunchSizeNV.y);
 	seedRandom(seed);
