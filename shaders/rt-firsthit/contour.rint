@@ -11,9 +11,13 @@
 struct RTVoxelContourHalf {
 	f16vec4 plane;
 };
+struct RTAABBHalf {
+	half minX, minY, minZ;
+	half maxX, maxY, maxZ;
+};
 
 layout(set = 1, binding = 6) buffer readonly VoxelContours  { RTVoxelContourHalf contours[]; } sets[];
-layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABB_packable aabbs[]; } aabbSets[];
+layout(set = 1, binding = 7, scalar) buffer readonly Voxels { RTAABBHalf aabbs[]; } aabbSets[];
 layout(set = 1, binding = 8, scalar) buffer readonly ColorIdx { uint colorIndices[]; } colorSets[];
 
 struct ContourHit {
@@ -36,7 +40,7 @@ void main()
 	if (rayPlaneIntersection(plane.xyz, plane.w, gl_ObjectRayOriginNV, gl_ObjectRayDirectionNV, t) && t >= gl_RayTminNV && t <= gl_RayTmaxNV) {
 		vec3 hitPoint = gl_ObjectRayOriginNV + t * gl_ObjectRayDirectionNV;
 
-		RTAABB_packable _aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
+		RTAABBHalf _aabb = aabbSets[gl_InstanceCustomIndexNV].aabbs[gl_PrimitiveID];
 		vec3 aabbMin = vec3(_aabb.minX, _aabb.minY, _aabb.minZ);
 		vec3 aabbMax = vec3(_aabb.maxX, _aabb.maxY, _aabb.maxZ);
 

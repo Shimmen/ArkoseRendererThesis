@@ -18,7 +18,7 @@
 
 void TestApp::setup(RenderGraph& graph)
 {
-    m_scene = Scene::loadFromFile("assets/Scenes/eval/small_spheres.json");
+    m_scene = Scene::loadFromFile("assets/Scenes/eval/small_contours.json");
     m_scene->camera().setMaxSpeed(2.0f);
 
     bool rtxOn = true;

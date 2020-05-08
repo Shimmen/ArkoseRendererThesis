@@ -106,7 +106,7 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
             if (voxelContourModel) {
                 using namespace half_float;
                 std::vector<half> contourPlaneData;
-                std::vector<RTAABB_packable> contourAabbData;
+                std::vector<half> contourAabbData;
                 std::vector<uint32_t> contourColorIdxData;
                 for (const auto& contour : voxelContourModel->contours()) {
 
@@ -115,14 +115,12 @@ void RTDiffuseGINode::constructNode(Registry& nodeReg)
                     contourPlaneData.push_back(half(contour.normal.z));
                     contourPlaneData.push_back(half(contour.distance));
 
-                    RTAABB_packable rtAabb;
-                    rtAabb.minX = contour.aabb.min.x;
-                    rtAabb.minY = contour.aabb.min.y;
-                    rtAabb.minZ = contour.aabb.min.z;
-                    rtAabb.maxX = contour.aabb.max.x;
-                    rtAabb.maxY = contour.aabb.max.y;
-                    rtAabb.maxZ = contour.aabb.max.z;
-                    contourAabbData.push_back(rtAabb);
+                    contourAabbData.push_back(half(contour.aabb.min.x));
+                    contourAabbData.push_back(half(contour.aabb.min.y));
+                    contourAabbData.push_back(half(contour.aabb.min.z));
+                    contourAabbData.push_back(half(contour.aabb.max.x));
+                    contourAabbData.push_back(half(contour.aabb.max.y));
+                    contourAabbData.push_back(half(contour.aabb.max.z));
 
                     size_t colorIdxOffset = contourColors.size();
                     size_t index = colorIdxOffset + contour.colorIndex;
