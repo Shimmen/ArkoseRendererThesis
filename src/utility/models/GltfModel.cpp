@@ -118,7 +118,10 @@ std::string GltfModel::directory() const
 {
     int lastSlash = m_path.rfind('/');
     if (lastSlash == -1) {
-        return "";
+        lastSlash = m_path.rfind('\\');
+        if (lastSlash == -1) {
+            return "";
+        }
     }
     auto dir = m_path.substr(0, lastSlash + 1);
     return dir;
@@ -286,7 +289,7 @@ std::vector<uint32_t> GltfMesh::indexData() const
     vec.reserve(accessor.count);
 
     switch (accessor.componentType) {
-        case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
+    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE: {
         auto* first = reinterpret_cast<const uint8_t*>(start);
         for (size_t i = 0; i < accessor.count; ++i) {
             uint32_t val = (uint32_t)(*(first + i));
