@@ -4,19 +4,17 @@
 
 layout(location = 0) in vec3 aPosition;
 
-layout(set = 0, binding = 0) uniform LightDataBlock
-{
+layout(push_constant) uniform PushConstants {
     mat4 lightProjectionFromWorld;
 };
 
-layout(set = 1, binding = 0) uniform TransformDataBlock
+layout(set = 0, binding = 0) uniform TransformDataBlock
 {
     mat4 transforms[SHADOW_MAX_OCCLUDERS];
 };
 
 void main()
 {
-    int objectIndex = gl_InstanceIndex;
-    mat4 worldFromLocal = transforms[objectIndex];
+    mat4 worldFromLocal = transforms[gl_InstanceIndex];
     gl_Position = lightProjectionFromWorld * worldFromLocal * vec4(aPosition, 1.0);
 }

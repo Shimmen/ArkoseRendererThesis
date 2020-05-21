@@ -32,45 +32,56 @@ void ShadowMapNode::constructNode(Registry& nodeReg)
 
 RenderGraphNode::ExecuteCallback ShadowMapNode::constructFrame(Registry& reg) const
 {
-    const SunLight& sunLight = m_scene.sun();
-
-    Texture& shadowMap = reg.createTexture2D(sunLight.shadowMapSize, Texture::Format::Depth32F, Texture::Usage::AttachAndSample);
-    reg.publish("directional", shadowMap);
-
-    Buffer& lightDataBuffer = reg.createBuffer(sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
-    BindingSet& lightBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, &lightDataBuffer } });
-
     Buffer& transformDataBuffer = reg.createBuffer(m_drawables.size() * sizeof(mat4), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     BindingSet& transformBindingSet = reg.createBindingSet({ { 0, ShaderStageVertex, &transformDataBuffer } });
 
-    const RenderTarget& shadowRenderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
-    Shader shader = Shader::createVertexOnly("shadowSun.vert");
+    Shader shader = Shader::createVertexOnly("light/shadow.vert");
     VertexLayout vertexLayout = VertexLayout { sizeof(vec3), { { 0, VertexAttributeType::Float3, 0 } } };
 
-    RenderStateBuilder renderStateBuilder { shadowRenderTarget, shader, vertexLayout };
-    renderStateBuilder
-        .addBindingSet(lightBindingSet)
-        .addBindingSet(transformBindingSet);
+    struct DrawContext {
+        const RenderState* renderState {};
+        const Light* light {};
+    };
+    std::vector<DrawContext> drawContexts;
 
-    RenderState& renderState = reg.createRenderState(renderStateBuilder);
+    m_scene.forEachLight([&](const Light& light) {
+        if (!light.shadowMap.has_value()) {
+            return;
+        }
 
-    return [&](const AppState& appState, CommandList& cmdList) {
-        cmdList.setRenderState(renderState, ClearColor(1, 0, 1), 1.0f);
+        const ShadowMapSpec& mapSpec = light.shadowMap.value();
 
-        mat4 lightProjectionFromWorld = sunLight.lightProjection();
-        cmdList.updateBufferImmediately(lightDataBuffer, &lightProjectionFromWorld, sizeof(mat4));
-        cmdList.bindSet(lightBindingSet, 0);
+        Texture& shadowMap = reg.createTexture2D(mapSpec.size, Texture::Format::Depth32F, Texture::Usage::AttachAndSample);
+        reg.publish(mapSpec.name, shadowMap);
 
+        const RenderTarget& shadowRenderTarget = reg.createRenderTarget({ { RenderTarget::AttachmentType::Depth, &shadowMap } });
+        RenderStateBuilder renderStateBuilder { shadowRenderTarget, shader, vertexLayout };
+        renderStateBuilder.addBindingSet(transformBindingSet);
+        RenderState& renderState = reg.createRenderState(renderStateBuilder);
+
+        DrawContext ctx;
+        ctx.light = &light;
+        ctx.renderState = &renderState;
+        drawContexts.push_back(ctx);
+    });
+
+    return [&, drawContexts = drawContexts](const AppState& appState, CommandList& cmdList) {
         mat4 objectTransforms[SHADOW_MAX_OCCLUDERS];
         for (uint32_t idx = 0; idx < m_drawables.size(); ++idx) {
             objectTransforms[idx] = m_drawables[idx].mesh->transform().worldMatrix();
         }
         cmdList.updateBufferImmediately(transformDataBuffer, objectTransforms, m_drawables.size() * sizeof(mat4));
-        cmdList.bindSet(transformBindingSet, 1);
 
-        for (uint32_t idx = 0; idx < m_drawables.size(); ++idx) {
-            auto& drawable = m_drawables[idx];
-            cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, drawable.mesh->indexType(), idx);
-        };
+        for (const DrawContext& ctx : drawContexts) {
+
+            cmdList.setRenderState(*ctx.renderState, ClearColor(1, 0, 1), 1.0f);
+            cmdList.pushConstant(ShaderStageVertex, ctx.light->lightProjection());
+            cmdList.bindSet(transformBindingSet, 0);
+
+            for (uint32_t idx = 0; idx < m_drawables.size(); ++idx) {
+                auto& drawable = m_drawables[idx];
+                cmdList.drawIndexed(*drawable.vertexBuffer, *drawable.indexBuffer, drawable.indexCount, drawable.mesh->indexType(), idx);
+            };
+        }
     };
 }

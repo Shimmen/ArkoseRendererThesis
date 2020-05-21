@@ -18,8 +18,8 @@
 
 void TestApp::setup(RenderGraph& graph)
 {
-    m_scene = Scene::loadFromFile("assets/Scenes/eval/small_spheres.json");
-    m_scene->camera().setMaxSpeed(2.0f);
+    m_scene = Scene::loadFromFile("assets/Scenes/eval/bunny_test.json");
+    m_scene->camera().setMaxSpeed(5.0f);
 
     bool rtxOn = true;
     bool firstHit = true;
@@ -36,6 +36,15 @@ void TestApp::setup(RenderGraph& graph)
         }
     }
     graph.addNode<FinalPostFxNode>(*m_scene);
+
+    if (true) {
+        ShadowMapSpec spotShadow { { 4096, 4096 }, "spot" };
+        vec3 spotPosition = { 0.0f, 4.0f, 12.0f };
+        vec3 spotTarget = { 0.0f, 3.0f, 0.0f };
+        vec3 spotDirection = normalize(spotTarget - spotPosition);
+        SpotLight spotLight { { 1, 1, 1 }, 1200.0f, spotShadow, spotPosition, spotDirection, mathkit::PI / 6.0f };
+        m_scene->spotLights().push_back(spotLight);
+    }
 }
 
 void TestApp::update(float elapsedTime, float deltaTime)
@@ -43,6 +52,8 @@ void TestApp::update(float elapsedTime, float deltaTime)
     ImGui::Begin("TestApp");
     ImGui::ColorEdit3("Sun color", value_ptr(m_scene->sun().color));
     ImGui::SliderFloat("Sun intensity", &m_scene->sun().intensity, 0.0f, 50.0f);
+    if (!m_scene->spotLights().empty())
+        ImGui::SliderFloat("Spot intensity", &m_scene->spotLights().front().intensity, 0.0f, 3000.0f);
     ImGui::SliderFloat("Environment", &m_scene->environmentMultiplier(), 0.0f, 5.0f);
     if (ImGui::CollapsingHeader("Cameras")) {
         m_scene->cameraGui();
@@ -69,8 +80,4 @@ void TestApp::update(float elapsedTime, float deltaTime)
             * mathkit::scale(6.0f + 1.0f * cosf(elapsedTime));
         m_spinningObject->transform().setLocalMatrix(matrix);
     }
-
-    float st = 0.4f * elapsedTime;
-    vec3 lightPosition = vec3(cosf(st), 2.0f, sinf(st));
-    //m_scene.sun().direction = -normalize(lightPosition);
 }

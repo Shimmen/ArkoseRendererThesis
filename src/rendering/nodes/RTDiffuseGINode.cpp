@@ -177,7 +177,8 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
                                                              { 5, ShaderStageRTRayGen, reg.getBuffer(SceneUniformNode::name(), "camera") },
                                                              { 6, ShaderStageRTMiss, reg.getBuffer(SceneUniformNode::name(), "environmentData") },
                                                              { 7, ShaderStageRTMiss, reg.getTexture(SceneUniformNode::name(), "environmentMap").value_or(&reg.createPixelTexture(vec4(1.0), true)) },
-                                                             { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
+                                                             { 8, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "directionalLight") },
+                                                             { 9, ShaderStageRTClosestHit, reg.getBuffer(SceneUniformNode::name(), "spotLight") } });
 
         ShaderFile raygen = ShaderFile("rt-diffuseGI/raygen.rgen");
         HitGroup mainHitGroup { ShaderFile("rt-diffuseGI/closestHit.rchit") };

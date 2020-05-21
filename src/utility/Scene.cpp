@@ -16,6 +16,22 @@ mat4 SunLight::lightProjection() const
     return lightProjection * lightOrientation;
 }
 
+mat4 SpotLight::lightProjection() const
+{
+    vec3 target = position + normalize(direction);
+    mat4 lightOrientation = mathkit::lookAt(position, target);
+    mat4 lightProjection = mathkit::perspective(1.1f * coneAngle, 1.0f, 0.1f, 50.0f);
+    return lightProjection * lightOrientation;
+}
+
+void Scene::forEachLight(std::function<void(const Light&)> callback) const
+{
+    callback(m_sunLight);
+    for (const auto& spotLight : m_spotLights) {
+        callback(spotLight);
+    }
+}
+
 std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
 {
     using json = nlohmann::json;
@@ -79,7 +95,7 @@ std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
     for (auto& jsonLight : jsonScene.at("lights")) {
         ASSERT(jsonLight.at("type") == "directional");
 
-        SunLight sun;
+        SunLight sun {};
 
         float color[3];
         jsonLight.at("color").get_to(color);
@@ -95,7 +111,8 @@ std::unique_ptr<Scene> Scene::loadFromFile(const std::string& path)
 
         int mapSize[2];
         jsonLight.at("shadowMapSize").get_to(mapSize);
-        sun.shadowMapSize = { mapSize[0], mapSize[1] };
+        ShadowMapSpec shadowMap { { mapSize[0], mapSize[1] }, "directional" };
+        sun.shadowMap = shadowMap;
 
         // TODO!
         scene->m_sunLight = sun;

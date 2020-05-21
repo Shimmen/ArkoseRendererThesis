@@ -115,6 +115,10 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     BindingSet& dirLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, shadowMap },
                                                             { 1, ShaderStageFragment, reg.getBuffer(SceneUniformNode::name(), "directionalLight") } });
 
+    const Texture* spotShadowMap = reg.getTexture(ShadowMapNode::name(), "spot").value_or(&reg.createPixelTexture(vec4(1.0), false));
+    BindingSet& spotLightBindingSet = reg.createBindingSet({ { 0, ShaderStageFragment, spotShadowMap },
+                                                             { 1, ShaderStageFragment, reg.getBuffer(SceneUniformNode::name(), "spotLight") } });
+
     Shader shader = Shader::createBasic("forwardSlow.vert", "forwardSlow.frag");
     VertexLayout vertexLayout = VertexLayout {
         sizeof(Vertex),
@@ -131,12 +135,12 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
     renderStateBuilder
         .addBindingSet(fixedBindingSet)
         .addBindingSet(*m_drawables[0].bindingSet)
-        .addBindingSet(dirLightBindingSet);
+        .addBindingSet(dirLightBindingSet)
+        .addBindingSet(spotLightBindingSet);
 
     RenderState& renderState = reg.createRenderState(renderStateBuilder);
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        
         static float ambientAmount = 0.0f;
         ImGui::SliderFloat("Ambient", &ambientAmount, 0.0f, 1.0f);
         static bool writeColor = true;
@@ -147,6 +151,7 @@ RenderGraphNode::ExecuteCallback SlowForwardRenderNode::constructFrame(Registry&
         cmdList.setRenderState(renderState, ClearColor(0, 0, 0, 0), 1.0f);
         cmdList.bindSet(fixedBindingSet, 0);
         cmdList.bindSet(dirLightBindingSet, 2);
+        cmdList.bindSet(spotLightBindingSet, 3);
 
         for (const Drawable& drawable : m_drawables) {
 

@@ -17,7 +17,6 @@ SceneUniformNode::SceneUniformNode(const Scene& scene)
 SceneUniformNode::ExecuteCallback SceneUniformNode::constructFrame(Registry& reg) const
 {
     const FpsCamera& camera = m_scene.camera();
-    const SunLight& light = m_scene.sun();
 
     Buffer& cameraUniformBuffer = reg.createBuffer(sizeof(CameraState), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     reg.publish("camera", cameraUniformBuffer);
@@ -32,6 +31,10 @@ SceneUniformNode::ExecuteCallback SceneUniformNode::constructFrame(Registry& reg
 
     Buffer& dirLightBuffer = reg.createBuffer(sizeof(DirectionalLight), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
     reg.publish("directionalLight", dirLightBuffer);
+
+    // TODO: This is all temporary hacking about to get a spot light in now..
+    Buffer& spotLightBuffer = reg.createBuffer(sizeof(SpotLightData), Buffer::Usage::UniformBuffer, Buffer::MemoryHint::TransferOptimal);
+    reg.publish("spotLight", spotLightBuffer);
 
     return [&](const AppState& appState, CommandList& cmdList) {
         // Camera uniforms
@@ -50,12 +53,28 @@ SceneUniformNode::ExecuteCallback SceneUniformNode::constructFrame(Registry& reg
         cmdList.updateBufferImmediately(envDataBuffer, &envMultiplier, sizeof(envMultiplier));
 
         // Directional light uniforms
+        const SunLight& sunLight = m_scene.sun();
         DirectionalLight dirLightData {
-            .colorAndIntensity = { light.color, light.intensity },
-            .worldSpaceDirection = normalize(vec4(light.direction, 0.0)),
-            .viewSpaceDirection = camera.viewMatrix() * normalize(vec4(m_scene.sun().direction, 0.0)),
-            .lightProjectionFromWorld = light.lightProjection()
+            .colorAndIntensity = { sunLight.color, sunLight.intensity },
+            .worldSpaceDirection = normalize(vec4(sunLight.direction, 0.0)),
+            .viewSpaceDirection = camera.viewMatrix() * normalize(vec4(sunLight.direction, 0.0)),
+            .lightProjectionFromWorld = sunLight.lightProjection()
         };
         cmdList.updateBufferImmediately(dirLightBuffer, &dirLightData, sizeof(DirectionalLight));
+
+        // Splot light light uniforms
+        if (!m_scene.spotLights().empty()) {
+            const SpotLight& spotLight = m_scene.spotLights().front();
+            SpotLightData spotLightData {
+                .colorAndIntensity = { spotLight.color, spotLight.intensity },
+                .worldSpacePosition = vec4(spotLight.position, 1.0f),
+                .worldSpaceDirection = vec4(normalize(spotLight.direction), 0.0f),
+                .viewSpacePosition = camera.viewMatrix() * vec4(spotLight.position, 1.0f),
+                .viewSpaceDirection = camera.viewMatrix() * vec4(normalize(spotLight.direction), 0.0f),
+                .lightProjectionFromWorld = spotLight.lightProjection(),
+                .coneAngle = spotLight.coneAngle
+            };
+            cmdList.updateBufferImmediately(spotLightBuffer, &spotLightData, sizeof(SpotLightData));
+        }
     };
 }

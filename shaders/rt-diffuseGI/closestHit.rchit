@@ -15,6 +15,7 @@ layout(location = 1) rayPayloadNV bool inShadow;
 
 layout(binding = 0, set = 0) uniform accelerationStructureNV topLevelAS;
 layout(binding = 8, set = 0) uniform DirLightBlock { DirectionalLight dirLight; };
+layout(binding = 9, set = 0) uniform SpotLightBlock { SpotLightData spotLight; };
 
 layout(binding = 0, set = 1, scalar) buffer readonly Meshes   { RTMesh meshes[]; };
 layout(binding = 1, set = 1, scalar) buffer readonly Vertices { RTVertex x[]; } vertices[];
@@ -69,9 +70,12 @@ void main()
 	mat3 normalMatrix = transpose(mat3(gl_WorldToObjectNV));
 	N = normalize(normalMatrix * N);
 
-	vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
+	//vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
+	vec3 hitPoint = gl_WorldRayOriginNV + gl_HitTNV * gl_WorldRayDirectionNV;
+	vec3 L = normalize(spotLight.worldSpacePosition.xyz - hitPoint);
 	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
 
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
-	hitValue = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);
+	//hitValue = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);
+	hitValue = evaluateSpotLight(spotLight, hitPoint, baseColor, N, shadowFactor);
 }

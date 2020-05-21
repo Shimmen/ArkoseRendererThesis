@@ -70,7 +70,7 @@ void VulkanCommandList::clearTexture(Texture& colorTexture, ClearColor color)
 void VulkanCommandList::setRenderState(const RenderState& renderState, ClearColor clearColor, float clearDepth, uint32_t clearStencil)
 {
     if (activeRenderState) {
-        LogWarning("setRenderState: already active render state!\n");
+        //LogWarning("setRenderState: already active render state!\n");
         endCurrentRenderPassIfAny();
     }
     activeRenderState = &renderState;

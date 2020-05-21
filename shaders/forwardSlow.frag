@@ -1,4 +1,4 @@
-#version 450
+#version 460
 #extension GL_ARB_separate_shader_objects : enable
 
 #include "shared/CameraState.h"
@@ -25,6 +25,12 @@ layout(set = 2, binding = 0) uniform sampler2D uDirLightShadowMap;
 layout(set = 2, binding = 1) uniform DirLightBlock
 {
     DirectionalLight dirLight;
+};
+
+layout(set = 3, binding = 0) uniform sampler2D uSpotLightShadowMap;
+layout(set = 3, binding = 1) uniform SpotLightBlock
+{
+    SpotLightData spotLight;
 };
 
 layout(location = 0) out vec4 oColor;
@@ -55,7 +61,7 @@ float evaluateShadow(sampler2D shadowMap, mat4 lightProjectionFromView, vec3 vie
 
     // This isn't optimal but it works for now
     vec2 pixelSize = 1.0 / textureSize(shadowMap, 0);
-    float bias = max(pixelSize.x, pixelSize.y) + 0.006;
+    float bias = max(pixelSize.x, pixelSize.y) + 0.0003;
 
     // (remember: 1 is furthest away, 0 is closest!)
     return (mapDepth < posInShadowMap.z - bias) ? 0.0 : 1.0;
@@ -70,6 +76,34 @@ vec3 evaluateDirectionalLight(DirectionalLight light, vec3 V, vec3 N, vec3 baseC
     float shadowFactor = evaluateShadow(uDirLightShadowMap, lightProjectionFromView, vPosition);
 
     vec3 directLight = lightColor * shadowFactor;
+
+    vec3 brdf;
+    if (forceDiffuse) {
+        brdf = baseColor * diffuseBRDF();
+    } else {
+        brdf = evaluateBRDF(L, V, N, baseColor, roughness, metallic);
+    }
+
+    float LdotN = max(dot(L, N), 0.0);
+    return brdf * LdotN * directLight;
+}
+
+vec3 evaluateSpotLight(SpotLightData light, vec3 V, vec3 N, vec3 baseColor, float roughness, float metallic)
+{
+    vec3 lightColor = light.colorAndIntensity.a * light.colorAndIntensity.rgb;
+
+    mat4 lightProjectionFromView = light.lightProjectionFromWorld * camera.worldFromView;
+    float shadowFactor = evaluateShadow(uSpotLightShadowMap, lightProjectionFromView, vPosition);
+
+    vec3 pointToLight = light.viewSpacePosition.xyz - vPosition;
+    float distToLight = length(pointToLight);
+    vec3 L = pointToLight / distToLight;
+
+    float distanceAttenuation = 1.0 / (distToLight * distToLight + 1e-4f);
+    vec3 directLight = lightColor * shadowFactor * distanceAttenuation;
+    if (dot(L, -light.viewSpaceDirection.xyz) < cos(0.5 * light.coneAngle)) {
+        directLight = vec3(0.0);
+    }
 
     vec3 brdf;
     if (forceDiffuse) {
@@ -107,6 +141,7 @@ void main()
 
     // TODO: Evaluate ALL lights that will have an effect on this pixel/tile/cluster or whatever we go with
     color += evaluateDirectionalLight(dirLight, V, N, writeColor ? baseColor : vec3(1.0), roughness, metallic);
+    color += evaluateSpotLight(spotLight, V, N, writeColor ? baseColor : vec3(1.0), roughness, metallic);
 
     oColor = vec4(color, 1.0);
     oNormal = vec4(N, 0.0);

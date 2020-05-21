@@ -8,4 +8,14 @@ struct DirectionalLight {
     mat4 lightProjectionFromWorld;
 };
 
+struct SpotLightData {
+    vec4 colorAndIntensity;
+    vec4 worldSpacePosition;
+    vec4 worldSpaceDirection;
+    vec4 viewSpacePosition;
+    vec4 viewSpaceDirection;
+    mat4 lightProjectionFromWorld;
+    float coneAngle;
+};
+
 #endif // LIGHT_DATA_H
