@@ -30,7 +30,7 @@ bool raySphereIntersection(vec3 center, float radius, vec3 origin, vec3 directio
 	return false;
 }
 
-#define PLANE_DOUBLE_SIDED 1
+#define PLANE_DOUBLE_SIDED 0
 bool rayPlaneIntersection(vec3 N, float d, vec3 origin, vec3 direction, out float t)
 {
 	float denom = dot(N, direction);
