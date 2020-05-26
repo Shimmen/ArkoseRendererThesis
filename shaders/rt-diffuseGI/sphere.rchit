@@ -24,7 +24,7 @@ layout(binding = 8, set = 0) uniform DirLightBlock { DirectionalLight dirLight; 
 layout(binding = 9, set = 0) uniform SpotLightBlock { SpotLightData spotLight; };
 
 layout(set = 1, binding = 5) buffer readonly SphereSH { SphericalHarmonics SHs[]; } setSHs[];
-
+/*
 bool hitPointInShadow(vec3 L)
 {
 	vec3 hitPoint = gl_WorldRayOriginNV + gl_HitTNV * gl_WorldRayDirectionNV;
@@ -45,7 +45,7 @@ bool hitPointInShadow(vec3 L)
 
 	return inShadow;
 }
-
+*/
 void main()
 {
 	vec3 N = normalize(hit.normal);
@@ -56,7 +56,7 @@ void main()
 	//vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 	vec3 hitPoint = gl_WorldRayOriginNV + gl_HitTNV * gl_WorldRayDirectionNV;
 	vec3 L = normalize(spotLight.worldSpacePosition.xyz - hitPoint);
-	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
+	float shadowFactor = 1.0;//hitPointInShadow(L) ? 0.0 : 1.0;
 
 	//hitValue = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);
 	hitValue = evaluateSpotLight(spotLight, hitPoint, baseColor, N, shadowFactor);

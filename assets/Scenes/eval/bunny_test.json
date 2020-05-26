@@ -6,7 +6,7 @@
   "models": [
     {
       "name": "cornell-box",
-      "gltf": "X:\\Models\\StanfordBunny\\prim-eval\\room.gltf",
+      "gltf": "C:\\Users\\simon.moos\\Documents\\Models\\prim-eval\\room.gltf",
       "transform": {
         "translation": [ 0, -0.49, 0 ],
         "rotation": {
@@ -19,8 +19,8 @@
     },
     {
       "name": "bunny",
-      "gltf": "X:\\Models\\StanfordBunny\\prim-eval\\bunny_144056_tris.gltf",
-      "proxy": "X:\\Models\\StanfordBunny\\prim-eval\\bunny_200_spheres.json",
+      "gltf": "C:\\Users\\simon.moos\\Documents\\Models\\prim-eval\\bunny_144056_tris.gltf",
+      "proxy": "C:\\Users\\simon.moos\\Documents\\Models\\prim-eval\\bunny_200_spheres.json",
       "transform": {
         "translation": [ 0, 0, 0 ],
         "rotation": {

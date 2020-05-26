@@ -18,7 +18,7 @@ public:
     void constructNode(Registry&) override;
     ExecuteCallback constructFrame(Registry&) const override;
 
-    static constexpr int maxSamplesPerPixel = 1024;
+    static constexpr int maxSamplesPerPixel = 1000 * 1024;
 
 private:
     const Scene& m_scene;

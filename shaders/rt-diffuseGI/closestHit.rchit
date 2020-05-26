@@ -35,7 +35,7 @@ void unpack(out RTMesh mesh, out RTVertex v0, out RTVertex v1, out RTVertex v2)
 	v1 = vertices[objId].x[idx.y];
 	v2 = vertices[objId].x[idx.z];
 }
-
+/*
 bool hitPointInShadow(vec3 L)
 {
 	vec3 hitPoint = gl_WorldRayOriginNV + gl_HitTNV * gl_WorldRayDirectionNV;
@@ -56,7 +56,7 @@ bool hitPointInShadow(vec3 L)
 
 	return inShadow;
 }
-
+*/
 void main()
 {
 	RTMesh mesh;
@@ -73,7 +73,7 @@ void main()
 	//vec3 L = -normalize(dirLight.worldSpaceDirection.xyz);
 	vec3 hitPoint = gl_WorldRayOriginNV + gl_HitTNV * gl_WorldRayDirectionNV;
 	vec3 L = normalize(spotLight.worldSpacePosition.xyz - hitPoint);
-	float shadowFactor = hitPointInShadow(L) ? 0.0 : 1.0;
+	float shadowFactor = 1.0;//hitPointInShadow(L) ? 0.0 : 1.0;
 
 	vec3 baseColor = texture(baseColorSamplers[mesh.baseColor], uv).rgb;
 	//hitValue = evaluateDirectionalLight(dirLight, baseColor, L, N, shadowFactor);

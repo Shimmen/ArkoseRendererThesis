@@ -59,7 +59,7 @@ FinalPostFxNode::ExecuteCallback FinalPostFxNode::constructFrame(Registry& reg) 
         ImGui::Checkbox("Use ray traced first-hit", &useRtFirstHit);
         static bool includeDiffuseGI = true;
         ImGui::Checkbox("Include diffuse GI", &includeDiffuseGI);
-        static float exposure = 0.45f;
+        static float exposure = 1.25f;
         ImGui::SliderFloat("Exposure", &exposure, 0.01f, 10.0f, "%.3f", 3.0f);
 
         cmdList.setRenderState(renderState, ClearColor(0.5f, 0.1f, 0.5f), 1.0f);

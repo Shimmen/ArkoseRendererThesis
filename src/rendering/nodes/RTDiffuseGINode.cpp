@@ -186,7 +186,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
                                               ShaderFile("rt-diffuseGI/shadow.rmiss") };
         ShaderBindingTable sbt { raygen, { mainHitGroup, sphereSetHitGroup, contourHitGroup }, missShaders };
 
-        uint32_t maxRecursionDepth = 2;
+        uint32_t maxRecursionDepth = 1;
         RayTracingState& rtState = reg.createRayTracingState(sbt, { &frameBindingSet, m_objectDataBindingSet }, maxRecursionDepth);
 
         return { frameBindingSet, rtState };
@@ -206,7 +206,7 @@ RenderGraphNode::ExecuteCallback RTDiffuseGINode::constructFrame(Registry& reg) 
     ComputeState& compAvgAccumState = reg.createComputeState(Shader::createCompute("averageAccum.comp"), { &avgAccumBindingSet });
 
     return [&](const AppState& appState, CommandList& cmdList) {
-        constexpr int samplesPerPass = 1; // (I don't wanna pass in a uniform for optimization reasons, so keep this up to date!)
+        constexpr int samplesPerPass = 16; // (I don't wanna pass in a uniform for optimization reasons, so keep this up to date!)
         int currentSamplesPerPixel = samplesPerPass * m_numAccumulatedFrames;
 
         if (currentSamplesPerPixel < maxSamplesPerPixel) {
